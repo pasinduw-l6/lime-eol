@@ -921,11 +921,23 @@ Estimates assume one developer; adjust as needed.
 - [x] ✅ Done when: `docker compose ... up` shows db healthy, API health returns OK, worker logs ready
 
 ### Phase 2 – Database (2 days)
-- [ ] Prisma init, schema from 7.1, first migration
-- [ ] Status view migration (7.2)
-- [ ] PrismaService / PrismaModule
-- [ ] Seed script (7.4)
-- [ ] ✅ Done when: migration + seed run in Docker, data visible in pgAdmin/Prisma Studio
+- [x] Prisma schema, first migration `20260917070747_init` — 19 tables
+- [x] Views: `v_cycle_status` and `v_deployment_effective_component` (see 7.2)
+- [x] `upgrade_action_completed_date_check` constraint; one primary owner per deployment
+- [x] PrismaService / PrismaModule (done in Phase 1)
+- [x] Seed script (7.4) — 9 technologies, 13 cycles, 15 versions, 2 customers, 4 deployments
+- [x] `prisma.config.ts` replaces the deprecated `package.json#prisma` key
+- [x] ✅ Done when: migration + seed run in Docker, both views return correct results
+
+**The schema differs from section 7.1** in four agreed ways — see
+[`docs/db-design-notes.md`](docs/db-design-notes.md) for the research and
+[section 14](#14-risks--decisions-log) for the decisions:
+
+1. Lifecycle data moved from `TechnologyVersion` to a new `TechnologyCycle`.
+2. `DeploymentOwner` join table replaces `Deployment.teamId` (one **or many** owners).
+3. Reference data is archived (`archivedAt`), not deleted; only join tables cascade.
+4. `uuid(7)` keys, `@db.Timestamptz(3)` instants, numeric `major`/`minor`/`patch`,
+   `TechnologyCycleHistory`, and a notification key that includes the date.
 
 ### Phase 3 – Auth, RBAC, audit (3 days)
 - [ ] Dev JWT strategy + `/auth/dev-login` (blocked in production)
@@ -1038,6 +1050,12 @@ null — `eolField=eoes` therefore falls back to `eolFrom`. No API key is requir
 | 2026-09-17 | Lifecycle rules are needed by five modules | `src/lifecycle/` holds them as pure functions with no HTTP or DB dependency, so they are unit-testable and never duplicated |
 | 2026-09-17 | External systems must be swappable and fakeable in tests | `eol-sync/` and `notifications/` define `ports/` interfaces with DI tokens; implementations live in `adapters/` and `senders/`. Adding a source or channel means adding a file, not editing a service |
 | 2026-09-17 | Stringly-typed `config.get('API_PORT')` scattered through the code | Typed namespaces in `config/namespaces/` (app, auth, eol, notification) built from the validated env |
+| 2026-09-17 | EOL dates are published per **cycle**, but 7.1 stored them per version — the same date duplicated on every build of a cycle, able to diverge | Split `TechnologyCycle` out of `TechnologyVersion`. One upstream fact, one row, one place to override |
+| 2026-09-17 | Requirement says responsible team "one or many"; 7.1 allowed one, so a second owning team would never be notified | `DeploymentOwner` join table with `is_primary` |
+| 2026-09-17 | Cascading deletes would destroy the upgrade history the tool exists to keep | Archive (`archived_at`) reference data, `RESTRICT` where referenced; cascade only on join tables |
+| 2026-09-17 | The "effective components" rule was needed by five modules | Defined once in the `v_deployment_effective_component` view using `DISTINCT ON` |
+| 2026-09-17 | 180-day threshold was hardcoded in the view *and* in `STATUS_APPROACHING_DAYS` | `v_cycle_status` exposes facts (`days_to_eol`, `is_eol`); the band is applied in `src/lifecycle/` from config |
+| 2026-09-17 | Docker Engine changed its cycle naming (`26.1`, then `27`, `28`) | `cycleRule` is a hint, not a guarantee; the Phase 7 sync must match against the published release list. See `docs/findings.md` |
 | | | |
 
 ---
@@ -1048,7 +1066,7 @@ null — `eolField=eoes` therefore falls back to `eolFrom`. No API key is requir
 |---|---|---|---|---|
 | 0 Environment | ✅ Done | 2026-09-17 | 2026-09-17 | Host Node is v10; builds happen in Docker |
 | 1 Skeleton + Docker | ✅ Done | 2026-09-17 | 2026-09-17 | API, worker and db run; health OK; Swagger live; Postman collection added |
-| 2 Database | ⬜ | | | |
+| 2 Database | ✅ Done | 2026-09-17 | 2026-09-17 | 19 tables, 2 views, seeded; schema revised after design R&D (see docs/db-design-notes.md) |
 | 3 Auth, RBAC, audit | ⬜ | | | |
 | 4 Registry APIs | ⬜ | | | |
 | 5 Customers & mapping | ⬜ | | | |
@@ -1070,6 +1088,31 @@ Legend: ⬜ Not started · 🟨 In progress · ✅ Done · ⛔ Blocked
 ## 16. Work Log
 
 Add a short entry every session (newest on top).
+
+### 2026-09-17 (session 3) — Phase 2, database
+- **Done:** Research first (`docs/db-design-notes.md`), then all twelve recommendations were
+  accepted and built. Migration `20260917070747_init`: 19 tables, 2 views
+  (`v_cycle_status`, `v_deployment_effective_component`), a check constraint tying
+  `COMPLETED` to `completed_date`, and a partial unique index allowing one primary owner per
+  deployment. Seed split into `prisma/seed/` with real lifecycle dates verified against the API.
+  `src/lifecycle/version.util.ts` (parse, derive cycle, compare) with 18 tests.
+  `prisma.config.ts` replaces the deprecated `package.json#prisma` key.
+- **Verified:** `v_cycle_status` returns 13 cycles ordered by urgency — Kafka 3.8 at -680 days,
+  MongoDB 8.2 at -48, OpenSSL 3.6 at +45, up to RHEL 9 at +2083.
+  `v_deployment_effective_component` resolves the override correctly: Northwind Production shows
+  MongoDB 8.3.11 (`OVERRIDE`) while the other three show 8.2.12 (`LIME_DEFAULT`) — one row per
+  technology per deployment, which is the rule. 46 unit tests pass; health still 200.
+- **Problems:**
+  - The seed's own consistency check caught Docker Engine deriving cycle `28.5` while upstream
+    publishes `28` — a product can change its cycle naming scheme. Recorded in `docs/findings.md`;
+    the Phase 7 sync must match against the published release list, not trust derivation.
+  - A failed seed run left an orphan cycle row behind (created before the check threw); removed by
+    hand. The seed is idempotent, but it is not transactional — worth wrapping in
+    `prisma.$transaction` if it grows.
+  - Partial unique indexes for soft-deleted names were dropped from the plan: Prisma would delete
+    them on the next generated migration. Plain `@unique` instead; un-archive rather than recreate.
+- **Next:** Phase 3 (auth, RBAC, audit) or Phase 7's sync service — the client, mapper and the
+  tables it writes to all exist now.
 
 ### 2026-09-17 (session 2) — endoflife.date connected
 - **Done:** Fetched the live v1 API and built the adapter against its real shape (fixtures saved from

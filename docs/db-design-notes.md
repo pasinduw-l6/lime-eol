@@ -301,3 +301,31 @@ latest supported release?", both need numeric comparison.
 
 Items 1, 7 and 8 change the shape of the schema and should be settled before any
 migration is written. The rest can be applied as the schema is built.
+
+---
+
+## Outcome — all twelve accepted, 2026-09-17
+
+Built in migration `20260917070747_init`: 19 tables, 2 views, 1 check
+constraint. Two notes on how the recommendations were actually implemented:
+
+**Soft delete and unique names.** Item 8 proposed partial unique indexes so a
+name is unique only among live rows. That was *not* done, because Prisma
+generates migrations by diffing `schema.prisma` against a shadow database, so an
+index added by hand-written SQL gets dropped by the next generated migration.
+Plain `@unique` is used instead: an archived name stays reserved, and reusing it
+means un-archiving the row rather than creating a duplicate — which is the
+better workflow anyway, since two technologies called "MongoDB" is precisely
+what should not happen.
+
+**Views are created by hand-written SQL** inside the migration, and read through
+typed `$queryRaw` in a repository rather than the `views` preview feature. Same
+single-implementation guarantee, no dependency on a preview feature, and the
+views stay queryable from psql and pgAdmin for ad-hoc reporting. Review the SQL
+that `prisma migrate dev` generates before applying it, in case it proposes
+dropping them.
+
+**One rule the database enforces rather than the service layer:**
+`upgrade_action_completed_date_check` makes a completed action require a
+completion date, and a non-completed action forbid one. No code path can write a
+half-finished record.
