@@ -5,6 +5,14 @@ technologies used in the Lime Platform: what we run, which versions, where they
 are deployed, when they go end-of-life, and who is upgrading them.
 
 Full specification and phase plan: [PLAN.md](PLAN.md).
+All documentation: [docs/](docs/) — start at [docs/README.md](docs/README.md).
+
+| Document | Answers |
+|---|---|
+| [docs/api-reference.md](docs/api-reference.md) | What endpoints exist, what they take and return |
+| [docs/folder-structure.md](docs/folder-structure.md) | What each folder is for, and where a new file belongs |
+| [docs/postman/](docs/postman/) | How to call the API by hand or run the whole suite |
+| [docs/findings.md](docs/findings.md) | What we learned about the external systems |
 
 ## Stack
 

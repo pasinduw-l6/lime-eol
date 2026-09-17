@@ -61,9 +61,12 @@ A web tool that is the single source of truth for the lifecycle of the open-sour
 ## 4. Repository Structure
 
 Created 2026-09-17. Feature modules live under `src/modules/`; shared domain
-rules, cross-cutting mechanics and infrastructure sit beside it. See
-`backend/src/modules/README.md` for the per-module responsibility table and the
-standard file anatomy.
+rules, cross-cutting mechanics and infrastructure sit beside it.
+
+**Full documentation:** [`docs/folder-structure.md`](docs/folder-structure.md)
+describes every folder, what belongs in it and where a new file goes;
+[`backend/src/modules/README.md`](backend/src/modules/README.md) holds the
+per-module responsibility table and the standard file anatomy.
 
 ```
 lime-eol-registry/
