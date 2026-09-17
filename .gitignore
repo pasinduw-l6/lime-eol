@@ -1,0 +1,39 @@
+# ---- Node ----
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Build output ----
+dist/
+build/
+*.tsbuildinfo
+
+# ---- Environment ----
+.env
+.env.*
+!.env.example
+
+# ---- Tests / coverage ----
+coverage/
+.nyc_output/
+
+# ---- Prisma ----
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# ---- Editors / OS ----
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---- Docker / local data ----
+pgdata/
+docker-compose.override.yml
+
+# ---- Logs ----
+logs/
+*.log
