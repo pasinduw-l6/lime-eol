@@ -1,0 +1,28 @@
+import { Injectable } from '@nestjs/common';
+import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
+import { PrismaService } from '../prisma/prisma.service';
+
+/**
+ * Single responsibility: report whether the database answers a trivial query.
+ */
+@Injectable()
+export class PrismaHealthIndicator {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly healthIndicatorService: HealthIndicatorService,
+  ) {}
+
+  async isHealthy(key: string): Promise<HealthIndicatorResult> {
+    const indicator = this.healthIndicatorService.check(key);
+
+    try {
+      const startedAt = Date.now();
+      await this.prisma.$queryRaw`SELECT 1`;
+      return indicator.up({ responseTimeMs: Date.now() - startedAt });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown database error';
+      return indicator.down({ message });
+    }
+  }
+}

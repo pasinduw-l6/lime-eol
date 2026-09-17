@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "Lime EOL Registry API",
+    "description": "Manual test collection for the Lime Technology Lifecycle & EOL Registry API.\n\nUsage:\n1. Import this collection and `lime-eol.local.postman_environment.json`.\n2. Select the **Lime EOL - Local** environment.\n3. Start the stack: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`.\n4. Run **System / Health** first — it must return status \"ok\".\n\nRequests are grouped by the delivery phase that implements them. Folders marked *(Phase n)* return 404 until that phase is done.\n\nAuthentication: run **Auth / Dev login**; its test script stores the JWT in the `token` environment variable and every other request inherits it as a bearer token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "description": "Public endpoints — no token required.",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Application + database health. Returns 200 with status \"ok\", or 503 with status \"error\" when the database is unreachable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Overall status is ok', function () {",
+                  "    pm.expect(pm.response.json().status).to.eql('ok');",
+                  "});",
+                  "",
+                  "pm.test('Database is up', function () {",
+                  "    pm.expect(pm.response.json().info.database.status).to.eql('up');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Swagger JSON",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3000/api/docs-json",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "3000",
+              "path": ["api", "docs-json"]
+            },
+            "description": "The generated OpenAPI document. Useful to re-import the API into Postman as endpoints are added."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Is an OpenAPI document', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('openapi');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth (Phase 3)",
+      "description": "Not implemented yet — these return 404 until Phase 3 lands.",
+      "item": [
+        {
+          "name": "Dev login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@linearsix.com\",\n    \"role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/dev-login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "dev-login"]
+            },
+            "description": "Local-only login. Returns a JWT signed with DEV_JWT_SECRET. Blocked when NODE_ENV=production."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "    const token = pm.response.json().accessToken;",
+                  "    pm.environment.set('token', token);",
+                  "    pm.test('Token stored in environment', function () {",
+                  "        pm.expect(token).to.be.a('string').and.not.empty;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Current user, role and teams. Requires a bearer token."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

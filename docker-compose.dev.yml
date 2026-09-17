@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      target: dev
+    command: sh -c "npx prisma migrate dev && npm run start:dev"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+  worker:
+    build:
+      target: dev
+    command: npm run start:worker:dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
