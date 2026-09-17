@@ -126,4 +126,76 @@ describe('EndOfLifeDateClient', () => {
 
     await expect(client.getRelease('nodejs', '99')).resolves.toBeNull();
   });
+
+  it('asks for the latest cycle by its own path segment', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        schema_version: '1.2.1',
+        generated_at: '2026-09-17T00:09:09+00:00',
+        result: nodejsFixture.result.releases[0],
+      }),
+    );
+
+    const latest = await client.getLatestRelease('nodejs');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://endoflife.date/api/v1/products/nodejs/releases/latest/',
+      expect.anything(),
+    );
+    expect(latest?.cycle).toBe('26');
+  });
+
+  it('lists categories by name', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        schema_version: '1.2.1',
+        generated_at: '2026-09-17T00:09:09+00:00',
+        total: 2,
+        result: [{ name: 'database' }, { name: 'framework' }],
+      }),
+    );
+
+    await expect(client.listCategories()).resolves.toEqual([
+      'database',
+      'framework',
+    ]);
+  });
+
+  it('narrows products at the source when a category is given', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        schema_version: '1.2.1',
+        generated_at: '2026-09-17T00:09:09+00:00',
+        total: 1,
+        result: [
+          {
+            name: 'mongodb',
+            label: 'MongoDB Server',
+            category: 'database',
+            aliases: ['mongo'],
+            tags: ['database'],
+          },
+        ],
+      }),
+    );
+
+    const products = await client.listProductsByCategory('database');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://endoflife.date/api/v1/categories/database/',
+      expect.anything(),
+    );
+    expect(products[0].slug).toBe('mongodb');
+  });
+
+  it('escapes path segments so a slug cannot alter the URL', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}, 404));
+
+    await client.getRelease('nodejs', '../../tags');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://endoflife.date/api/v1/products/nodejs/releases/..%2F..%2Ftags/',
+      expect.anything(),
+    );
+  });
 });

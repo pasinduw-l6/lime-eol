@@ -12,6 +12,8 @@ import {
   RawProduct,
   RawProductSummary,
   RawRelease,
+  namedResourceListResponseSchema,
+  productFullListResponseSchema,
   productListResponseSchema,
   productResponseSchema,
   releaseResponseSchema,
@@ -62,6 +64,15 @@ export class EndOfLifeDateClient implements EolDataSource {
     return body.result.map((product) => this.toSummary(product));
   }
 
+  async listProductsFull(): Promise<EolProduct[]> {
+    const body = await this.request(
+      'products/full/',
+      productFullListResponseSchema,
+    );
+
+    return body.result.map((product) => this.toProduct(product));
+  }
+
   async getProduct(slug: string): Promise<EolProduct> {
     const body = await this.request(
       `products/${encodeURIComponent(slug)}/`,
@@ -72,16 +83,63 @@ export class EndOfLifeDateClient implements EolDataSource {
     return this.toProduct(body.result);
   }
 
-  async getRelease(slug: string, cycle: string): Promise<EolRelease | null> {
+  async listCategories(): Promise<string[]> {
+    const body = await this.request(
+      'categories/',
+      namedResourceListResponseSchema,
+    );
+
+    return body.result.map((category) => category.name);
+  }
+
+  async listProductsByCategory(category: string): Promise<EolProductSummary[]> {
+    const body = await this.request(
+      `categories/${encodeURIComponent(category)}/`,
+      productListResponseSchema,
+      category,
+    );
+
+    return body.result.map((product) => this.toSummary(product));
+  }
+
+  async listTags(): Promise<string[]> {
+    const body = await this.request('tags/', namedResourceListResponseSchema);
+
+    return body.result.map((tag) => tag.name);
+  }
+
+  async listProductsByTag(tag: string): Promise<EolProductSummary[]> {
+    const body = await this.request(
+      `tags/${encodeURIComponent(tag)}/`,
+      productListResponseSchema,
+      tag,
+    );
+
+    return body.result.map((product) => this.toSummary(product));
+  }
+
+  getRelease(slug: string, cycle: string): Promise<EolRelease | null> {
+    return this.fetchRelease(slug, encodeURIComponent(cycle));
+  }
+
+  getLatestRelease(slug: string): Promise<EolRelease | null> {
+    return this.fetchRelease(slug, 'latest');
+  }
+
+  private async fetchRelease(
+    slug: string,
+    cycleSegment: string,
+  ): Promise<EolRelease | null> {
     try {
       const body = await this.request(
-        `products/${encodeURIComponent(slug)}/releases/${encodeURIComponent(cycle)}/`,
+        `products/${encodeURIComponent(slug)}/releases/${cycleSegment}/`,
         releaseResponseSchema,
         slug,
       );
 
       return this.toRelease(body.result);
     } catch (error) {
+      // A 404 here means "no such cycle", which is an answer, not a failure.
       if (error instanceof EolProductNotFoundError) {
         return null;
       }

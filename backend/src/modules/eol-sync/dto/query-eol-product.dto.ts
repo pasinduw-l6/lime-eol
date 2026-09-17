@@ -25,8 +25,19 @@ export class QueryEolProductListDto {
   @IsString()
   q?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by category', example: 'database' })
+  @ApiPropertyOptional({
+    description: 'Filter by category (see GET /eol/categories)',
+    example: 'database',
+  })
   @IsOptional()
   @IsString()
   category?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by tag (see GET /eol/tags). Ignored when category is set.',
+    example: 'javascript-runtime',
+  })
+  @IsOptional()
+  @IsString()
+  tag?: string;
 }

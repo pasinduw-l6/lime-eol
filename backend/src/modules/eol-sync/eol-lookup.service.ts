@@ -3,6 +3,7 @@ import {
   EolDataSource,
   EolField,
   EolProductSummary,
+  EolRelease,
   EOL_DATA_SOURCE,
 } from './ports/eol-data-source.port';
 import { EolProductNotFoundError } from './adapters/endoflife-date.client';
@@ -29,16 +30,48 @@ export class EolLookupService {
   async listProducts(filters: {
     q?: string;
     category?: string;
+    tag?: string;
   }): Promise<EolProductSummaryDto[]> {
-    const products = await this.dataSource.listProducts();
+    // Let the source narrow by category or tag — far cheaper than pulling all
+    // 475 products and filtering here.
+    const products = filters.category
+      ? await this.dataSource.listProductsByCategory(filters.category)
+      : filters.tag
+        ? await this.dataSource.listProductsByTag(filters.tag)
+        : await this.dataSource.listProducts();
+
     const needle = filters.q?.trim().toLowerCase();
 
     return products
-      .filter((product) =>
-        filters.category ? product.category === filters.category : true,
-      )
       .filter((product) => (needle ? matches(product, needle) : true))
       .map((product) => ({ ...product }));
+  }
+
+  listCategories(): Promise<string[]> {
+    return this.dataSource.listCategories();
+  }
+
+  listTags(): Promise<string[]> {
+    return this.dataSource.listTags();
+  }
+
+  async getRelease(
+    slug: string,
+    cycle: string,
+    eolField: EolField = 'eol',
+  ): Promise<EolReleaseDto> {
+    const release =
+      cycle === 'latest'
+        ? await this.dataSource.getLatestRelease(slug)
+        : await this.dataSource.getRelease(slug, cycle);
+
+    if (!release) {
+      throw new NotFoundException(
+        `Product "${slug}" has no release cycle "${cycle}"`,
+      );
+    }
+
+    return this.toReleaseDto(release, eolField);
   }
 
   async getProduct(slug: string, eolField: EolField = 'eol'): Promise<EolProductDto> {
@@ -54,21 +87,9 @@ export class EolLookupService {
         htmlUrl: product.htmlUrl,
         releasePolicyUrl: product.releasePolicyUrl,
         phaseLabels: product.phaseLabels,
-        releases: product.releases.map((release) => {
-          const mapped = mapReleaseToVersionLifecycle(release, eolField);
-
-          return {
-            cycle: mapped.cycle,
-            label: release.label,
-            releaseDate: toIsoDate(mapped.releaseDate),
-            isLts: mapped.isLts,
-            activeSupportEnd: toIsoDate(mapped.activeSupportEnd),
-            eolDate: toIsoDate(mapped.eolDate),
-            latestSupported: mapped.latestSupported,
-            isMaintained: release.isMaintained,
-            daysToEol: daysUntil(mapped.eolDate),
-          } satisfies EolReleaseDto;
-        }),
+        releases: product.releases.map((release) =>
+          this.toReleaseDto(release, eolField),
+        ),
       };
     } catch (error) {
       if (error instanceof EolProductNotFoundError) {
@@ -82,6 +103,25 @@ export class EolLookupService {
       );
       throw error;
     }
+  }
+
+  private toReleaseDto(
+    release: EolRelease,
+    eolField: EolField,
+  ): EolReleaseDto {
+    const mapped = mapReleaseToVersionLifecycle(release, eolField);
+
+    return {
+      cycle: mapped.cycle,
+      label: release.label,
+      releaseDate: toIsoDate(mapped.releaseDate),
+      isLts: mapped.isLts,
+      activeSupportEnd: toIsoDate(mapped.activeSupportEnd),
+      eolDate: toIsoDate(mapped.eolDate),
+      latestSupported: mapped.latestSupported,
+      isMaintained: release.isMaintained,
+      daysToEol: daysUntil(mapped.eolDate),
+    };
   }
 }
 

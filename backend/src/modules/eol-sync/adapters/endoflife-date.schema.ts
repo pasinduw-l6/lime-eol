@@ -70,11 +70,23 @@ export function envelopeSchema<T extends z.ZodTypeAny>(result: T) {
   });
 }
 
+/** Categories, tags and identifiers are all listed as { name, uri }. */
+export const namedResourceSchema = z.object({
+  name: z.string(),
+  uri: z.string().optional(),
+});
+
 export const productResponseSchema = envelopeSchema(productSchema);
 export const productListResponseSchema = envelopeSchema(
   z.array(productSummarySchema),
 );
+export const productFullListResponseSchema = envelopeSchema(
+  z.array(productSchema),
+);
 export const releaseResponseSchema = envelopeSchema(releaseSchema);
+export const namedResourceListResponseSchema = envelopeSchema(
+  z.array(namedResourceSchema),
+);
 
 export type RawRelease = z.infer<typeof releaseSchema>;
 export type RawProduct = z.infer<typeof productSchema>;

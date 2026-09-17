@@ -52,12 +52,36 @@ export interface EolProduct extends EolProductSummary {
 }
 
 export interface EolDataSource {
-  /** Every product the source knows about. */
+  /** Every product the source knows about, without release detail. */
   listProducts(): Promise<EolProductSummary[]>;
+
+  /**
+   * Every product *with* its releases, in a single request.
+   *
+   * Preferred by the nightly sync: one call instead of one per technology,
+   * which removes the per-product pacing delay entirely. The payload is large
+   * (~2.8 MB), so this is for background work, not for serving a UI request.
+   */
+  listProductsFull(): Promise<EolProduct[]>;
 
   /** One product with all of its release cycles. */
   getProduct(slug: string): Promise<EolProduct>;
 
   /** A single cycle, or null when the product has no such cycle. */
   getRelease(slug: string, cycle: string): Promise<EolRelease | null>;
+
+  /** The most recent cycle of a product, used to suggest an upgrade target. */
+  getLatestRelease(slug: string): Promise<EolRelease | null>;
+
+  /** Category names, e.g. database, framework, os. */
+  listCategories(): Promise<string[]>;
+
+  /** Products in one category — cheaper than filtering the full list. */
+  listProductsByCategory(category: string): Promise<EolProductSummary[]>;
+
+  /** Tag names, e.g. javascript-runtime, apache. */
+  listTags(): Promise<string[]>;
+
+  /** Products carrying one tag. */
+  listProductsByTag(tag: string): Promise<EolProductSummary[]>;
 }

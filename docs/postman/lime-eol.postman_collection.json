@@ -26,6 +26,11 @@
       "key": "baseUrl",
       "value": "http://localhost:3000/api/v1",
       "type": "string"
+    },
+    {
+      "key": "docsUrl",
+      "value": "http://localhost:3000/api/docs-json",
+      "type": "string"
     }
   ],
   "item": [
@@ -76,11 +81,8 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:3000/api/docs-json",
-              "protocol": "http",
-              "host": ["localhost"],
-              "port": "3000",
-              "path": ["api", "docs-json"]
+              "raw": "{{docsUrl}}",
+              "host": ["{{docsUrl}}"]
             },
             "description": "The generated OpenAPI document. Useful to re-import the API into Postman as endpoints are added."
           },
@@ -148,6 +150,194 @@
                   "    const body = pm.response.json();",
                   "    pm.expect(body).to.be.an('array').that.is.not.empty;",
                   "    pm.expect(body[0]).to.have.property('slug');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "List products in a category",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products?category=database",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products"],
+              "query": [{ "key": "category", "value": "database" }]
+            },
+            "description": "Narrowed at the source (GET /categories/{category}) rather than by filtering all 475 products."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Every product is in the category', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an('array').that.is.not.empty;",
+                  "    body.forEach(function (p) {",
+                  "        pm.expect(p.category).to.eql('database');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Categories",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "categories"]
+            },
+            "description": "The nine categories products are grouped into."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Includes database', function () {",
+                  "    pm.expect(pm.response.json()).to.include('database');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Tags",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/tags",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "tags"]
+            },
+            "description": "88 tags, e.g. javascript-runtime, apache, managed-kubernetes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Latest cycle - Node.js",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products/nodejs/releases/latest",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products", "nodejs", "releases", "latest"]
+            },
+            "description": "The newest cycle — the upgrade target to suggest when planning an action."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns a single cycle', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('cycle');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Single cycle - MongoDB 6.0 (already EOL)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products/mongodb/releases/6.0",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products", "mongodb", "releases", "6.0"]
+            },
+            "description": "How a registered version is checked against the source. MongoDB 6.0 went EOL on 2025-07-31, so daysToEol is negative."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Past EOL shows a negative daysToEol', function () {",
+                  "    pm.expect(pm.response.json().daysToEol).to.be.below(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Unknown cycle returns 404",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products/nodejs/releases/99",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products", "nodejs", "releases", "99"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
                   "});"
                 ]
               }

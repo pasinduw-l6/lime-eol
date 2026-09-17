@@ -958,15 +958,22 @@ Estimates assume one developer; adjust as needed.
 - [ ] Cron job in worker, `/sync/run`, `/sync/logs`, `/technologies/:id/cycles`
 - [ ] ✅ Done when: real sync updates seeded versions and logs results
 
-**API facts confirmed 2026-09-17** (`schema_version` 1.2.1):
+**API coverage** (`schema_version` 1.2.1, confirmed 2026-09-17). Upstream has 12 endpoints;
+10 are mapped in `EndOfLifeDateClient`:
 
-| Endpoint | Returns |
-|---|---|
-| `GET /api/v1/` | Index of the three collections |
-| `GET /api/v1/products/` | All 475 products (`name`, `aliases`, `label`, `category`, `tags`, `uri`) |
-| `GET /api/v1/products/{slug}/` | Product with `releases[]` |
-| `GET /api/v1/products/{slug}/releases/{cycle}/` | One cycle |
-| `GET /api/v1/categories/` · `/tags/` | 9 categories · 88 tags |
+| Upstream endpoint | Mapped to | Exposed as |
+|---|---|---|
+| `GET /products` | `listProducts()` | `GET /eol/products` |
+| `GET /products/full` | `listProductsFull()` | — internal, for the nightly sync (2.8 MB, one call instead of N) |
+| `GET /products/{p}` | `getProduct()` | `GET /eol/products/:slug` |
+| `GET /products/{p}/releases/{r}` | `getRelease()` | `GET /eol/products/:slug/releases/:cycle` |
+| `GET /products/{p}/releases/latest` | `getLatestRelease()` | `GET /eol/products/:slug/releases/latest` |
+| `GET /categories` | `listCategories()` | `GET /eol/categories` |
+| `GET /categories/{c}` | `listProductsByCategory()` | `GET /eol/products?category=` |
+| `GET /tags` | `listTags()` | `GET /eol/tags` |
+| `GET /tags/{t}` | `listProductsByTag()` | `GET /eol/products?tag=` |
+| `GET /` | — | Not mapped: a discovery index of the three collections, no data we need |
+| `GET /identifiers` · `/identifiers/{type}` | — | Not mapped: purl/CPE/repology identifiers serve SBOM and vulnerability matching, explicitly out of scope (section 1). Add if that scope returns |
 
 Every response is wrapped in `{ schema_version, generated_at, last_modified?, total?, result }`.
 A release carries `name` (the cycle), `label`, `releaseDate`, `isLts`, `ltsFrom`, `isEoas`/`eoasFrom`,
@@ -1074,6 +1081,13 @@ Add a short entry every session (newest on top).
   All nine seed slugs from section 7.4 return 200.
 - **Notes:** v1 field names end in `From` (`eolFrom`, `eoasFrom`); `eoesFrom` is almost always null so
   `eolField=eoes` falls back to `eolFrom`. MongoDB confirms major.minor cycles (8.3 … 1.0).
+- **Also done:** Mapped the rest of the upstream API — `products/full`, `releases/latest`,
+  `categories`, `categories/{c}`, `tags`, `tags/{t}` — taking coverage from 3 to 10 of 12 endpoints
+  (index and `identifiers/*` deliberately skipped, see the table above). Category and tag filters now
+  narrow at the source instead of pulling all 475 products. New endpoints: `/eol/categories`,
+  `/eol/tags`, `/eol/products/:slug/releases/:cycle`, `/eol/products/:slug/releases/latest`.
+  28 unit tests pass. Postman collection covers all of it: **13 requests, 33 assertions, 0 failures**
+  via newman (command in `docs/postman/README.md`).
 - **Next:** Phase 2 – Prisma schema, migration, status view, seed. Then the sync service can write
   these dates into `technology_version`.
 
