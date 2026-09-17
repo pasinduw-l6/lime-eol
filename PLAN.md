@@ -686,6 +686,8 @@ Rule: a deployment uses the components of its Lime version, **plus** any explici
 - Notification rules: 180, 90, 30, 0.
 - Technologies with slugs and cycle rules:
 
+All nine slugs verified against the live API on 2026-09-17 (each returns HTTP 200).
+
 | Name | Slug | Type | Cycle rule |
 |---|---|---|---|
 | MongoDB | `mongodb` | DATABASE | MAJOR_MINOR |
@@ -950,10 +952,27 @@ Estimates assume one developer; adjust as needed.
 - [ ] Tests for inbox rules
 
 ### Phase 7 – EOL sync (3 days)
-- [ ] endoflife.date client (timeout, retries, response validation, fixtures)
-- [ ] Sync service (section 10.2), manual override protection
+- [x] endoflife.date client (timeout, retries, response validation, fixtures) — **done early, 2026-09-17**
+- [x] Read-only lookup endpoints `/eol/products` and `/eol/products/:slug` (no DB needed)
+- [ ] Sync service (section 10.2), manual override protection — needs Phase 2 schema
 - [ ] Cron job in worker, `/sync/run`, `/sync/logs`, `/technologies/:id/cycles`
 - [ ] ✅ Done when: real sync updates seeded versions and logs results
+
+**API facts confirmed 2026-09-17** (`schema_version` 1.2.1):
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/v1/` | Index of the three collections |
+| `GET /api/v1/products/` | All 475 products (`name`, `aliases`, `label`, `category`, `tags`, `uri`) |
+| `GET /api/v1/products/{slug}/` | Product with `releases[]` |
+| `GET /api/v1/products/{slug}/releases/{cycle}/` | One cycle |
+| `GET /api/v1/categories/` · `/tags/` | 9 categories · 88 tags |
+
+Every response is wrapped in `{ schema_version, generated_at, last_modified?, total?, result }`.
+A release carries `name` (the cycle), `label`, `releaseDate`, `isLts`, `ltsFrom`, `isEoas`/`eoasFrom`,
+`isEol`/`eolFrom`, `isEoes`/`eoesFrom`, `isMaintained` and `latest { name, date, link }`.
+Note the v1 field names end in `From` (`eolFrom`, not `eol`), and `isEoes`/`eoesFrom` are usually
+null — `eolField=eoes` therefore falls back to `eolFrom`. No API key is required.
 
 ### Phase 8 – Dashboard, timeline, search (2–3 days)
 - [ ] `/dashboard/summary` with filters
@@ -1041,6 +1060,22 @@ Legend: ⬜ Not started · 🟨 In progress · ✅ Done · ⛔ Blocked
 ## 16. Work Log
 
 Add a short entry every session (newest on top).
+
+### 2026-09-17 (session 2) — endoflife.date connected
+- **Done:** Fetched the live v1 API and built the adapter against its real shape (fixtures saved from
+  the actual responses, not hand-written). `EOL_DATA_SOURCE` port + `EndOfLifeDateClient` adapter with
+  10 s timeout, 3 retries with exponential backoff, retry only on 408/425/429/5xx, no retry on 404,
+  zod validation of every response, and a 1-hour in-memory cache. `EolLookupService` maps releases to
+  the registry's fields and computes `daysToEol`. Live endpoints: `GET /api/v1/eol/products` (with
+  `q` and `category` filters) and `GET /api/v1/eol/products/:slug?eolField=eol|eoas|eoes`.
+  24 unit tests pass. Postman collection gained an "EOL data source" folder.
+- **Verified live:** Node.js cycle 24 → `eolDate 2028-04-30`, `daysToEol 591`, `latestSupported 24.21.0`;
+  with `eolField=eoas` the same cycle → `2026-10-20`, 33 days. Unknown slug → 404. Bad `eolField` → 400.
+  All nine seed slugs from section 7.4 return 200.
+- **Notes:** v1 field names end in `From` (`eolFrom`, `eoasFrom`); `eoesFrom` is almost always null so
+  `eolField=eoes` falls back to `eolFrom`. MongoDB confirms major.minor cycles (8.3 … 1.0).
+- **Next:** Phase 2 – Prisma schema, migration, status view, seed. Then the sync service can write
+  these dates into `technology_version`.
 
 ### 2026-09-17
 - **Done:** Phase 0 and Phase 1. Git repo, `.gitignore`, `README.md`, `.env.example` + `.env`.

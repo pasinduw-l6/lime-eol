@@ -106,6 +106,157 @@
       ]
     },
     {
+      "name": "EOL data source",
+      "description": "Live lookups against endoflife.date. No database needed — these work today and are how you find a product slug and its cycles before registering a technology.",
+      "item": [
+        {
+          "name": "List products",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products?q=&category=",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Filter on slug, label or alias (e.g. mongo)"
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "e.g. database, framework, os, server-app"
+                }
+              ]
+            },
+            "description": "Every product endoflife.date tracks (~475). Cached for an hour."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns products with a slug', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(body[0]).to.have.property('slug');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Product cycles - Node.js",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products/nodejs",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products", "nodejs"]
+            },
+            "description": "Release cycles with lifecycle dates already mapped to the registry's fields, plus daysToEol."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Cycles carry lifecycle dates', function () {",
+                  "    const release = pm.response.json().releases[0];",
+                  "    pm.expect(release).to.have.property('cycle');",
+                  "    pm.expect(release).to.have.property('eolDate');",
+                  "    pm.expect(release).to.have.property('daysToEol');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Product cycles - MongoDB (major.minor)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products/mongodb",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products", "mongodb"]
+            },
+            "description": "MongoDB publishes major.minor cycles (8.0, 7.0, 6.0), which is why its cycleRule is MAJOR_MINOR."
+          },
+          "response": []
+        },
+        {
+          "name": "Product cycles - active support as EOL",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products/nodejs?eolField=eoas",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products", "nodejs"],
+              "query": [
+                {
+                  "key": "eolField",
+                  "value": "eoas",
+                  "description": "eol (security support) | eoas (active support) | eoes (extended support)"
+                }
+              ]
+            },
+            "description": "For a team that will not run security-only builds, active support end is the deadline that matters. Compare cycle 24's eolDate with the default request."
+          },
+          "response": []
+        },
+        {
+          "name": "Unknown product returns 404",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/eol/products/not-a-real-thing",
+              "host": ["{{baseUrl}}"],
+              "path": ["eol", "products", "not-a-real-thing"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Auth (Phase 3)",
       "description": "Not implemented yet — these return 404 until Phase 3 lands.",
       "item": [

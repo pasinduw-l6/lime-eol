@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/config.module';
+import { EolSyncModule } from './modules/eol-sync/eol-sync.module';
 import { HealthModule } from './modules/health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -8,6 +9,6 @@ import { PrismaModule } from './prisma/prisma.module';
  * Scheduled jobs deliberately live in WorkerModule only.
  */
 @Module({
-  imports: [AppConfigModule, PrismaModule, HealthModule],
+  imports: [AppConfigModule, PrismaModule, HealthModule, EolSyncModule],
 })
 export class AppModule {}
