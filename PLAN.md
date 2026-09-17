@@ -60,6 +60,11 @@ A web tool that is the single source of truth for the lifecycle of the open-sour
 
 ## 4. Repository Structure
 
+Created 2026-09-17. Feature modules live under `src/modules/`; shared domain
+rules, cross-cutting mechanics and infrastructure sit beside it. See
+`backend/src/modules/README.md` for the per-module responsibility table and the
+standard file anatomy.
+
 ```
 lime-eol-registry/
 ├── PLAN.md                     ← this file
@@ -70,48 +75,58 @@ lime-eol-registry/
 ├── docker-compose.dev.yml      ← hot-reload overrides for development
 ├── docs/
 │   ├── findings.md
+│   ├── api-examples.http       ← REST Client requests
 │   ├── diagrams/               ← C4 / architecture images
-│   └── api-examples.http       ← REST Client requests
+│   └── postman/                ← collection + local environment
 ├── backend/
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   ├── package.json
 │   ├── nest-cli.json
 │   ├── tsconfig.json
-│   ├── tsconfig.build.json     ← exclude prisma/ and test/
+│   ├── tsconfig.build.json     ← excludes prisma/ and test/
 │   ├── prisma/
 │   │   ├── schema.prisma
 │   │   ├── migrations/
-│   │   └── seed.ts
+│   │   └── seed/               ← seed.ts orchestrator + one file per data set
 │   ├── src/
 │   │   ├── main.ts             ← API entry point
 │   │   ├── worker.ts           ← worker entry point
 │   │   ├── app.module.ts
 │   │   ├── worker.module.ts
-│   │   ├── config/             ← env validation (zod or joi)
+│   │   ├── bootstrap/          ← swagger / security / validation / shutdown wiring
+│   │   ├── config/
+│   │   │   ├── env.validation.ts   ← zod schema, single source of truth
+│   │   │   └── namespaces/         ← typed config: app, auth, eol, notification
 │   │   ├── prisma/             ← PrismaService, PrismaModule
-│   │   ├── common/             ← guards, decorators, filters, pagination, dto helpers
-│   │   ├── auth/               ← JWT strategies (dev + entra), RolesGuard, /auth/me
-│   │   ├── users/
-│   │   ├── teams/
-│   │   ├── technologies/
-│   │   ├── versions/
-│   │   ├── lime-versions/
-│   │   ├── customers/
-│   │   ├── deployments/
-│   │   ├── upgrade-actions/
-│   │   ├── dashboard/          ← summary, timeline
-│   │   ├── inbox/              ← "needs you" items for current user
-│   │   ├── search/
-│   │   ├── reports/            ← Excel / CSV export
-│   │   ├── settings/           ← notification rules
-│   │   ├── audit/              ← audit log interceptor + endpoint
-│   │   ├── eol-sync/           ← endoflife.date client + sync service
-│   │   ├── notifications/      ← email + Teams senders, notification service
-│   │   ├── lifecycle/          ← status rules, cycle derivation
-│   │   ├── health/
+│   │   ├── common/             ← decorators, guards, interceptors, filters,
+│   │   │                          pipes, pagination dto, types, utils
+│   │   ├── lifecycle/          ← pure domain rules: cycle derivation, support
+│   │   │                          status, display status, notification thresholds
+│   │   ├── modules/
+│   │   │   ├── health/
+│   │   │   ├── auth/           ← strategies/, user provisioning, /auth/me
+│   │   │   ├── users/
+│   │   │   ├── teams/
+│   │   │   ├── technologies/
+│   │   │   ├── versions/
+│   │   │   ├── lime-versions/
+│   │   │   ├── customers/
+│   │   │   ├── deployments/
+│   │   │   ├── upgrade-actions/
+│   │   │   ├── inbox/
+│   │   │   ├── dashboard/
+│   │   │   ├── search/
+│   │   │   ├── reports/        ← builders/ + formatters/ (xlsx, csv)
+│   │   │   ├── settings/
+│   │   │   ├── audit/
+│   │   │   ├── eol-sync/       ← ports/ + adapters/ + mappers/ + __fixtures__/
+│   │   │   └── notifications/  ← ports/ + senders/ + templates/
 │   │   └── jobs/               ← cron jobs (loaded only by worker.module)
 │   └── test/
+│       ├── jest-e2e.json
+│       ├── helpers/
+│       └── e2e/
 └── frontend/                   ← later (Angular + spartan/ui)
 ```
 
@@ -990,6 +1005,10 @@ Estimates assume one developer; adjust as needed.
 | 2026-09-17 | Database choice | PostgreSQL + Prisma (relational data, joins, constraints) |
 | 2026-09-17 | endoflife.date client needs tuning knobs | Added `EOL_HTTP_TIMEOUT_MS`, `EOL_RETRY_ATTEMPTS`, `EOL_RETRY_BASE_DELAY_MS`, `EOL_REQUEST_DELAY_MS`, `EOL_USER_AGENT`, `SYNC_ON_STARTUP` to `.env` — the values section 10.2 requires, configurable instead of hard-coded |
 | 2026-09-17 | Worker process exited immediately (no HTTP server, no jobs yet) | `JobsModule` with a `WorkerHeartbeatService` 15-minute interval keeps the event loop alive and logs liveness; Phase 7 cron jobs join the same module |
+| 2026-09-17 | ~20 feature folders flat under `src/` hid the infrastructure | Feature modules moved under `src/modules/`; `config/`, `common/`, `prisma/`, `bootstrap/`, `lifecycle/` and `jobs/` stay at `src/` root. Section 4 updated |
+| 2026-09-17 | Lifecycle rules are needed by five modules | `src/lifecycle/` holds them as pure functions with no HTTP or DB dependency, so they are unit-testable and never duplicated |
+| 2026-09-17 | External systems must be swappable and fakeable in tests | `eol-sync/` and `notifications/` define `ports/` interfaces with DI tokens; implementations live in `adapters/` and `senders/`. Adding a source or channel means adding a file, not editing a service |
+| 2026-09-17 | Stringly-typed `config.get('API_PORT')` scattered through the code | Typed namespaces in `config/namespaces/` (app, auth, eol, notification) built from the validated env |
 | | | |
 
 ---
@@ -1040,6 +1059,13 @@ Add a short entry every session (newest on top).
     `WorkerHeartbeatService` (a 15-minute `@Interval`), which also gives the worker a liveness log
     until the Phase 7 cron jobs exist.
   - `.env.example` is committed — keep real secrets in `.env` only.
+- **Also done:** Full folder structure created (section 4 rewritten to match). Feature modules moved
+  under `src/modules/` with `health/` relocated; `common/`, `lifecycle/`, `config/namespaces/`,
+  `bootstrap/` split into security/validation/swagger/shutdown; `ports/`+`adapters/` folders for
+  `eol-sync/` and `notifications/`; `prisma/seed/`, `test/e2e/`, `docs/diagrams/`. Empty folders hold
+  a `.gitkeep` until their phase fills them. Added `backend/src/modules/README.md` (responsibility
+  table + module anatomy), `docs/findings.md`, `docs/api-examples.http`, `test/jest-e2e.json`.
+  Rebuilt and re-verified: health 200, worker ready.
 - **Next:** Phase 2 – Prisma schema from section 7.1, first migration, status view (7.2), seed (7.4).
 
 ```

@@ -63,6 +63,8 @@ export const envSchema = z
 
 export type AppEnv = z.infer<typeof envSchema>;
 
+let validated: AppEnv | undefined;
+
 export function validateEnv(raw: Record<string, unknown>): AppEnv {
   const parsed = envSchema.safeParse(raw);
 
@@ -73,5 +75,14 @@ export function validateEnv(raw: Record<string, unknown>): AppEnv {
     throw new Error(`Invalid environment configuration:\n${details}`);
   }
 
-  return parsed.data;
+  validated = parsed.data;
+  return validated;
+}
+
+/**
+ * The validated, coerced environment. Config namespaces read from here rather
+ * than from process.env, so nothing bypasses the schema.
+ */
+export function getEnv(): AppEnv {
+  return validated ?? validateEnv(process.env);
 }

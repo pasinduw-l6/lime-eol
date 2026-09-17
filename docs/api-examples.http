@@ -1,0 +1,24 @@
+### Lime EOL Registry — manual requests (VS Code REST Client)
+### Postman users: see docs/postman/
+
+@baseUrl = http://localhost:3000/api/v1
+@token = paste-a-dev-login-token-here
+
+### Health (public)
+GET {{baseUrl}}/health
+
+### OpenAPI document
+GET http://localhost:3000/api/docs-json
+
+### Dev login (Phase 3)
+POST {{baseUrl}}/auth/dev-login
+Content-Type: application/json
+
+{
+  "email": "admin@linearsix.com",
+  "role": "ADMIN"
+}
+
+### Current user (Phase 3)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
