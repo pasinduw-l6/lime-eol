@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   NOTICE_DAYS,
   formatDate,
@@ -53,7 +54,7 @@ interface Row {
  */
 @Component({
   selector: 'lime-schedule',
-  imports: [TechnologyView],
+  imports: [TechnologyView, RouterLink],
   host: { class: 'block' },
   template: `
     <header class="card mb-5 px-7 py-6">
@@ -105,6 +106,25 @@ interface Row {
         }
       </div>
     </header>
+
+    @if (status() !== 'ALL' && picked() === 'estate') {
+      <div class="card mb-5 flex flex-wrap items-center gap-3 px-7 py-3">
+        <span class="text-[13px] text-ink-soft">Showing only</span>
+        <span
+          class="rounded-full border px-3 py-1 text-[13px]"
+          [style.border-color]="statusColour()"
+          [style.color]="statusColour()"
+        >
+          {{ statusText() }}
+        </span>
+        <a
+          [routerLink]="['/schedule']"
+          [queryParams]="{}"
+          class="text-[13px] text-accent-bright no-underline hover:underline"
+          >Clear filter</a
+        >
+      </div>
+    }
 
     @if (picked() !== 'estate') {
       <section class="card px-7 py-6">
@@ -314,6 +334,23 @@ export class Schedule {
   /** 'estate' for the cross-customer timeline, otherwise a technology name. */
   protected readonly picked = signal<string>('estate');
 
+  /**
+   * Bound from ?status= by withComponentInputBinding, so the Overview's status
+   * bands link straight into a filtered schedule and the filter survives a
+   * refresh or a shared URL.
+   */
+  readonly status = input<'ALL' | 'EOL' | 'NEAR' | 'SUPPORTED'>('ALL');
+
+  protected readonly statusText = computed(() => {
+    const status = this.status();
+    return status === 'ALL' ? '' : statusLabel(status);
+  });
+
+  protected readonly statusColour = computed(() => {
+    const status = this.status();
+    return status === 'ALL' ? 'var(--color-ink-soft)' : statusFill(status);
+  });
+
   /** Technologies in the registry, worst first, with a count of risky cycles. */
   protected readonly technologies = computed(() => {
     const names = [...new Set(this.store.cycles().map((c) => c.technology))];
@@ -358,7 +395,10 @@ export class Schedule {
   }
 
   protected readonly rows = computed<Row[]>(() =>
-    this.store.cyclesInUse().map(({ cycle, days, status }, index) => {
+    this.store
+      .cyclesInUse()
+      .filter((entry) => this.status() === 'ALL' || entry.status === this.status())
+      .map(({ cycle, days, status }, index) => {
       const release = cycle.releaseDate
         ? Date.parse(`${cycle.releaseDate}T00:00:00Z`)
         : this.windowStart();

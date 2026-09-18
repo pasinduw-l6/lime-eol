@@ -90,13 +90,18 @@ interface Bucket {
 
         <div class="grid gap-6 sm:grid-cols-3">
           @for (band of bands(); track band.key) {
-            <div class="flex flex-col">
-              <p class="tabular m-0 text-[22px] font-semibold">{{ band.count }}</p>
-              <p class="m-0 mb-3 text-[13px]">
+            <a
+              [routerLink]="['/schedule']"
+              [queryParams]="{ status: band.key }"
+              class="flex flex-col rounded-xl p-2 -m-2 no-underline transition-colors hover:bg-elevated"
+              [attr.aria-label]="'Show the ' + band.count + ' cycles ' + band.label"
+            >
+              <span class="tabular m-0 text-[22px] font-semibold text-ink">{{ band.count }}</span>
+              <span class="m-0 mb-3 text-[13px]">
                 <span [style.color]="band.colour">{{ band.share }}%</span>
                 <span class="text-ink-soft"> {{ band.label }}</span>
-              </p>
-              <div class="flex h-[62px] items-end gap-[3px]" aria-hidden="true">
+              </span>
+              <span class="flex h-[62px] items-end gap-[3px]" aria-hidden="true">
                 @for (bar of band.bars; track $index) {
                   <span
                     class="flex-1 rounded-[2px]"
@@ -105,15 +110,15 @@ interface Bucket {
                     [style.opacity]="0.35 + (bar / 100) * 0.65"
                   ></span>
                 }
-              </div>
-            </div>
+              </span>
+            </a>
           }
         </div>
       </div>
     </section>
 
-    <!-- three panels, equal thirds, each header / body / footer -->
-    <div class="grid items-stretch gap-5 xl:grid-cols-3">
+    <!-- panels: equal columns, each header / body / footer -->
+    <div class="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
       <!-- 1. when support ends -->
       <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
@@ -249,6 +254,62 @@ interface Bucket {
           <a routerLink="/schedule" class="text-[12px] text-accent-bright no-underline hover:underline">
             Open the schedule
           </a>
+        </footer>
+      </section>
+
+      <!-- 4. are we gaining or losing ground -->
+      <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
+        <header class="mb-4 flex items-baseline justify-between gap-3">
+          <h2 class="m-0 text-[15px] font-semibold">Upgrade velocity</h2>
+          <span class="text-[12px] text-ink-soft">6 months</span>
+        </header>
+
+        <div class="flex flex-col justify-between" [style.min-height.px]="bodyH">
+          <p class="m-0 text-[13px]">
+            <span class="tabular text-[22px] font-semibold" [style.color]="velocityColour()">
+              {{ net() > 0 ? '+' : '' }}{{ net() }}
+            </span>
+            <span class="text-ink-soft"> net</span>
+          </p>
+          <p class="m-0 mb-3 text-[12px] text-ink-soft">
+            {{ totalUpgrades() }} upgrades done, {{ totalExpiries() }} cycles expired
+          </p>
+
+          <ol class="m-0 flex list-none items-end gap-2 p-0" [style.height.px]="96">
+            @for (month of velocity(); track month.key) {
+              <li
+                class="flex h-full flex-1 flex-col justify-end gap-[2px]"
+                [attr.title]="month.title"
+              >
+                <span
+                  class="w-full rounded-t-[2px]"
+                  [style.height.px]="month.upHeight"
+                  style="background: var(--color-good)"
+                ></span>
+                <span
+                  class="w-full rounded-b-[2px]"
+                  [style.height.px]="month.expHeight"
+                  style="background: var(--color-overdue)"
+                ></span>
+              </li>
+            }
+          </ol>
+          <div class="mt-1 flex gap-2 text-[10px] text-ink-faint">
+            @for (month of velocity(); track month.key) {
+              <span class="flex-1 text-center">{{ month.label }}</span>
+            }
+          </div>
+        </div>
+
+        <footer class="mt-3 flex items-center gap-4 border-t border-rule pt-3 text-[11px] text-ink-soft">
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block h-2 w-3 rounded-[2px]" style="background: var(--color-good)"></span>
+            upgrades
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block h-2 w-3 rounded-[2px]" style="background: var(--color-overdue)"></span>
+            expired
+          </span>
         </footer>
       </section>
     </div>
@@ -418,6 +479,88 @@ export class Overview {
         };
       }),
   );
+
+  /**
+   * Upgrades completed against cycles that expired, month by month.
+   *
+   * The honest measure of whether the team is gaining ground: doing three
+   * upgrades in a quarter means nothing if five cycles went out of support in
+   * the same period. Upgrades come from the revision history, so this counts
+   * what was actually recorded, not what was planned.
+   */
+  protected readonly velocity = computed(() => {
+    const start = today();
+    const events = this.store.changeEvents().filter((e) => e.kind === 'UPGRADE');
+    const expiries = this.store
+      .cyclesInUse()
+      .map((c) => parseDate(c.cycle.eolDate))
+      .filter((d): d is Date => d !== null);
+
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const from = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - (5 - i), 1);
+      const to = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - (4 - i), 1);
+      const date = new Date(from);
+
+      return {
+        key: `v${i}`,
+        from,
+        to,
+        label: date.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }),
+        full: date.toLocaleDateString('en-GB', {
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'UTC',
+        }),
+        upgrades: events.filter(
+          (e) => e.at.getTime() >= from && e.at.getTime() < to,
+        ).length,
+        expired: expiries.filter((d) => d.getTime() >= from && d.getTime() < to).length,
+      };
+    });
+
+    const max = Math.max(1, ...months.map((m) => Math.max(m.upgrades, m.expired)));
+
+    return months.map((m) => ({
+      key: m.key,
+      label: m.label,
+      upHeight: m.upgrades ? Math.max(4, (m.upgrades / max) * 44) : 2,
+      expHeight: m.expired ? Math.max(4, (m.expired / max) * 44) : 2,
+      title: `${m.full}: ${m.upgrades} upgrade(s) done, ${m.expired} cycle(s) expired`,
+    }));
+  });
+
+  protected readonly totalUpgrades = computed(() =>
+    this.velocitySource().reduce((sum, m) => sum + m.upgrades, 0),
+  );
+
+  protected readonly totalExpiries = computed(() =>
+    this.velocitySource().reduce((sum, m) => sum + m.expired, 0),
+  );
+
+  protected readonly net = computed(() => this.totalUpgrades() - this.totalExpiries());
+
+  protected readonly velocityColour = computed(() =>
+    this.net() >= 0 ? 'var(--color-good)' : 'var(--color-overdue)',
+  );
+
+  /** Raw counts behind the bars, kept separate so totals stay readable. */
+  private readonly velocitySource = computed(() => {
+    const start = today();
+    const events = this.store.changeEvents().filter((e) => e.kind === 'UPGRADE');
+    const expiries = this.store
+      .cyclesInUse()
+      .map((c) => parseDate(c.cycle.eolDate))
+      .filter((d): d is Date => d !== null);
+
+    return Array.from({ length: 6 }, (_, i) => {
+      const from = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - (5 - i), 1);
+      const to = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() - (4 - i), 1);
+      return {
+        upgrades: events.filter((e) => e.at.getTime() >= from && e.at.getTime() < to).length,
+        expired: expiries.filter((d) => d.getTime() >= from && d.getTime() < to).length,
+      };
+    });
+  });
 
   protected focus(projectId: string): void {
     this.store.scope.set(projectId);

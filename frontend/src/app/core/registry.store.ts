@@ -1,4 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { ComponentChange, summariseChange } from './diff';
 import { daysToEol, statusOf, SupportStatus } from './lifecycle';
 import { CYCLES, UPGRADE_ACTIONS } from './mock-data';
 import {
@@ -341,6 +342,42 @@ export class RegistryStore {
     this.replaceTopology(content);
     return revision;
   }
+
+  /**
+   * Every component change recorded across the environments in scope, derived
+   * from the revision history rather than stored separately — the commits are
+   * the source of truth, so this can never drift from what the diffs show.
+   */
+  readonly changeEvents = computed(() => {
+    const out: {
+      at: Date;
+      kind: ComponentChange['kind'];
+      technology: string;
+      deploymentId: string;
+    }[] = [];
+
+    for (const deployment of this.deployments()) {
+      const revisions = this.revisionsFor(deployment.id)
+        .slice()
+        .sort((a, b) => a.number - b.number);
+
+      for (let i = 1; i < revisions.length; i++) {
+        for (const change of summariseChange(
+          revisions[i - 1].content,
+          revisions[i].content,
+        )) {
+          out.push({
+            at: new Date(revisions[i].createdAt),
+            kind: change.kind,
+            technology: change.technology,
+            deploymentId: deployment.id,
+          });
+        }
+      }
+    }
+
+    return out;
+  });
 
   topologyFor(deploymentId: string): EnvTopology | undefined {
     return this._topologies().find((t) => t.deploymentId === deploymentId);
