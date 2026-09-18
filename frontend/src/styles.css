@@ -106,6 +106,26 @@ body {
   font-weight: 500;
 }
 
+/* Diff rendering: whole-line tint for the change, stronger tint for the exact
+   tokens that moved, so a version bump reads at a glance. */
+.diff-line-add {
+  background: color-mix(in oklab, var(--color-good) 10%, transparent);
+}
+
+.diff-line-remove {
+  background: color-mix(in oklab, var(--color-overdue) 10%, transparent);
+}
+
+.diff-word-add {
+  background: color-mix(in oklab, var(--color-good) 32%, transparent);
+  border-radius: 2px;
+}
+
+.diff-word-remove {
+  background: color-mix(in oklab, var(--color-overdue) 32%, transparent);
+  border-radius: 2px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

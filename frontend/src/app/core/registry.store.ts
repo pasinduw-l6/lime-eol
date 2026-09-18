@@ -16,8 +16,72 @@ import {
   EnvTopology,
   EnvironmentName,
   Project,
+  Revision,
   UpgradeAction,
 } from './models';
+
+/**
+ * Seeds a starting history so the timeline is not empty: every environment
+ * gets its "recorded" commit, and the two flagship environments get the real
+ * change that followed — a node added, and a database upgraded.
+ */
+function seedRevisions(topologies: EnvTopology[]): Revision[] {
+  const out: Revision[] = [];
+
+  for (const topology of topologies) {
+    const id = topology.deploymentId;
+
+    if (id === 'acme-prod') {
+      // Before the Kafka tier was introduced.
+      const before: EnvTopology = {
+        ...topology,
+        nodes: topology.nodes.filter((n) => n.id !== 'kafka'),
+        links: topology.links.filter((l) => l.to !== 'kafka'),
+      };
+      out.push(revision(id, 1, 'Record environment as built', 'Nadun Perera', '2026-04-02T09:12:00Z', before));
+      out.push(revision(id, 2, 'Add Kafka broker tier (LIME-0912)', 'Ishara Fernando', '2026-06-18T14:40:00Z', topology));
+      continue;
+    }
+
+    if (id === 'nwnd-prod') {
+      // Before this customer moved off the Lime default MongoDB.
+      const before: EnvTopology = {
+        ...topology,
+        nodes: topology.nodes.map((n) =>
+          n.id === 'mongo'
+            ? { ...n, stack: [{ technology: 'MongoDB', version: '8.2.12' }] }
+            : n,
+        ),
+      };
+      out.push(revision(id, 1, 'Record environment as built', 'Dilshan Silva', '2026-03-11T08:05:00Z', before));
+      out.push(revision(id, 2, 'Upgrade MongoDB 8.2.12 to 8.3.11 (LIME-0987)', 'Dilshan Silva', '2026-08-04T21:30:00Z', topology));
+      continue;
+    }
+
+    out.push(revision(id, 1, 'Record environment as built', 'Platform Admin', '2026-05-20T10:00:00Z', topology));
+  }
+
+  return out;
+}
+
+function revision(
+  deploymentId: string,
+  number: number,
+  message: string,
+  author: string,
+  createdAt: string,
+  content: EnvTopology,
+): Revision {
+  return {
+    id: `${deploymentId}-r${number}`,
+    deploymentId,
+    number,
+    message,
+    author,
+    createdAt,
+    content: structuredClone(content),
+  };
+}
 
 /** Everything, or one project. The switcher writes this. */
 export type ProjectScope = 'all' | string;
@@ -229,6 +293,54 @@ export class RegistryStore {
         } satisfies InboxItem;
       }),
   );
+
+  // ---- revision history ----------------------------------------------------
+
+  private readonly _revisions = signal<Revision[]>(seedRevisions(ALL_TOPOLOGIES));
+
+  /** Commits for one environment, newest first. */
+  revisionsFor(deploymentId: string): Revision[] {
+    return this._revisions()
+      .filter((r) => r.deploymentId === deploymentId)
+      .sort((a, b) => b.number - a.number);
+  }
+
+  /** The revision a given one is compared against — its parent. */
+  parentOf(revision: Revision): Revision | null {
+    return (
+      this._revisions().find(
+        (r) =>
+          r.deploymentId === revision.deploymentId &&
+          r.number === revision.number - 1,
+      ) ?? null
+    );
+  }
+
+  /**
+   * Saves a new state of an environment as a commit, and makes it current.
+   * Nothing is overwritten, so any earlier state stays readable.
+   */
+  commit(
+    deploymentId: string,
+    content: EnvTopology,
+    message: string,
+    author = 'Platform Admin',
+  ): Revision {
+    const previous = this.revisionsFor(deploymentId)[0];
+    const revision: Revision = {
+      id: `${deploymentId}-r${(previous?.number ?? 0) + 1}`,
+      deploymentId,
+      number: (previous?.number ?? 0) + 1,
+      message: message.trim() || 'Update environment',
+      author,
+      createdAt: new Date().toISOString(),
+      content: structuredClone(content),
+    };
+
+    this._revisions.update((all) => [...all, revision]);
+    this.replaceTopology(content);
+    return revision;
+  }
 
   topologyFor(deploymentId: string): EnvTopology | undefined {
     return this._topologies().find((t) => t.deploymentId === deploymentId);

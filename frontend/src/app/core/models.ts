@@ -112,6 +112,23 @@ export interface EnvTopology {
   links: EnvLink[];
 }
 
+/**
+ * One saved state of an environment — a commit.
+ *
+ * History is kept as full snapshots rather than deltas: a snapshot always
+ * renders, can be diffed against any other revision, and answers "what was
+ * running on this date?" without replaying anything.
+ */
+export interface Revision {
+  id: string;
+  deploymentId: string;
+  number: number;
+  message: string;
+  author: string;
+  createdAt: string;
+  content: EnvTopology;
+}
+
 export interface UpgradeAction {
   id: string;
   technology: string;

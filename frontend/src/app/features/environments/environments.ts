@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { formatDays, statusFill, statusLabel } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { Deployment, EnvNode, EnvTopology } from '../../core/models';
+import { History } from './history';
 
 const NODE_WIDTH = 210;
 const HEADER_HEIGHT = 30;
@@ -32,7 +33,7 @@ interface PlacedNode {
  */
 @Component({
   selector: 'lime-environments',
-  imports: [FormsModule],
+  imports: [FormsModule, History],
   host: { class: 'block' },
   template: `
     <div class="flex flex-wrap gap-5 xl:flex-nowrap">
@@ -77,7 +78,7 @@ interface PlacedNode {
             </p>
           </div>
           <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
-            @for (m of ['visual', 'json']; track m) {
+            @for (m of ['visual', 'json', 'history']; track m) {
               <button
                 type="button"
                 class="rounded-full px-4 py-1 text-[13px] capitalize"
@@ -92,6 +93,11 @@ interface PlacedNode {
           </div>
         </header>
 
+        @if (mode() === 'history') {
+          <div class="p-6">
+            <lime-history [deploymentId]="deployment().id" />
+          </div>
+        } @else {
         <div class="overflow-auto p-6">
           <svg
             [attr.width]="canvasWidth()" [attr.height]="canvasHeight()"
@@ -153,6 +159,7 @@ interface PlacedNode {
             }
           </svg>
         </div>
+        }
       </section>
 
       <!-- inspector -->
@@ -172,9 +179,17 @@ interface PlacedNode {
             @if (error()) {
               <p class="m-0 mt-2 text-[12px] text-overdue" role="alert">{{ error() }}</p>
             }
+            <label class="mt-3 block text-[12px] text-ink-soft">
+              Change description
+              <input
+                [(ngModel)]="message"
+                placeholder="Upgrade MongoDB to 8.3.11 (LIME-1042)"
+                class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[13px] text-ink"
+              />
+            </label>
             <div class="mt-3 flex gap-2">
               <button type="button" class="btn btn-primary" (click)="applyJson()">
-                Apply
+                Commit change
               </button>
               <button type="button" class="btn" (click)="resetJson()">Revert</button>
             </div>
@@ -228,7 +243,8 @@ export class Environments {
   protected readonly HEADER_HEIGHT = HEADER_HEIGHT;
   protected readonly ROW_HEIGHT = ROW_HEIGHT;
 
-  protected readonly mode = signal<'visual' | 'json'>('visual');
+  protected readonly mode = signal<'visual' | 'json' | 'history'>('visual');
+  protected readonly message = signal('');
   protected readonly deployment = signal<Deployment>(this.store.deployments()[0]);
   protected readonly selectedNode = signal<EnvNode | null>(null);
   protected readonly draft = signal('');
@@ -369,12 +385,17 @@ export class Environments {
         }
       }
 
-      this.store.replaceTopology({
-        ...parsed,
-        deploymentId: this.deployment().id,
-      });
+      // Saved as a revision, never overwritten: the previous state stays
+      // readable and the change shows as a diff in History.
+      this.store.commit(
+        this.deployment().id,
+        { ...parsed, deploymentId: this.deployment().id },
+        this.message(),
+      );
+      this.message.set('');
       this.error.set(null);
       this.selectedNode.set(null);
+      this.mode.set('history');
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : 'Invalid JSON.');
     }
