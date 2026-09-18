@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+/* ---------------------------------------------------------------------------
+   Lime Lifecycle design tokens.
+
+   The rule this palette encodes: only trouble gets pigment. A supported
+   technology is ink on paper. Green on 80% of rows trains people to ignore
+   colour, so "fine" has no colour of its own — which makes the two pigments
+   that do exist actually mean something.
+
+   Urgency is carried first by POSITION on the time axis (overdue items sit
+   left of the today rule) and by a signed day count in tabular figures.
+   Colour reinforces; it is never the only signal.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-ground: #edeff2;
+  --color-surface: #ffffff;
+  --color-ink: #1c2430;
+  --color-ink-soft: #5b6676;
+  --color-rule: #d3d9e0;
+  --color-overdue: #b3271e;
+  --color-overdue-soft: #f3dedc;
+  --color-soon: #c2760a;
+  --color-soon-soft: #f7e9d3;
+
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Day counts and version strings must align character-for-character when
+   scanned down a column. This is the mono face doing a job, not decorating. */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus stays visible everywhere. */
+:where(a, button, [tabindex], input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

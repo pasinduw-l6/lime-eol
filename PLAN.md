@@ -1076,7 +1076,7 @@ null — `eolField=eoes` therefore falls back to `eolFrom`. No API key is requir
 | 9 Notifications | ⬜ | | | |
 | 10 Reports & export | ⬜ | | | |
 | 11 Hardening | ⬜ | | | |
-| 12 Frontend | ⬜ | | | |
+| 12 Frontend | 🟨 In progress | 2026-09-18 | | Angular 22 shell, schedule, environment topology, calendar — running on mock data |
 | 13 Deployment | ⬜ | | | |
 
 Legend: ⬜ Not started · 🟨 In progress · ✅ Done · ⛔ Blocked
@@ -1088,6 +1088,27 @@ Legend: ⬜ Not started · 🟨 In progress · ✅ Done · ⛔ Blocked
 ## 16. Work Log
 
 Add a short entry every session (newest on top).
+
+### 2026-09-18 — Frontend, mock-first
+- **Done:** Angular 22 app in `frontend/`: standalone components, zoneless change detection, signals,
+  Tailwind v4, no NgModules. Three screens — **Schedule** (cycles on a time axis with a today rule and
+  a dashed 180-day notice horizon, plus a "Needs you" list and an impact panel), **Environments**
+  (per-customer topology diagram where each server's stack is coloured by EOL risk, editable on the
+  canvas *or* as JSON through one store method), **Calendar** (24-month band showing where EOL dates
+  cluster, plus a month grid). Mock data exported from the seeded database, so shapes already match
+  the API. `web` container added to both compose files; nginx serves the bundle and proxies `/api`.
+- **Design:** ran the two installed skills. Kept `ui-ux-pro-max`'s Swiss/minimal style verdict,
+  Angular 22 stack rules and a11y checklist; **rejected** its "Hero + Features + CTA / Contact Sales"
+  pattern (marketing page, wrong for an internal tool), its Outfit/Work Sans pairing, and its line-chart
+  recommendation for the timeline. Palette encodes one rule: only trouble gets pigment — there is no
+  "healthy green", so the two pigments that exist mean something. Urgency is carried by position and a
+  signed day count first, colour second, which satisfies "never distinguish by hue alone" structurally.
+- **Verified:** production bundle compiles (269 kB initial, 72.65 kB transferred); `/` and deep link
+  `/environments` both 200; `/api/v1/health` returns 200 *through* the nginx proxy.
+- **Problems:** Angular 22 requires TypeScript >= 6.0, so the frontend pins `~6.0.0` while the backend
+  stays on 5.9. One real type error caught by the build (a formatted string typed as a number).
+- **Next:** spartan/ui primitives where complex widgets are needed; replace `core/mock-data.ts` with
+  generated types from `/api/docs-json` as Phases 3–8 land.
 
 ### 2026-09-17 (session 3) — Phase 2, database
 - **Done:** Research first (`docs/db-design-notes.md`), then all twelve recommendations were

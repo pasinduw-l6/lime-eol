@@ -42,6 +42,17 @@ services:
       api:
         condition: service_started
 
+  web:
+    build:
+      context: ./frontend
+      target: prod
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      api:
+        condition: service_started
+
   pgadmin:
     image: dpage/pgadmin4
     profiles: ["tools"]
