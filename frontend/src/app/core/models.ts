@@ -136,6 +136,7 @@ export interface UpgradeAction {
   targetVersion: string | null;
   status: 'NOT_STARTED' | 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'DEFERRED';
   plannedDate: string | null;
+  completedDate: string | null;
   assignee: string | null;
   team: string | null;
   jiraKey: string | null;
