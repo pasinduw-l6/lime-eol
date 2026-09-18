@@ -35,9 +35,9 @@ interface PlacedNode {
   imports: [FormsModule],
   host: { class: 'block' },
   template: `
-    <div class="flex min-h-screen">
+    <div class="flex flex-wrap gap-5 xl:flex-nowrap">
       <!-- environment tree -->
-      <aside class="w-[230px] shrink-0 border-r border-rule bg-surface" aria-label="Environments">
+      <aside class="card w-[240px] shrink-0 overflow-hidden" aria-label="Environments">
         <h1 class="m-0 px-5 pt-5 pb-3 text-[17px] font-semibold">Environments</h1>
         @for (group of grouped(); track group.customer) {
           <div class="border-t border-rule px-5 py-3">
@@ -64,8 +64,8 @@ interface PlacedNode {
       </aside>
 
       <!-- canvas -->
-      <section class="min-w-0 flex-1">
-        <header class="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule bg-surface px-6 py-4">
+      <section class="card min-w-0 flex-1 overflow-hidden">
+        <header class="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule px-6 py-4">
           <div>
             <h2 class="m-0 text-[17px] font-semibold">
               {{ deployment().customer }} · {{ deployment().environment }}
@@ -76,13 +76,19 @@ interface PlacedNode {
               owned by {{ deployment().owners.join(' and ') }}
             </p>
           </div>
-          <div class="flex gap-2 text-[13px]">
-            <button type="button" class="border border-rule px-3 py-1" [class.bg-ground]="mode() === 'visual'" (click)="mode.set('visual')">
-              Visual
-            </button>
-            <button type="button" class="border border-rule px-3 py-1" [class.bg-ground]="mode() === 'json'" (click)="mode.set('json')">
-              JSON
-            </button>
+          <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
+            @for (m of ['visual', 'json']; track m) {
+              <button
+                type="button"
+                class="rounded-full px-4 py-1 text-[13px] capitalize"
+                [class.bg-ink]="mode() === m"
+                [class.text-ground]="mode() === m"
+                [class.text-ink-soft]="mode() !== m"
+                (click)="mode.set($any(m))"
+              >
+                {{ m }}
+              </button>
+            }
           </div>
         </header>
 
@@ -150,7 +156,7 @@ interface PlacedNode {
       </section>
 
       <!-- inspector -->
-      <aside class="w-[330px] shrink-0 border-l border-rule bg-surface" aria-label="Details">
+      <aside class="card w-full shrink-0 xl:w-[340px]" aria-label="Details">
         @if (mode() === 'json') {
           <div class="flex h-full flex-col p-5">
             <h2 class="m-0 mb-1 text-[15px] font-semibold">Environment as data</h2>
@@ -166,13 +172,11 @@ interface PlacedNode {
             @if (error()) {
               <p class="m-0 mt-2 text-[12px] text-overdue" role="alert">{{ error() }}</p>
             }
-            <div class="mt-3 flex gap-2 text-[13px]">
-              <button type="button" class="border border-ink bg-ink px-3 py-1 text-surface" (click)="applyJson()">
+            <div class="mt-3 flex gap-2">
+              <button type="button" class="btn btn-primary" (click)="applyJson()">
                 Apply
               </button>
-              <button type="button" class="border border-rule px-3 py-1" (click)="resetJson()">
-                Revert
-              </button>
+              <button type="button" class="btn" (click)="resetJson()">Revert</button>
             </div>
           </div>
         } @else if (selectedNode(); as node) {

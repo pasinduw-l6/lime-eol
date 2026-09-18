@@ -41,8 +41,8 @@ interface Row {
   selector: 'lime-schedule',
   host: { class: 'block' },
   template: `
-    <header class="border-b border-rule bg-surface px-8 pt-6 pb-5">
-      <h1 class="m-0 text-[28px] font-semibold tracking-[-0.01em]">Schedule</h1>
+    <header class="card mb-5 px-7 py-6">
+      <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Schedule</h1>
       <p class="mt-1 mb-0 max-w-[62ch] text-[14px] text-ink-soft">
         Every technology cycle running in a customer environment, placed on the
         date its support ends.
@@ -50,7 +50,7 @@ interface Row {
     </header>
 
     @if (inbox().length > 0) {
-      <section class="border-b border-rule bg-surface px-8 py-4" aria-labelledby="needs-you">
+      <section class="card mb-5 px-7 py-5" aria-labelledby="needs-you">
         <h2 id="needs-you" class="m-0 mb-2 text-[13px] font-semibold">
           Needs you
         </h2>
@@ -78,7 +78,7 @@ interface Row {
       </section>
     }
 
-    <section class="px-8 py-6">
+    <section class="card px-7 py-6">
       <div class="mb-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[12px] text-ink-soft">
         <span><span class="inline-block h-2 w-3 align-middle" [style.background]="fill('EOL')"></span> past end of life</span>
         <span><span class="inline-block h-2 w-3 align-middle" [style.background]="fill('NEAR')"></span> ends within {{ noticeDays }} days</span>
@@ -191,7 +191,7 @@ interface Row {
     </section>
 
     @if (selected(); as cycle) {
-      <aside class="border-t border-rule bg-surface px-8 py-5" aria-labelledby="impact">
+      <aside class="card mt-5 px-7 py-5" aria-labelledby="impact">
         <div class="flex items-baseline justify-between gap-4">
           <h2 id="impact" class="m-0 text-[17px] font-semibold">
             {{ cycle.technology }} {{ cycle.label }}

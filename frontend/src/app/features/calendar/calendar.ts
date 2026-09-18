@@ -36,16 +36,16 @@ interface MonthBand {
   selector: 'lime-calendar',
   host: { class: 'block' },
   template: `
-    <header class="border-b border-rule bg-surface px-8 pt-6 pb-5">
-      <h1 class="m-0 text-[28px] font-semibold tracking-[-0.01em]">Calendar</h1>
+    <header class="card mb-5 px-7 py-6">
+      <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Calendar</h1>
       <p class="mt-1 mb-0 max-w-[62ch] text-[14px] text-ink-soft">
         When support actually ends, month by month, so upgrade work can be
         planned against the quarters it falls in.
       </p>
     </header>
 
-    <section class="px-8 py-6">
-      <h2 class="m-0 mb-2 text-[13px] font-semibold">Next 24 months</h2>
+    <section class="card mb-5 px-7 py-5">
+      <h2 class="m-0 mb-3 text-[13px] font-semibold">Next 24 months</h2>
       <div class="flex flex-wrap gap-1" role="list">
         @for (band of bands(); track band.key) {
           <button
@@ -66,8 +66,8 @@ interface MonthBand {
       </div>
     </section>
 
-    <section class="grid gap-8 px-8 pb-10 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div>
+    <section class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_330px]">
+      <div class="card px-7 py-6">
         <h2 class="m-0 mb-3 text-[15px] font-semibold">{{ monthLabel() }}</h2>
         <table class="w-full border-collapse">
           <caption class="sr-only">End-of-life dates in {{ monthLabel() }}</caption>
@@ -120,7 +120,7 @@ interface MonthBand {
         </table>
       </div>
 
-      <aside>
+      <aside class="card px-7 py-6">
         <h2 class="m-0 mb-3 text-[15px] font-semibold">Ending soonest</h2>
         <ul class="m-0 flex list-none flex-col gap-2 p-0">
           @for (row of upcoming(); track row.cycle.id) {

@@ -5,46 +5,52 @@ import { RegistryStore } from './core/registry.store';
 @Component({
   selector: 'lime-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
-  host: { class: 'block h-full' },
+  host: { class: 'block min-h-screen' },
   template: `
-    <div class="flex h-full min-h-screen">
-      <nav
-        class="flex w-[184px] shrink-0 flex-col border-r border-rule bg-surface"
-        aria-label="Sections"
+    <div class="mx-auto flex min-h-screen max-w-[1500px] flex-col px-5 py-5">
+      <header
+        class="card mb-5 flex flex-wrap items-center gap-4 px-5 py-3"
+        role="banner"
       >
-        <a routerLink="/schedule" class="block px-5 pt-5 pb-6 no-underline">
-          <span class="block text-[15px] font-semibold text-ink">Lime</span>
-          <span class="block text-[15px] text-ink-soft">Lifecycle</span>
+        <a routerLink="/overview" class="flex items-center gap-2.5 no-underline">
+          <span
+            class="grid h-8 w-8 place-items-center rounded-full"
+            style="background: linear-gradient(135deg, var(--color-accent-bright), var(--color-accent-deep))"
+            aria-hidden="true"
+          ></span>
+          <span class="text-[17px] font-semibold text-ink">Lime</span>
         </a>
 
-        <ul class="m-0 flex list-none flex-col gap-px p-0">
+        <nav class="flex flex-1 flex-wrap justify-center gap-1" aria-label="Sections">
           @for (item of nav; track item.path) {
-            <li>
-              <a
-                [routerLink]="item.path"
-                routerLinkActive="bg-ground font-medium text-ink"
-                class="flex items-center justify-between px-5 py-2 text-[14px] text-ink-soft no-underline hover:bg-ground"
-              >
-                <span>{{ item.label }}</span>
-                @if (item.path === '/schedule' && needsYou() > 0) {
-                  <span
-                    class="tabular text-[12px] text-overdue"
-                    [attr.aria-label]="needsYou() + ' items need attention'"
-                    >{{ needsYou() }}</span
-                  >
-                }
-              </a>
-            </li>
+            <a
+              [routerLink]="item.path"
+              routerLinkActive="pill-active"
+              class="pill"
+            >
+              {{ item.label }}
+              @if (item.badge && needsYou() > 0) {
+                <span class="tabular text-[12px] text-overdue">{{ needsYou() }}</span>
+              }
+            </a>
           }
-        </ul>
+        </nav>
 
-        <div class="mt-auto px-5 py-4 text-[12px] text-ink-soft">
-          <span class="block">Mock data</span>
-          <span class="block">seeded registry</span>
+        <div class="flex items-center gap-2">
+          <span
+            class="hidden text-[13px] text-ink-faint sm:inline"
+            title="All screens run on data seeded from the registry"
+            >mock data</span
+          >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-full bg-elevated text-[13px] font-medium text-ink-soft"
+            aria-label="Signed in as Platform Admin"
+            >PA</span
+          >
         </div>
-      </nav>
+      </header>
 
-      <main class="min-w-0 flex-1 overflow-x-hidden">
+      <main class="flex-1">
         <router-outlet />
       </main>
     </div>
@@ -54,9 +60,10 @@ export class App {
   private readonly store = inject(RegistryStore);
 
   protected readonly nav = [
-    { path: '/schedule', label: 'Schedule' },
-    { path: '/environments', label: 'Environments' },
-    { path: '/calendar', label: 'Calendar' },
+    { path: '/overview', label: 'Overview', badge: false },
+    { path: '/schedule', label: 'Schedule', badge: true },
+    { path: '/environments', label: 'Environments', badge: false },
+    { path: '/calendar', label: 'Calendar', badge: false },
   ];
 
   protected readonly needsYou = () => this.store.inbox().length;

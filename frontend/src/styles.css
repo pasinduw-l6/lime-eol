@@ -1,34 +1,45 @@
 @import 'tailwindcss';
 
 /* ---------------------------------------------------------------------------
-   Lime Lifecycle design tokens.
+   Lime Lifecycle — dark product theme.
 
-   The rule this palette encodes: only trouble gets pigment. A supported
-   technology is ink on paper. Green on 80% of rows trains people to ignore
-   colour, so "fine" has no colour of its own — which makes the two pigments
-   that do exist actually mean something.
+   Every screen reads from these tokens, so the palette is the skin: changing
+   the values here re-skins the whole app without touching a component.
 
-   Urgency is carried first by POSITION on the time axis (overdue items sit
-   left of the today rule) and by a signed day count in tabular figures.
-   Colour reinforces; it is never the only signal.
+   Urgency is still carried by position on the time axis and by a signed day
+   count (−681 d) before colour does any work, so the theme stays readable
+   without colour vision.
 --------------------------------------------------------------------------- */
 @theme {
-  --color-ground: #edeff2;
-  --color-surface: #ffffff;
-  --color-ink: #1c2430;
-  --color-ink-soft: #5b6676;
-  --color-rule: #d3d9e0;
-  --color-overdue: #b3271e;
-  --color-overdue-soft: #f3dedc;
-  --color-soon: #c2760a;
-  --color-soon-soft: #f7e9d3;
+  /* surfaces, darkest to lightest */
+  --color-ground: #08080c;
+  --color-surface: #13131c;
+  --color-elevated: #1c1c28;
+  --color-rule: #272736;
+
+  /* text */
+  --color-ink: #f3f4f8;
+  --color-ink-soft: #9ba2b4;
+  --color-ink-faint: #666e82;
+
+  /* brand */
+  --color-accent: #7c5cff;
+  --color-accent-bright: #a78bff;
+  --color-accent-deep: #4c33c4;
+
+  /* status — brighter than the light theme so they hold up on near-black */
+  --color-overdue: #ff5f57;
+  --color-soon: #ffb020;
+  --color-good: #4ade80;
 
   --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+
+  --radius-card: 20px;
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 html,
@@ -46,18 +57,81 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Day counts and version strings must align character-for-character when
-   scanned down a column. This is the mono face doing a job, not decorating. */
+/* Figures that must align down a column: day counts, versions, dates. */
 .tabular {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-/* Keyboard focus stays visible everywhere. */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+
+/* Navigation pills. The active one inverts, as in a segmented control. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.05rem;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--color-ink-soft);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.pill:hover {
+  background: var(--color-elevated);
+  color: var(--color-ink);
+}
+
+.pill-active,
+.pill-active:hover {
+  background: var(--color-ink);
+  color: var(--color-ground);
+  font-weight: 500;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--color-rule);
+  background: var(--color-elevated);
+  color: var(--color-ink);
+  transition: background-color 180ms ease;
+}
+
+.btn:hover {
+  background: var(--color-rule);
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-bright);
+}
+
 :where(a, button, [tabindex], input, select, textarea):focus-visible {
-  outline: 2px solid var(--color-ink);
+  outline: 2px solid var(--color-accent-bright);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {
