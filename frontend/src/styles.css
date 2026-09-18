@@ -57,6 +57,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Tailwind v4's reset does not restore the pointer cursor on buttons, and the
+   browser default for <button> is the plain arrow — so without this nothing
+   clickable looks clickable. */
+:where(button, [role='button'], summary):not(:disabled) {
+  cursor: pointer;
+}
+
+:where(button, [role='button']):disabled {
+  cursor: not-allowed;
+}
+
 /* Figures that must align down a column: day counts, versions, dates. */
 .tabular {
   font-family: var(--font-mono);
