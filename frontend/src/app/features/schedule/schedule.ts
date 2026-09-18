@@ -10,6 +10,20 @@ import {
 } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { Cycle } from '../../core/models';
+import { TechnologyView } from './technology-view';
+
+/** endoflife.date product slugs for the technologies in the registry. */
+const SLUGS: Record<string, string> = {
+  MongoDB: 'mongodb',
+  'Node.js': 'nodejs',
+  Angular: 'angular',
+  Kubernetes: 'kubernetes',
+  RHEL: 'rhel',
+  'Docker Engine': 'docker-engine',
+  'Apache Kafka': 'apache-kafka',
+  OpenSSL: 'openssl',
+  PostgreSQL: 'postgresql',
+};
 
 const MS_PER_DAY = 86_400_000;
 const CHART_WIDTH = 940;
@@ -39,15 +53,64 @@ interface Row {
  */
 @Component({
   selector: 'lime-schedule',
+  imports: [TechnologyView],
   host: { class: 'block' },
   template: `
     <header class="card mb-5 px-7 py-6">
       <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Schedule</h1>
-      <p class="mt-1 mb-0 max-w-[62ch] text-[14px] text-ink-soft">
-        Every technology cycle running in a customer environment, placed on the
-        date its support ends.
+      <p class="mt-1 mb-4 max-w-[62ch] text-[14px] text-ink-soft">
+        @if (picked() === 'estate') {
+          Every technology cycle running in a customer environment, placed on the
+          date its support ends.
+        } @else {
+          Every published release of one technology, with the cycles you run
+          marked.
+        }
       </p>
+
+      <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Choose a technology">
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="picked() === 'estate'"
+          class="rounded-full border px-4 py-1.5 text-[13px]"
+          [class.border-ink]="picked() === 'estate'"
+          [class.bg-ink]="picked() === 'estate'"
+          [class.text-ground]="picked() === 'estate'"
+          [class.border-rule]="picked() !== 'estate'"
+          [class.text-ink-soft]="picked() !== 'estate'"
+          (click)="picked.set('estate')"
+        >
+          Your estate
+        </button>
+
+        @for (tech of technologies(); track tech.name) {
+          <button
+            type="button"
+            role="tab"
+            [attr.aria-selected]="picked() === tech.name"
+            class="flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px]"
+            [class.border-ink]="picked() === tech.name"
+            [class.bg-ink]="picked() === tech.name"
+            [class.text-ground]="picked() === tech.name"
+            [class.border-rule]="picked() !== tech.name"
+            [class.text-ink-soft]="picked() !== tech.name"
+            (click)="picked.set(tech.name)"
+          >
+            {{ tech.name }}
+            @if (tech.atRisk > 0 && picked() !== tech.name) {
+              <span class="tabular text-[11px] text-overdue">{{ tech.atRisk }}</span>
+            }
+          </button>
+        }
+      </div>
     </header>
+
+    @if (picked() !== 'estate') {
+      <section class="card px-7 py-6">
+        <lime-technology-view [slug]="slugFor(picked())" [technology]="picked()" />
+      </section>
+    } @else {
 
     @if (inbox().length > 0) {
       <section class="card mb-5 px-7 py-5" aria-labelledby="needs-you">
@@ -235,6 +298,7 @@ interface Row {
         </ul>
       </aside>
     }
+    }
   `,
 })
 export class Schedule {
@@ -246,6 +310,32 @@ export class Schedule {
   protected readonly selected = signal<Cycle | null>(null);
   protected readonly showTable = signal(false);
   protected readonly inbox = this.store.inbox;
+
+  /** 'estate' for the cross-customer timeline, otherwise a technology name. */
+  protected readonly picked = signal<string>('estate');
+
+  /** Technologies in the registry, worst first, with a count of risky cycles. */
+  protected readonly technologies = computed(() => {
+    const names = [...new Set(this.store.cycles().map((c) => c.technology))];
+
+    return names
+      .filter((name) => SLUGS[name])
+      .map((name) => ({
+        name,
+        atRisk: this.store
+          .cyclesInUse()
+          .filter(
+            (c) =>
+              c.cycle.technology === name &&
+              (c.status === 'EOL' || c.status === 'NEAR'),
+          ).length,
+      }))
+      .sort((a, b) => b.atRisk - a.atRisk || a.name.localeCompare(b.name));
+  });
+
+  protected slugFor(technology: string): string {
+    return SLUGS[technology] ?? technology.toLowerCase();
+  }
 
   private readonly windowStart = computed(() => {
     const t = today();
