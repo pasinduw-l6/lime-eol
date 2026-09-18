@@ -1,17 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import {
-  NOTICE_DAYS,
-  formatDate,
-  formatDays,
-  parseDate,
-  statusFill,
-  today,
-} from '../../core/lifecycle';
+import { Router, RouterLink } from '@angular/router';
+import { NOTICE_DAYS, formatDays, parseDate, statusFill, today } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 
-const LINE_W = 520;
-const LINE_H = 150;
+const BODY_H = 176;
 
 interface Band {
   key: 'EOL' | 'NEAR' | 'SUPPORTED';
@@ -22,28 +14,43 @@ interface Band {
   bars: number[];
 }
 
+interface Bucket {
+  key: string;
+  label: string;
+  sub: string;
+  count: number;
+  height: number;
+  colour: string;
+  title: string;
+}
+
 /**
  * Overview.
  *
- * The three questions in one screen: how much is at risk, when it lands, and
- * what needs a decision today. Counts are the headline, but every number is a
- * link into the detail that explains it.
+ * Three questions, one per panel, and deliberately not the same question
+ * twice: when support ends, which customers carry the risk, and what needs a
+ * decision today.
  */
 @Component({
   selector: 'lime-overview',
   imports: [RouterLink],
   host: { class: 'block' },
   template: `
-    <!-- ── headline row ───────────────────────────────────────────── -->
+    <!-- headline -->
     <section class="card mb-5 px-7 py-6">
       <div class="mb-7 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="m-0 text-[34px] font-semibold tracking-[-0.02em]">
-            Lifecycle overview
+            {{ activeProject()?.name ?? 'Lifecycle overview' }}
           </h1>
           <p class="m-0 text-[14px] text-ink-soft">
-            {{ deploymentCount() }} environments across
-            {{ customerCount() }} customers · Lime 2026.1
+            @if (activeProject(); as project) {
+              Lime {{ project.limeVersion }} · {{ deploymentCount() }} environments ·
+              {{ engineerNames() }}
+            } @else {
+              {{ deploymentCount() }} environments across
+              {{ projectCount() }} projects
+            }
           </p>
         </div>
 
@@ -64,7 +71,6 @@ interface Band {
       </div>
 
       <div class="grid gap-7 lg:grid-cols-[300px_1fr]">
-        <!-- hero metric -->
         <div class="lg:border-r lg:border-rule lg:pr-7">
           <p class="m-0 text-[13px] text-ink-soft">Cycles at risk</p>
           <p class="m-0 mt-1 flex items-baseline gap-1 text-[46px] leading-none font-semibold tracking-[-0.02em]">
@@ -78,15 +84,14 @@ interface Band {
 
           <div class="mt-5 flex flex-wrap gap-2">
             <a routerLink="/schedule" class="btn btn-primary">Open schedule</a>
-            <a routerLink="/environments" class="btn">Environments</a>
+            <a routerLink="/projects" class="btn">Projects</a>
           </div>
         </div>
 
-        <!-- status bands: shape of the risk, not just a number -->
         <div class="grid gap-6 sm:grid-cols-3">
           @for (band of bands(); track band.key) {
             <div class="flex flex-col">
-              <p class="m-0 text-[22px] font-semibold tabular">{{ band.count }}</p>
+              <p class="tabular m-0 text-[22px] font-semibold">{{ band.count }}</p>
               <p class="m-0 mb-3 text-[13px]">
                 <span [style.color]="band.colour">{{ band.share }}%</span>
                 <span class="text-ink-soft"> {{ band.label }}</span>
@@ -107,146 +112,158 @@ interface Band {
       </div>
     </section>
 
-    <!-- ── three panels ───────────────────────────────────────────── -->
-    <div class="grid gap-5 xl:grid-cols-[1.15fr_1fr_0.95fr]">
-      <!-- support ending, cumulative -->
-      <section class="card px-6 py-5">
+    <!-- three panels, equal thirds, each header / body / footer -->
+    <div class="grid items-stretch gap-5 xl:grid-cols-3">
+      <!-- 1. when support ends -->
+      <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
           <h2 class="m-0 text-[15px] font-semibold">Support ending</h2>
           <span class="text-[12px] text-ink-soft">next {{ horizon() }} months</span>
         </header>
 
-        <svg
-          [attr.viewBox]="'0 0 ' + lineW + ' ' + lineH"
-          class="w-full"
-          role="img"
-          [attr.aria-label]="'Cumulative cycles reaching end of life over ' + horizon() + ' months'"
-        >
-          <defs>
-            <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--color-accent)" stop-opacity="0.45" />
-              <stop offset="100%" stop-color="var(--color-accent)" stop-opacity="0" />
-            </linearGradient>
-          </defs>
-
-          @for (g of gridLines; track g) {
-            <line x1="0" [attr.x2]="lineW" [attr.y1]="g" [attr.y2]="g"
-                  stroke="var(--color-rule)" stroke-width="1" />
-          }
-
-          <path [attr.d]="areaPath()" fill="url(#fade)" />
-          <path [attr.d]="linePath()" fill="none" stroke="var(--color-accent-bright)" stroke-width="2" />
-
-          @for (p of points(); track p.i) {
-            @if (p.marked) {
-              <circle [attr.cx]="p.x" [attr.cy]="p.y" r="3.5" fill="var(--color-accent-bright)" />
+        <div class="flex gap-3" [style.height.px]="bodyH">
+          <!-- y axis -->
+          <div
+            class="tabular flex w-6 flex-col justify-between text-right text-[10px] text-ink-faint"
+            aria-hidden="true"
+          >
+            @for (tick of yTicks(); track tick) {
+              <span>{{ tick }}</span>
             }
-          }
-        </svg>
+          </div>
 
-        <div class="mt-3 flex justify-between text-[12px] text-ink-soft">
-          <span>{{ firstMonth() }}</span>
-          <span class="tabular">{{ totalInHorizon() }} cycles</span>
-          <span>{{ lastMonth() }}</span>
+          <ol class="m-0 flex flex-1 list-none items-end gap-[3px] border-b border-rule p-0">
+            @for (bucket of buckets(); track bucket.key) {
+              <li class="flex h-full flex-1 flex-col justify-end" [attr.title]="bucket.title">
+                @if (bucket.count > 0) {
+                  <span
+                    class="tabular mb-1 text-center text-[10px]"
+                    [style.color]="bucket.colour"
+                    >{{ bucket.count }}</span
+                  >
+                }
+                <span
+                  class="w-full rounded-t-[3px]"
+                  [style.height.px]="bucket.height"
+                  [style.background]="bucket.colour"
+                  [style.opacity]="bucket.count ? 1 : 0.18"
+                ></span>
+              </li>
+            }
+          </ol>
         </div>
+
+        <footer class="mt-2 flex justify-between pl-9 text-[10px] text-ink-faint">
+          @for (bucket of buckets(); track bucket.key) {
+            <span class="flex-1 text-center">{{ bucket.label }}</span>
+          }
+        </footer>
       </section>
 
-      <!-- density heatmap: where the work lands -->
-      <section class="card px-6 py-5">
+      <!-- 2. who carries it -->
+      <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
-          <h2 class="m-0 text-[15px] font-semibold">When it lands</h2>
-          <span class="text-[12px] text-ink-soft">by month</span>
+          <h2 class="m-0 text-[15px] font-semibold">Risk by project</h2>
+          <span class="text-[12px] text-ink-soft">components affected</span>
         </header>
 
-        <table class="w-full border-separate border-spacing-[3px]">
-          <caption class="sr-only">Count of cycles reaching end of life per month</caption>
-          <thead>
-            <tr>
-              <th></th>
-              @for (m of monthNames; track m) {
-                <th class="pb-1 text-[10px] font-normal text-ink-faint">{{ m }}</th>
-              }
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of heatmap(); track row.year) {
-              <tr>
-                <th class="pr-2 text-right text-[11px] font-normal text-ink-soft">{{ row.year }}</th>
-                @for (cell of row.cells; track cell.month) {
-                  <td
-                    class="h-[26px] rounded-[4px]"
-                    [style.background]="cell.background"
-                    [attr.title]="cell.title"
-                  >
-                    <span class="sr-only">{{ cell.title }}</span>
-                  </td>
-                }
-              </tr>
-            }
-          </tbody>
-        </table>
-
-        <div class="mt-4 flex items-center justify-end gap-1.5 text-[11px] text-ink-soft">
-          <span>less</span>
-          @for (step of legend; track step) {
-            <span class="h-3 w-4 rounded-[3px]" [style.background]="shade(step)"></span>
+        <ol class="m-0 flex list-none flex-col justify-start gap-3 p-0" [style.min-height.px]="bodyH">
+          @for (row of projectRisk(); track row.id) {
+            <li>
+              <button
+                type="button"
+                class="block w-full text-left"
+                (click)="focus(row.id)"
+                [attr.aria-label]="'Focus ' + row.name"
+              >
+                <span class="mb-1 flex items-baseline justify-between gap-2 text-[12px]">
+                  <span class="truncate">{{ row.name }}</span>
+                  <span class="tabular shrink-0 text-ink-soft">
+                    Lime {{ row.limeVersion }}
+                  </span>
+                </span>
+                <span class="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full bg-elevated">
+                  @if (row.eol > 0) {
+                    <span
+                      class="h-full rounded-full"
+                      [style.width.%]="(row.eol / maxRisk()) * 100"
+                      style="background: var(--color-overdue)"
+                    ></span>
+                  }
+                  @if (row.near > 0) {
+                    <span
+                      class="h-full rounded-full"
+                      [style.width.%]="(row.near / maxRisk()) * 100"
+                      style="background: var(--color-soon)"
+                    ></span>
+                  }
+                </span>
+              </button>
+            </li>
+          } @empty {
+            <li class="text-[13px] text-ink-soft">Nothing at risk in scope.</li>
           }
-          <span>more</span>
-        </div>
+        </ol>
+
+        <footer class="mt-3 flex items-center gap-4 border-t border-rule pt-3 text-[11px] text-ink-soft">
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block h-2 w-3 rounded-full" style="background: var(--color-overdue)"></span>
+            past EOL
+          </span>
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block h-2 w-3 rounded-full" style="background: var(--color-soon)"></span>
+            within {{ noticeDays }}d
+          </span>
+        </footer>
       </section>
 
-      <!-- needs you -->
-      <section class="card px-6 py-5">
+      <!-- 3. what to do -->
+      <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
           <h2 class="m-0 text-[15px] font-semibold">Needs you</h2>
-          <a routerLink="/schedule" class="text-[12px] text-accent-bright no-underline hover:underline">
-            All items
-          </a>
+          <span class="tabular text-[12px] text-ink-soft">{{ inbox().length }}</span>
         </header>
 
-        <ul class="m-0 flex list-none flex-col p-0">
-          @for (item of inbox(); track item.cycle.id) {
-            <li class="flex items-center gap-3 border-b border-rule py-2.5 last:border-b-0">
+        <ul class="m-0 flex list-none flex-col p-0" [style.min-height.px]="bodyH">
+          @for (item of inboxRows(); track item.id) {
+            <li class="flex h-[52px] items-center gap-3 border-b border-rule last:border-b-0">
               <span
                 class="h-2 w-2 shrink-0 rounded-full"
-                [style.background]="fill(item.days === null ? 'UNKNOWN' : item.days <= 0 ? 'EOL' : 'NEAR')"
+                [style.background]="item.colour"
                 aria-hidden="true"
               ></span>
               <span class="min-w-0 flex-1">
-                <span class="block truncate text-[14px]">
-                  {{ item.cycle.technology }} {{ item.cycle.cycle }}
-                </span>
-                <span class="block truncate text-[12px] text-ink-soft">
-                  {{ item.deployments.length }} env ·
-                  {{ item.action ? item.action.jiraKey : 'no plan' }}
-                </span>
+                <span class="block truncate text-[13px]">{{ item.title }}</span>
+                <span class="block truncate text-[11px] text-ink-soft">{{ item.sub }}</span>
               </span>
-              <span
-                class="tabular shrink-0 text-[13px]"
-                [style.color]="fill(item.days === null ? 'UNKNOWN' : item.days <= 0 ? 'EOL' : 'NEAR')"
-              >
-                {{ days(item.days) }}
+              <span class="tabular shrink-0 text-[12px]" [style.color]="item.colour">
+                {{ item.days }}
               </span>
             </li>
           } @empty {
             <li class="py-3 text-[13px] text-ink-soft">Nothing needs attention.</li>
           }
         </ul>
+
+        <footer class="mt-3 border-t border-rule pt-3">
+          <a routerLink="/schedule" class="text-[12px] text-accent-bright no-underline hover:underline">
+            Open the schedule
+          </a>
+        </footer>
       </section>
     </div>
   `,
 })
 export class Overview {
   private readonly store = inject(RegistryStore);
+  private readonly router = inject(Router);
 
   protected readonly noticeDays = NOTICE_DAYS;
-  protected readonly lineW = LINE_W;
-  protected readonly lineH = LINE_H;
+  protected readonly bodyH = BODY_H;
   protected readonly horizons = [6, 12, 24] as const;
   protected readonly horizon = signal<number>(12);
-  protected readonly monthNames = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-  protected readonly legend = [0.15, 0.35, 0.6, 1];
   protected readonly inbox = this.store.inbox;
+  protected readonly activeProject = this.store.activeProject;
 
   protected readonly inUse = computed(() => this.store.cyclesInUse().length);
   protected readonly overdue = computed(
@@ -257,14 +274,18 @@ export class Overview {
   );
   protected readonly atRisk = computed(() => this.overdue() + this.nearCount());
 
-  protected readonly deploymentCount = computed(
-    () => this.store.deployments().length,
-  );
-  protected readonly customerCount = computed(
-    () => new Set(this.store.deployments().map((d) => d.customer)).size,
-  );
+  protected readonly deploymentCount = computed(() => this.store.deployments().length);
+  protected readonly projectCount = computed(() => this.store.projects().length);
 
-  /** Each band gets a bar per member, heights ranked by urgency. */
+  protected readonly engineerNames = computed(() => {
+    const project = this.activeProject();
+    if (!project) {
+      return '';
+    }
+    const names = this.store.engineersFor(project).map((e) => e.name);
+    return names.length ? names.join(' and ') : 'unstaffed';
+  });
+
   protected readonly bands = computed<Band[]>(() => {
     const all = this.store.cyclesInUse();
     const total = Math.max(1, all.length);
@@ -272,7 +293,7 @@ export class Overview {
     const build = (key: Band['key'], label: string): Band => {
       const members = all.filter((c) => c.status === key);
       const bars = members.length
-        ? members.map((m, i) => 100 - (i / Math.max(1, members.length)) * 55)
+        ? members.map((_, i) => 100 - (i / Math.max(1, members.length)) * 55)
         : [8];
       return {
         key,
@@ -291,118 +312,115 @@ export class Overview {
     ];
   });
 
-  /** Cumulative count of cycles whose support has ended, month by month. */
-  private readonly series = computed(() => {
-    const months = this.horizon();
+  /**
+   * One column per month, plus a leading bucket for everything already past
+   * end of life — otherwise the most urgent work is the one thing the chart
+   * cannot show.
+   */
+  protected readonly buckets = computed<Bucket[]>(() => {
     const start = today();
+    const months = this.horizon();
+    const step = months > 12 ? 2 : 1;
     const dated = this.store
       .cyclesInUse()
-      .map((c) => parseDate(c.cycle.eolDate))
-      .filter((d): d is Date => d !== null);
+      .map((c) => ({ cycle: c.cycle, date: parseDate(c.cycle.eolDate) }))
+      .filter((e): e is { cycle: (typeof e)['cycle']; date: Date } => e.date !== null);
 
-    const out: number[] = [];
-    for (let i = 0; i <= months; i++) {
-      const edge = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i + 1, 0);
-      out.push(dated.filter((d) => d.getTime() <= edge).length);
+    const overdue = dated.filter((e) => e.date.getTime() <= start.getTime());
+    const raw: { key: string; label: string; sub: string; count: number; names: string[]; colour: string }[] = [
+      {
+        key: 'past',
+        label: 'past',
+        sub: 'already ended',
+        count: overdue.length,
+        names: overdue.map((e) => `${e.cycle.technology} ${e.cycle.cycle}`),
+        colour: 'var(--color-overdue)',
+      },
+    ];
+
+    for (let i = 0; i < months; i += step) {
+      const from = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1);
+      const to = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i + step, 1);
+      const hits = dated.filter(
+        (e) => e.date.getTime() >= from && e.date.getTime() < to && e.date.getTime() > start.getTime(),
+      );
+      const days = Math.round((from - start.getTime()) / 86_400_000);
+
+      raw.push({
+        key: `m${i}`,
+        label: new Date(from).toLocaleDateString('en-GB', {
+          month: 'short',
+          timeZone: 'UTC',
+        }),
+        sub: new Date(from).toLocaleDateString('en-GB', {
+          month: 'long',
+          year: 'numeric',
+          timeZone: 'UTC',
+        }),
+        count: hits.length,
+        names: hits.map((e) => `${e.cycle.technology} ${e.cycle.cycle}`),
+        colour: days <= NOTICE_DAYS ? 'var(--color-soon)' : 'var(--color-accent)',
+      });
     }
-    return out;
-  });
 
-  protected readonly points = computed(() => {
-    const values = this.series();
-    const max = Math.max(1, ...values);
-    return values.map((v, i) => ({
-      i,
-      x: (i / Math.max(1, values.length - 1)) * LINE_W,
-      y: LINE_H - 10 - (v / max) * (LINE_H - 30),
-      marked: i > 0 && v > values[i - 1],
+    const max = Math.max(1, ...raw.map((b) => b.count));
+
+    return raw.map((b) => ({
+      key: b.key,
+      label: b.label,
+      sub: b.sub,
+      count: b.count,
+      colour: b.colour,
+      height: b.count ? Math.max(6, (b.count / max) * (BODY_H - 22)) : 3,
+      title: b.count ? `${b.sub}: ${b.names.join(', ')}` : `${b.sub}: nothing ends`,
     }));
   });
 
-  protected readonly linePath = computed(() =>
-    this.points()
-      .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-      .join(' '),
-  );
-
-  protected readonly areaPath = computed(
-    () => `${this.linePath()} L${LINE_W},${LINE_H} L0,${LINE_H} Z`,
-  );
-
-  protected readonly gridLines = [30, 70, 110];
-
-  protected readonly totalInHorizon = computed(() => {
-    const values = this.series();
-    return values[values.length - 1] - values[0];
+  protected readonly yTicks = computed(() => {
+    const max = Math.max(1, ...this.buckets().map((b) => b.count));
+    return [max, Math.round(max / 2), 0];
   });
 
-  protected readonly firstMonth = computed(() => this.monthLabel(0));
-  protected readonly lastMonth = computed(() => this.monthLabel(this.horizon()));
+  /** Which customers actually carry the risk — the panel that replaced a heatmap. */
+  protected readonly projectRisk = computed(() =>
+    this.store
+      .projects()
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        limeVersion: project.limeVersion,
+        ...this.store.riskOf(project.id),
+      }))
+      .filter((row) => row.eol > 0 || row.near > 0)
+      .sort((a, b) => b.eol - a.eol || b.near - a.near)
+      .slice(0, 5),
+  );
 
-  /** Years × months grid of how many cycles end in each month. */
-  protected readonly heatmap = computed(() => {
-    const start = today().getUTCFullYear();
-    const dated = this.store
-      .cyclesInUse()
-      .map((c) => ({ date: parseDate(c.cycle.eolDate), cycle: c.cycle }))
-      .filter((e): e is { date: Date; cycle: (typeof e)['cycle'] } => e.date !== null);
+  protected readonly maxRisk = computed(() =>
+    Math.max(1, ...this.projectRisk().map((r) => r.eol + r.near)),
+  );
 
-    const years = [start, start + 1, start + 2];
-    const max = Math.max(
-      1,
-      ...years.flatMap((y) =>
-        Array.from({ length: 12 }, (_, m) =>
-          dated.filter(
-            (e) => e.date.getUTCFullYear() === y && e.date.getUTCMonth() === m,
-          ).length,
-        ),
-      ),
-    );
-
-    return years.map((year) => ({
-      year,
-      cells: Array.from({ length: 12 }, (_, month) => {
-        const hits = dated.filter(
-          (e) => e.date.getUTCFullYear() === year && e.date.getUTCMonth() === month,
-        );
+  protected readonly inboxRows = computed(() =>
+    this.inbox()
+      .slice(0, 3)
+      .map((item) => {
+        const customers = [...new Set(item.deployments.map((d) => d.customer))];
         return {
-          month,
-          count: hits.length,
-          background: hits.length ? this.shade(hits.length / max) : 'var(--color-elevated)',
-          title: hits.length
-            ? `${hits.length} ending in ${this.monthName(month)} ${year}: ${hits
-                .map((h) => `${h.cycle.technology} ${h.cycle.cycle}`)
-                .join(', ')}`
-            : `Nothing ends in ${this.monthName(month)} ${year}`,
+          id: item.cycle.id,
+          title: `${item.cycle.technology} ${item.cycle.cycle}`,
+          sub: item.action
+            ? `${item.action.jiraKey} · ${customers.length} customer(s)`
+            : `no plan · ${customers.join(', ') || 'not deployed'}`,
+          days: formatDays(item.days),
+          colour: statusFill(
+            item.days === null ? 'UNKNOWN' : item.days <= 0 ? 'EOL' : 'NEAR',
+          ),
         };
       }),
-    }));
-  });
+  );
 
-  protected shade(intensity: number): string {
-    const clamped = Math.max(0.15, Math.min(1, intensity));
-    return `color-mix(in oklab, var(--color-accent) ${Math.round(clamped * 100)}%, var(--color-elevated))`;
+  protected focus(projectId: string): void {
+    this.store.scope.set(projectId);
+    void this.router.navigate(['/schedule']);
   }
-
-  private monthLabel(offset: number): string {
-    const start = today();
-    return new Date(
-      Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + offset, 1),
-    ).toLocaleDateString('en-GB', {
-      month: 'short',
-      year: '2-digit',
-      timeZone: 'UTC',
-    });
-  }
-
-  private monthName(month: number): string {
-    return new Date(Date.UTC(2026, month, 1)).toLocaleDateString('en-GB', {
-      month: 'long',
-      timeZone: 'UTC',
-    });
-  }
-
-  protected days = formatDays;
-  protected date = formatDate;
-  protected fill = statusFill;
 }
