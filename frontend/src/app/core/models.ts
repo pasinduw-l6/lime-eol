@@ -41,8 +41,38 @@ export interface DeploymentComponent {
   source: 'LIME_DEFAULT' | 'OVERRIDE';
 }
 
+/** A DevOps engineer. Projects are staffed, and staffing drives the inbox. */
+export interface Engineer {
+  id: string;
+  name: string;
+  initials: string;
+  role: 'Lead' | 'Engineer';
+}
+
+export type ProjectStatus = 'ACTIVE' | 'ONBOARDING' | 'PAUSED';
+
+/**
+ * One customer's Lime installation — the unit engineers actually work in.
+ *
+ * A customer may run more than one (a second brand, a separate region), so
+ * this is deliberately not the same record as the customer.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  customer: string;
+  code: string;
+  /** Which Lime release this customer is on — differs per project. */
+  limeVersion: string;
+  status: ProjectStatus;
+  engineerIds: string[];
+  startedAt: string;
+  notes?: string;
+}
+
 export interface Deployment {
   id: string;
+  projectId: string;
   customer: string;
   customerCode: string;
   name: string;

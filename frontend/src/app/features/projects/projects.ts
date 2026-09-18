@@ -1,0 +1,408 @@
+import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { RegistryStore } from '../../core/registry.store';
+import { LIME_VERSIONS } from '../../core/projects.mock';
+import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
+
+const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
+
+/**
+ * Projects.
+ *
+ * One row per customer installation, with the Lime release it runs, who is
+ * staffed on it and how much of its stack is out of support. Built as a
+ * searchable, filterable list rather than a card wall, because the number of
+ * projects grows with sales.
+ */
+@Component({
+  selector: 'lime-projects',
+  imports: [FormsModule],
+  host: { class: 'block' },
+  template: `
+    <section class="card mb-5 px-7 py-6">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Projects</h1>
+          <p class="m-0 text-[14px] text-ink-soft">
+            {{ projects().length }} customer installations ·
+            {{ atRiskProjects() }} with something out of support
+          </p>
+        </div>
+        <button type="button" class="btn btn-primary" (click)="toggleForm()">
+          {{ showForm() ? 'Cancel' : 'New project' }}
+        </button>
+      </div>
+
+      <!-- add project -->
+      @if (showForm()) {
+        <form
+          class="mt-6 grid gap-5 border-t border-rule pt-6 lg:grid-cols-2"
+          (submit)="create($event)"
+        >
+          <div class="grid gap-4">
+            <label class="block text-[12px] text-ink-soft">
+              Project name
+              <input
+                required
+                name="name"
+                [(ngModel)]="form.name"
+                placeholder="Acme Bank — Core"
+                class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
+              />
+            </label>
+
+            <div class="grid grid-cols-[1fr_120px] gap-3">
+              <label class="block text-[12px] text-ink-soft">
+                Customer
+                <input
+                  required
+                  name="customer"
+                  [(ngModel)]="form.customer"
+                  class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
+                />
+              </label>
+              <label class="block text-[12px] text-ink-soft">
+                Code
+                <input
+                  required
+                  name="code"
+                  [(ngModel)]="form.code"
+                  maxlength="6"
+                  placeholder="ACME"
+                  class="tabular mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink uppercase"
+                />
+              </label>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block text-[12px] text-ink-soft">
+                Lime version
+                <select
+                  name="limeVersion"
+                  [(ngModel)]="form.limeVersion"
+                  class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
+                >
+                  @for (v of limeVersions; track v) {
+                    <option [value]="v">{{ v }}</option>
+                  }
+                </select>
+              </label>
+              <label class="block text-[12px] text-ink-soft">
+                Status
+                <select
+                  name="status"
+                  [(ngModel)]="form.status"
+                  class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
+                >
+                  @for (s of statuses; track s) {
+                    <option [value]="s">{{ s }}</option>
+                  }
+                </select>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-[140px_1fr] gap-3">
+              <label class="block text-[12px] text-ink-soft">
+                Hosting
+                <select
+                  name="location"
+                  [(ngModel)]="form.location"
+                  class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
+                >
+                  <option value="EC2">AWS</option>
+                  <option value="CUSTOMER_SITE">Customer site</option>
+                </select>
+              </label>
+              <label class="block text-[12px] text-ink-soft">
+                Region or site
+                <input
+                  name="locationDetail"
+                  [(ngModel)]="form.locationDetail"
+                  placeholder="eu-west-1"
+                  class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="grid content-start gap-5">
+            <fieldset class="m-0 border-0 p-0">
+              <legend class="mb-2 p-0 text-[12px] text-ink-soft">Environments</legend>
+              <div class="flex flex-wrap gap-2">
+                @for (env of allEnvironments; track env) {
+                  <button
+                    type="button"
+                    class="rounded-full border px-4 py-1.5 text-[13px]"
+                    [class.border-accent]="form.environments.includes(env)"
+                    [class.bg-accent]="form.environments.includes(env)"
+                    [class.border-rule]="!form.environments.includes(env)"
+                    (click)="toggleEnv(env)"
+                  >
+                    {{ env }}
+                  </button>
+                }
+              </div>
+            </fieldset>
+
+            <fieldset class="m-0 border-0 p-0">
+              <legend class="mb-2 p-0 text-[12px] text-ink-soft">
+                Assigned engineers
+              </legend>
+              <div class="flex flex-wrap gap-2">
+                @for (e of engineers(); track e.id) {
+                  <button
+                    type="button"
+                    class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px]"
+                    [class.border-accent]="form.engineerIds.includes(e.id)"
+                    [class.bg-elevated]="form.engineerIds.includes(e.id)"
+                    [class.border-rule]="!form.engineerIds.includes(e.id)"
+                    (click)="toggleEngineer(e.id)"
+                  >
+                    <span
+                      class="grid h-6 w-6 place-items-center rounded-full bg-accent-deep text-[10px] text-ink"
+                      >{{ e.initials }}</span
+                    >
+                    {{ e.name }}
+                  </button>
+                }
+              </div>
+            </fieldset>
+
+            <p class="m-0 text-[12px] text-ink-soft">
+              The project inherits the component set of Lime
+              {{ form.limeVersion }}, so its EOL risk appears on every screen as
+              soon as it is created.
+            </p>
+
+            @if (error()) {
+              <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
+            }
+
+            <div class="flex gap-2">
+              <button type="submit" class="btn btn-primary">Create project</button>
+              <button type="button" class="btn" (click)="toggleForm()">Cancel</button>
+            </div>
+          </div>
+        </form>
+      }
+    </section>
+
+    <!-- filters -->
+    <section class="card mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
+      <input
+        type="search"
+        [(ngModel)]="query"
+        placeholder="Search project, customer or code"
+        aria-label="Search projects"
+        class="min-w-[240px] flex-1 rounded-full border border-rule bg-elevated px-4 py-2 text-[14px] text-ink"
+      />
+      <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
+        @for (f of statusFilters; track f) {
+          <button
+            type="button"
+            class="rounded-full px-3.5 py-1.5 text-[13px] capitalize"
+            [class.bg-ink]="statusFilter() === f"
+            [class.text-ground]="statusFilter() === f"
+            [class.text-ink-soft]="statusFilter() !== f"
+            (click)="statusFilter.set(f)"
+          >
+            {{ f.toLowerCase() }}
+          </button>
+        }
+      </div>
+      <span class="tabular text-[13px] text-ink-soft">{{ filtered().length }} shown</span>
+    </section>
+
+    <!-- list -->
+    <section class="card overflow-hidden">
+      <table class="w-full border-collapse text-[14px]">
+        <caption class="sr-only">Projects with Lime version, staffing and risk</caption>
+        <thead>
+          <tr class="border-b border-rule text-left text-[12px] text-ink-soft">
+            <th class="px-6 py-3 font-medium">Project</th>
+            <th class="px-3 py-3 font-medium">Lime</th>
+            <th class="px-3 py-3 font-medium">Environments</th>
+            <th class="px-3 py-3 font-medium">Engineers</th>
+            <th class="px-3 py-3 font-medium">At risk</th>
+            <th class="px-6 py-3 font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of filtered(); track row.project.id) {
+            <tr class="border-b border-rule last:border-b-0">
+              <td class="px-6 py-3">
+                <button
+                  type="button"
+                  class="text-left"
+                  (click)="open(row.project)"
+                  [attr.aria-label]="'Open ' + row.project.name"
+                >
+                  <span class="block font-medium">{{ row.project.name }}</span>
+                  <span class="tabular block text-[12px] text-ink-soft">
+                    {{ row.project.code }} · since {{ row.project.startedAt }}
+                  </span>
+                </button>
+              </td>
+              <td class="tabular px-3 py-3">{{ row.project.limeVersion }}</td>
+              <td class="px-3 py-3 text-ink-soft">
+                {{ row.environments.join(', ') || '—' }}
+              </td>
+              <td class="px-3 py-3">
+                <span class="flex -space-x-1.5">
+                  @for (e of row.engineers; track e.id) {
+                    <span
+                      class="grid h-7 w-7 place-items-center rounded-full border border-surface bg-accent-deep text-[10px]"
+                      [attr.title]="e.name + ' · ' + e.role"
+                      >{{ e.initials }}</span
+                    >
+                  }
+                </span>
+              </td>
+              <td class="tabular px-3 py-3">
+                @if (row.risk.eol > 0) {
+                  <span class="text-overdue">{{ row.risk.eol }} EOL</span>
+                }
+                @if (row.risk.near > 0) {
+                  <span class="text-soon">
+                    @if (row.risk.eol > 0) {<span class="text-ink-faint"> · </span>}
+                    {{ row.risk.near }} near
+                  </span>
+                }
+                @if (row.risk.eol === 0 && row.risk.near === 0) {
+                  <span class="text-ink-faint">clear</span>
+                }
+              </td>
+              <td class="px-6 py-3">
+                <span
+                  class="rounded-full border px-2.5 py-0.5 text-[12px]"
+                  [class.border-rule]="row.project.status !== 'ACTIVE'"
+                  [class.text-ink-soft]="row.project.status !== 'ACTIVE'"
+                  [class.border-accent]="row.project.status === 'ACTIVE'"
+                  [class.text-accent-bright]="row.project.status === 'ACTIVE'"
+                >
+                  {{ row.project.status.toLowerCase() }}
+                </span>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="px-6 py-8 text-center text-ink-soft">
+                No project matches that search.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  `,
+})
+export class Projects {
+  private readonly store = inject(RegistryStore);
+  private readonly router = inject(Router);
+
+  protected readonly projects = this.store.projects;
+  protected readonly engineers = this.store.engineers;
+  protected readonly limeVersions = LIME_VERSIONS;
+  protected readonly allEnvironments = ALL_ENVIRONMENTS;
+  protected readonly statuses: ProjectStatus[] = ['ACTIVE', 'ONBOARDING', 'PAUSED'];
+  protected readonly statusFilters = ['ALL', 'ACTIVE', 'ONBOARDING', 'PAUSED'] as const;
+
+  protected readonly query = signal('');
+  protected readonly statusFilter = signal<(typeof this.statusFilters)[number]>('ALL');
+  protected readonly showForm = signal(false);
+  protected readonly error = signal<string | null>(null);
+
+  protected form = {
+    name: '',
+    customer: '',
+    code: '',
+    limeVersion: LIME_VERSIONS[0],
+    status: 'ONBOARDING' as ProjectStatus,
+    engineerIds: [] as string[],
+    environments: ['PROD'] as EnvironmentName[],
+    location: 'EC2' as 'EC2' | 'CUSTOMER_SITE',
+    locationDetail: '',
+  };
+
+  protected readonly rows = computed(() =>
+    this.store.projects().map((project) => ({
+      project,
+      engineers: this.store.engineersFor(project),
+      risk: this.store.riskOf(project.id),
+      environments: this.store
+        .deploymentsOf(project.id)
+        .map((d) => d.environment),
+    })),
+  );
+
+  protected readonly filtered = computed(() => {
+    const needle = this.query().trim().toLowerCase();
+    const status = this.statusFilter();
+
+    return this.rows()
+      .filter((r) => status === 'ALL' || r.project.status === status)
+      .filter(
+        (r) =>
+          !needle ||
+          r.project.name.toLowerCase().includes(needle) ||
+          r.project.customer.toLowerCase().includes(needle) ||
+          r.project.code.toLowerCase().includes(needle),
+      )
+      .sort((a, b) => b.risk.eol - a.risk.eol || b.risk.near - a.risk.near);
+  });
+
+  protected readonly atRiskProjects = computed(
+    () => this.rows().filter((r) => r.risk.eol > 0 || r.risk.near > 0).length,
+  );
+
+  protected toggleForm(): void {
+    this.showForm.update((open) => !open);
+    this.error.set(null);
+  }
+
+  protected toggleEnv(env: EnvironmentName): void {
+    this.form.environments = this.form.environments.includes(env)
+      ? this.form.environments.filter((e) => e !== env)
+      : [...this.form.environments, env];
+  }
+
+  protected toggleEngineer(id: string): void {
+    this.form.engineerIds = this.form.engineerIds.includes(id)
+      ? this.form.engineerIds.filter((e) => e !== id)
+      : [...this.form.engineerIds, id];
+  }
+
+  protected create(event: Event): void {
+    event.preventDefault();
+
+    if (!this.form.name.trim() || !this.form.customer.trim() || !this.form.code.trim()) {
+      this.error.set('Project name, customer and code are all required.');
+      return;
+    }
+    if (this.form.environments.length === 0) {
+      this.error.set('Pick at least one environment to create.');
+      return;
+    }
+
+    const project = this.store.addProject({ ...this.form });
+    this.showForm.set(false);
+    this.error.set(null);
+    this.form = {
+      ...this.form,
+      name: '',
+      customer: '',
+      code: '',
+      engineerIds: [],
+      locationDetail: '',
+    };
+    void this.router.navigate(['/overview']);
+    void project;
+  }
+
+  /** Selecting a project scopes the whole app to it. */
+  protected open(project: Project): void {
+    this.store.scope.set(project.id);
+    void this.router.navigate(['/overview']);
+  }
+}

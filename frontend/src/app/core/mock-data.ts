@@ -225,6 +225,7 @@ const LIME_DEFAULTS: Deployment['components'] = [
 export const DEPLOYMENTS: Deployment[] = [
   {
     id: 'acme-prod',
+    projectId: 'acme',
     customer: 'Acme Bank',
     customerCode: 'ACME',
     name: 'Acme Production',
@@ -237,6 +238,7 @@ export const DEPLOYMENTS: Deployment[] = [
   },
   {
     id: 'acme-uat',
+    projectId: 'acme',
     customer: 'Acme Bank',
     customerCode: 'ACME',
     name: 'Acme UAT',
@@ -249,6 +251,7 @@ export const DEPLOYMENTS: Deployment[] = [
   },
   {
     id: 'nwnd-prod',
+    projectId: 'nwnd',
     customer: 'Northwind Insurance',
     customerCode: 'NWND',
     name: 'Northwind Production',
@@ -265,6 +268,7 @@ export const DEPLOYMENTS: Deployment[] = [
   },
   {
     id: 'nwnd-dev',
+    projectId: 'nwnd',
     customer: 'Northwind Insurance',
     customerCode: 'NWND',
     name: 'Northwind DEV',

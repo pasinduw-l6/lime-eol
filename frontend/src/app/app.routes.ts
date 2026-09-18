@@ -9,6 +9,12 @@ export const routes: Routes = [
       import('./features/overview/overview').then((m) => m.Overview),
   },
   {
+    path: 'projects',
+    title: 'Projects · Lime Lifecycle',
+    loadComponent: () =>
+      import('./features/projects/projects').then((m) => m.Projects),
+  },
+  {
     path: 'schedule',
     title: 'Schedule · Lime Lifecycle',
     loadComponent: () =>
