@@ -1,7 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { ComponentChange, summariseChange } from './diff';
 import { daysToEol, statusOf, SupportStatus } from './lifecycle';
-import { CYCLES, UPGRADE_ACTIONS } from './mock-data';
+import { CYCLES, TECHNOLOGIES, UPGRADE_ACTIONS } from './mock-data';
 import {
   ALL_DEPLOYMENTS,
   ALL_TOPOLOGIES,
@@ -18,6 +18,7 @@ import {
   EnvironmentName,
   Project,
   Revision,
+  Technology,
   UpgradeAction,
 } from './models';
 
@@ -134,7 +135,6 @@ export class RegistryStore {
   readonly topologies = this._topologies.asReadonly();
   readonly actions = this._actions.asReadonly();
   readonly projects = this._projects.asReadonly();
-  readonly engineers = signal<Engineer[]>(ENGINEERS).asReadonly();
 
   readonly allDeployments = this._deployments.asReadonly();
 
@@ -295,6 +295,201 @@ export class RegistryStore {
       }),
   );
 
+  // ---- writes --------------------------------------------------------------
+  //
+  // Deletes are guarded rather than cascading: removing something still in use
+  // would destroy the history this tool exists to keep, so a guarded delete
+  // returns a reason instead. Same rule as the database (see db-design-notes).
+
+  private readonly _technologies = signal<Technology[]>(TECHNOLOGIES);
+  private readonly _engineers = signal<Engineer[]>(ENGINEERS);
+
+  readonly technologies = this._technologies.asReadonly();
+  readonly engineers = this._engineers.asReadonly();
+
+  // Technologies -------------------------------------------------------------
+
+  saveTechnology(input: Omit<Technology, 'id'> & { id?: string }): Technology {
+    const technology: Technology = { ...input, id: input.id ?? newId('t') };
+
+    this._technologies.update((all) =>
+      input.id
+        ? all.map((t) => (t.id === input.id ? technology : t))
+        : [...all, technology],
+    );
+    return technology;
+  }
+
+  /** Blocked while any environment still runs it. */
+  deleteTechnology(id: string): string | null {
+    const technology = this._technologies().find((t) => t.id === id);
+    if (!technology) {
+      return 'That technology no longer exists.';
+    }
+
+    const users = this._deployments().filter((d) =>
+      d.components.some((c) => c.technology === technology.name),
+    );
+    if (users.length > 0) {
+      return `${technology.name} is still installed on ${users.length} environment(s). Remove it there first.`;
+    }
+
+    this._technologies.update((all) => all.filter((t) => t.id !== id));
+    this._cycles.update((all) => all.filter((c) => c.technology !== technology.name));
+    return null;
+  }
+
+  // Cycles -------------------------------------------------------------------
+
+  /** Manual entry for anything endoflife.date does not publish. */
+  saveCycle(input: Omit<Cycle, 'id'> & { id?: string }): Cycle {
+    const cycle: Cycle = { ...input, id: input.id ?? newId('c') };
+
+    this._cycles.update((all) =>
+      input.id ? all.map((c) => (c.id === input.id ? cycle : c)) : [...all, cycle],
+    );
+    return cycle;
+  }
+
+  deleteCycle(id: string): string | null {
+    const cycle = this._cycles().find((c) => c.id === id);
+    if (!cycle) {
+      return 'That cycle no longer exists.';
+    }
+    if (this.deploymentsUsing(cycle).length > 0) {
+      return `${cycle.technology} ${cycle.cycle} is still deployed. Remove it from those environments first.`;
+    }
+
+    this._cycles.update((all) => all.filter((c) => c.id !== id));
+    return null;
+  }
+
+  // Engineers ----------------------------------------------------------------
+
+  saveEngineer(input: Omit<Engineer, 'id'> & { id?: string }): Engineer {
+    const engineer: Engineer = { ...input, id: input.id ?? newId('e') };
+
+    this._engineers.update((all) =>
+      input.id ? all.map((e) => (e.id === input.id ? engineer : e)) : [...all, engineer],
+    );
+    return engineer;
+  }
+
+  deleteEngineer(id: string): string | null {
+    const staffed = this._projects().filter((p) => p.engineerIds.includes(id));
+    if (staffed.length > 0) {
+      return `Still assigned to ${staffed.length} project(s). Unassign them first.`;
+    }
+
+    this._engineers.update((all) => all.filter((e) => e.id !== id));
+    return null;
+  }
+
+  // Projects -----------------------------------------------------------------
+
+  updateProject(id: string, patch: Partial<Project>): void {
+    this._projects.update((all) =>
+      all.map((p) => (p.id === id ? { ...p, ...patch, id: p.id } : p)),
+    );
+  }
+
+  /**
+   * Removes a project and everything recorded against it. Destructive, so the
+   * UI confirms first and says exactly what will go.
+   */
+  deleteProject(id: string): void {
+    const deploymentIds = this.deploymentsOf(id).map((d) => d.id);
+
+    this._projects.update((all) => all.filter((p) => p.id !== id));
+    this._deployments.update((all) => all.filter((d) => d.projectId !== id));
+    this._topologies.update((all) =>
+      all.filter((t) => !deploymentIds.includes(t.deploymentId)),
+    );
+    this._revisions.update((all) =>
+      all.filter((r) => !deploymentIds.includes(r.deploymentId)),
+    );
+
+    if (this.scope() === id) {
+      this.scope.set('all');
+    }
+  }
+
+  // Environments -------------------------------------------------------------
+
+  addEnvironment(
+    projectId: string,
+    environment: EnvironmentName,
+    location: Deployment['location'],
+    locationDetail: string,
+  ): string | null {
+    const project = this._projects().find((p) => p.id === projectId);
+    if (!project) {
+      return 'That project no longer exists.';
+    }
+    if (this.deploymentsOf(projectId).some((d) => d.environment === environment)) {
+      return `${project.customer} already has a ${environment} environment.`;
+    }
+
+    const deployment = buildDeployment(project, environment, location, locationDetail);
+    this._deployments.update((all) => [...all, deployment]);
+    this._topologies.update((all) => [...all, buildTopology(deployment)]);
+    this._revisions.update((all) => [
+      ...all,
+      {
+        id: `${deployment.id}-r1`,
+        deploymentId: deployment.id,
+        number: 1,
+        message: `Create ${environment} from Lime ${project.limeVersion}`,
+        author: 'Platform Admin',
+        createdAt: new Date().toISOString(),
+        content: buildTopology(deployment),
+      },
+    ]);
+    return null;
+  }
+
+  updateDeployment(id: string, patch: Partial<Deployment>): void {
+    this._deployments.update((all) =>
+      all.map((d) => (d.id === id ? { ...d, ...patch, id: d.id } : d)),
+    );
+  }
+
+  deleteDeployment(id: string): void {
+    this._deployments.update((all) => all.filter((d) => d.id !== id));
+    this._topologies.update((all) => all.filter((t) => t.deploymentId !== id));
+    this._revisions.update((all) => all.filter((r) => r.deploymentId !== id));
+    this._actions.update((all) =>
+      all.map((a) => ({
+        ...a,
+        deploymentIds: a.deploymentIds.filter((d) => d !== id),
+      })),
+    );
+  }
+
+  // Upgrade actions ----------------------------------------------------------
+
+  saveAction(input: Omit<UpgradeAction, 'id'> & { id?: string }): UpgradeAction {
+    const action: UpgradeAction = { ...input, id: input.id ?? newId('act') };
+
+    this._actions.update((all) =>
+      input.id ? all.map((a) => (a.id === input.id ? action : a)) : [...all, action],
+    );
+    return action;
+  }
+
+  /** Completing sets the date, mirroring the database check constraint. */
+  completeAction(id: string, completedDate: string): void {
+    this._actions.update((all) =>
+      all.map((a) =>
+        a.id === id ? { ...a, status: 'COMPLETED' as const, completedDate } : a,
+      ),
+    );
+  }
+
+  deleteAction(id: string): void {
+    this._actions.update((all) => all.filter((a) => a.id !== id));
+  }
+
   // ---- revision history ----------------------------------------------------
 
   private readonly _revisions = signal<Revision[]>(seedRevisions(ALL_TOPOLOGIES));
@@ -392,4 +587,9 @@ export class RegistryStore {
       all.map((t) => (t.deploymentId === next.deploymentId ? next : t)),
     );
   }
+}
+
+/** Short unique id for records created in the browser. */
+function newId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 }

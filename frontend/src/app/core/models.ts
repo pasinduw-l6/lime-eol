@@ -18,6 +18,20 @@ export type EnvironmentName = 'DEV' | 'UAT' | 'PROD';
 export type DeploymentLocation = 'EC2' | 'CUSTOMER_SITE';
 export type EolSource = 'API' | 'MANUAL';
 
+export type CycleRule = 'MAJOR' | 'MAJOR_MINOR';
+
+/** A technology in the registry. Cycles hang off it. */
+export interface Technology {
+  id: string;
+  name: string;
+  componentType: ComponentType;
+  vendor: string | null;
+  /** endoflife.date slug; null for things it does not track. */
+  eolSlug: string | null;
+  cycleRule: CycleRule;
+  notes: string | null;
+}
+
 /** One support cycle — where all lifecycle dates live (see db-design-notes). */
 export interface Cycle {
   id: string;

@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { RegistryStore } from '../../core/registry.store';
+import { Modal } from '../../shared/modal';
 import { LIME_VERSIONS } from '../../core/projects.mock';
 import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
 
@@ -17,7 +18,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
  */
 @Component({
   selector: 'lime-projects',
-  imports: [FormsModule],
+  imports: [FormsModule, Modal],
   host: { class: 'block' },
   template: `
     <section class="card mb-5 px-7 py-6">
@@ -274,14 +275,19 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 }
               </td>
               <td class="px-6 py-3">
-                <span
-                  class="rounded-full border px-2.5 py-0.5 text-[12px]"
-                  [class.border-rule]="row.project.status !== 'ACTIVE'"
-                  [class.text-ink-soft]="row.project.status !== 'ACTIVE'"
-                  [class.border-accent]="row.project.status === 'ACTIVE'"
-                  [class.text-accent-bright]="row.project.status === 'ACTIVE'"
-                >
-                  {{ row.project.status.toLowerCase() }}
+                <span class="flex items-center justify-end gap-3">
+                  <span
+                    class="rounded-full border px-2.5 py-0.5 text-[12px]"
+                    [class.border-rule]="row.project.status !== 'ACTIVE'"
+                    [class.text-ink-soft]="row.project.status !== 'ACTIVE'"
+                    [class.border-accent]="row.project.status === 'ACTIVE'"
+                    [class.text-accent-bright]="row.project.status === 'ACTIVE'"
+                  >
+                    {{ row.project.status.toLowerCase() }}
+                  </span>
+                  <button type="button" class="text-[12px] text-accent-bright" (click)="manage(row.project)">
+                    Manage
+                  </button>
                 </span>
               </td>
             </tr>
@@ -295,6 +301,132 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
         </tbody>
       </table>
     </section>
+
+    <!-- manage: edit, environments, delete -->
+    @if (managed(); as project) {
+      <lime-modal
+        [title]="project.name"
+        [subtitle]="project.customer + ' · ' + project.code"
+        (dismiss)="managed.set(null)"
+      >
+        <div class="grid gap-5">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="field">
+              Project name
+              <input class="input" [(ngModel)]="editForm.name" name="ename" />
+            </label>
+            <label class="field">
+              Lime version
+              <select class="input" [(ngModel)]="editForm.limeVersion" name="elime">
+                @for (v of limeVersions; track v) {
+                  <option [value]="v">{{ v }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <label class="field">
+            Status
+            <select class="input" [(ngModel)]="editForm.status" name="estatus">
+              @for (s of statuses; track s) {
+                <option [value]="s">{{ s.toLowerCase() }}</option>
+              }
+            </select>
+          </label>
+
+          <fieldset class="m-0 border-0 p-0">
+            <legend class="mb-2 p-0 text-[12px] text-ink-soft">Assigned engineers</legend>
+            <div class="flex flex-wrap gap-2">
+              @for (e of engineers(); track e.id) {
+                <button
+                  type="button"
+                  class="rounded-full border px-3 py-1.5 text-[12px]"
+                  [class.border-accent]="editForm.engineerIds.includes(e.id)"
+                  [class.bg-elevated]="editForm.engineerIds.includes(e.id)"
+                  [class.border-rule]="!editForm.engineerIds.includes(e.id)"
+                  (click)="toggleEditEngineer(e.id)"
+                >
+                  {{ e.name }}
+                </button>
+              }
+            </div>
+          </fieldset>
+
+          <div>
+            <h3 class="m-0 mb-2 text-[13px] font-semibold">Environments</h3>
+            <ul class="m-0 mb-3 flex list-none flex-col gap-2 p-0">
+              @for (d of environmentsOf(project.id); track d.id) {
+                <li class="flex items-center justify-between gap-3 rounded-lg border border-rule px-3 py-2">
+                  <span class="min-w-0">
+                    <span class="block text-[13px]">{{ d.environment }} · {{ d.locationDetail }}</span>
+                    <span class="tabular block text-[11px] text-ink-soft">
+                      {{ d.components.length }} components
+                    </span>
+                  </span>
+                  <button type="button" class="text-[12px] text-overdue" (click)="removeEnvironment(d.id)">
+                    Remove
+                  </button>
+                </li>
+              } @empty {
+                <li class="text-[13px] text-ink-soft">No environments yet.</li>
+              }
+            </ul>
+
+            <div class="flex flex-wrap items-end gap-2">
+              <label class="field flex-1">
+                Add environment
+                <select class="input" [(ngModel)]="newEnv" name="newenv">
+                  @for (env of allEnvironments; track env) {
+                    <option [value]="env">{{ env }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field flex-1">
+                Region or site
+                <input class="input" [(ngModel)]="newEnvDetail" name="newdetail" placeholder="eu-west-1" />
+              </label>
+              <button type="button" class="btn" (click)="addEnvironment(project.id)">Add</button>
+            </div>
+          </div>
+
+          @if (manageError()) {
+            <p class="m-0 text-[13px] text-overdue" role="alert">{{ manageError() }}</p>
+          }
+
+          <div class="flex flex-wrap justify-between gap-2 border-t border-rule pt-4">
+            <button type="button" class="btn btn-danger" (click)="confirmDelete.set(project)">
+              Delete project
+            </button>
+            <span class="flex gap-2">
+              <button type="button" class="btn" (click)="managed.set(null)">Cancel</button>
+              <button type="button" class="btn btn-primary" (click)="saveProject(project.id)">
+                Save changes
+              </button>
+            </span>
+          </div>
+        </div>
+      </lime-modal>
+    }
+
+    @if (confirmDelete(); as project) {
+      <lime-modal
+        title="Delete this project?"
+        [subtitle]="project.name"
+        (dismiss)="confirmDelete.set(null)"
+      >
+        <p class="m-0 mb-4 text-[14px] text-ink-soft">
+          This removes {{ environmentsOf(project.id).length }} environment(s) and
+          their full revision history. The upgrade record for this customer will
+          be gone. This cannot be undone.
+        </p>
+        <div class="flex justify-end gap-2">
+          <button type="button" class="btn" (click)="confirmDelete.set(null)">Keep it</button>
+          <button type="button" class="btn btn-danger" (click)="deleteProject(project.id)">
+            Delete everything
+          </button>
+        </div>
+      </lime-modal>
+    }
   `,
 })
 export class Projects {
@@ -355,6 +487,69 @@ export class Projects {
   protected readonly atRiskProjects = computed(
     () => this.rows().filter((r) => r.risk.eol > 0 || r.risk.near > 0).length,
   );
+
+  // ---- manage an existing project -----------------------------------------
+
+  protected readonly managed = signal<Project | null>(null);
+  protected readonly confirmDelete = signal<Project | null>(null);
+  protected readonly manageError = signal<string | null>(null);
+  protected readonly newEnv = signal<EnvironmentName>('UAT');
+  protected readonly newEnvDetail = signal('');
+
+  protected editForm = {
+    name: '',
+    limeVersion: LIME_VERSIONS[0],
+    status: 'ACTIVE' as ProjectStatus,
+    engineerIds: [] as string[],
+  };
+
+  protected manage(project: Project): void {
+    this.editForm = {
+      name: project.name,
+      limeVersion: project.limeVersion,
+      status: project.status,
+      engineerIds: [...project.engineerIds],
+    };
+    this.manageError.set(null);
+    this.managed.set(project);
+  }
+
+  protected toggleEditEngineer(id: string): void {
+    this.editForm.engineerIds = this.editForm.engineerIds.includes(id)
+      ? this.editForm.engineerIds.filter((e) => e !== id)
+      : [...this.editForm.engineerIds, id];
+  }
+
+  protected environmentsOf(projectId: string) {
+    return this.store.deploymentsOf(projectId);
+  }
+
+  protected addEnvironment(projectId: string): void {
+    this.manageError.set(
+      this.store.addEnvironment(
+        projectId,
+        this.newEnv(),
+        'EC2',
+        this.newEnvDetail() || 'not recorded',
+      ),
+    );
+    this.newEnvDetail.set('');
+  }
+
+  protected removeEnvironment(id: string): void {
+    this.store.deleteDeployment(id);
+  }
+
+  protected saveProject(id: string): void {
+    this.store.updateProject(id, { ...this.editForm });
+    this.managed.set(null);
+  }
+
+  protected deleteProject(id: string): void {
+    this.store.deleteProject(id);
+    this.confirmDelete.set(null);
+    this.managed.set(null);
+  }
 
   protected toggleForm(): void {
     this.showForm.update((open) => !open);

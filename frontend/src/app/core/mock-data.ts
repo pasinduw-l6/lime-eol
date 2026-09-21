@@ -212,6 +212,18 @@ export const CYCLES: Cycle[] = [
   },
 ];
 
+export const TECHNOLOGIES: import('./models').Technology[] = [
+  { id: 't-mongodb', name: 'MongoDB', componentType: 'DATABASE', vendor: 'MongoDB Inc.', eolSlug: 'mongodb', cycleRule: 'MAJOR_MINOR', notes: null },
+  { id: 't-nodejs', name: 'Node.js', componentType: 'RUNTIME', vendor: 'OpenJS Foundation', eolSlug: 'nodejs', cycleRule: 'MAJOR', notes: null },
+  { id: 't-angular', name: 'Angular', componentType: 'FRAMEWORK', vendor: 'Google', eolSlug: 'angular', cycleRule: 'MAJOR', notes: null },
+  { id: 't-k8s', name: 'Kubernetes', componentType: 'ORCHESTRATION', vendor: 'CNCF', eolSlug: 'kubernetes', cycleRule: 'MAJOR_MINOR', notes: null },
+  { id: 't-rhel', name: 'RHEL', componentType: 'OS', vendor: 'Red Hat', eolSlug: 'rhel', cycleRule: 'MAJOR', notes: null },
+  { id: 't-docker', name: 'Docker Engine', componentType: 'CONTAINER', vendor: 'Docker Inc.', eolSlug: 'docker-engine', cycleRule: 'MAJOR', notes: 'Upstream changed cycle naming at 27' },
+  { id: 't-kafka', name: 'Apache Kafka', componentType: 'MESSAGING', vendor: 'Apache', eolSlug: 'apache-kafka', cycleRule: 'MAJOR_MINOR', notes: null },
+  { id: 't-openssl', name: 'OpenSSL', componentType: 'LIBRARY', vendor: null, eolSlug: 'openssl', cycleRule: 'MAJOR_MINOR', notes: null },
+  { id: 't-postgres', name: 'PostgreSQL', componentType: 'DATABASE', vendor: 'PGDG', eolSlug: 'postgresql', cycleRule: 'MAJOR', notes: null },
+];
+
 const LIME_DEFAULTS: Deployment['components'] = [
   { technology: 'MongoDB', version: '8.2.12', source: 'LIME_DEFAULT' },
   { technology: 'Node.js', version: '24.21.0', source: 'LIME_DEFAULT' },

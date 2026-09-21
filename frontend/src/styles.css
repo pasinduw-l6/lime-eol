@@ -106,6 +106,38 @@ body {
   font-weight: 500;
 }
 
+/* Form controls, so every create/edit form looks and behaves the same. */
+.field {
+  display: block;
+  font-size: 12px;
+  color: var(--color-ink-soft);
+}
+
+.input {
+  margin-top: 4px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--color-rule);
+  background: var(--color-elevated);
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--color-ink);
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+}
+
+.btn-danger {
+  border-color: color-mix(in oklab, var(--color-overdue) 55%, transparent);
+  color: var(--color-overdue);
+  background: transparent;
+}
+
+.btn-danger:hover {
+  background: color-mix(in oklab, var(--color-overdue) 14%, transparent);
+}
+
 /* Calendar event chip: tinted to its kind, readable at 10px, truncating
    rather than wrapping so a day cell keeps its rhythm. */
 .chip {
