@@ -3,8 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
-import { LIME_VERSIONS } from '../../core/projects.mock';
 import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
+import { Environments } from '../environments/environments';
+
+/** Lime releases offered when creating or editing a project. */
+const LIME_VERSIONS = ['2026.2', '2026.1', '2025.4'];
 
 const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
@@ -18,7 +21,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
  */
 @Component({
   selector: 'lime-projects',
-  imports: [FormsModule, Modal],
+  imports: [FormsModule, Modal, Environments],
   host: { class: 'block' },
   template: `
     <section class="card mb-5 px-7 py-6">
@@ -301,6 +304,9 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
         </tbody>
       </table>
     </section>
+
+    <!-- the selected project's environments and their technologies -->
+    <lime-environments class="mt-5 block" />
 
     <!-- manage: edit, environments, delete -->
     @if (managed(); as project) {

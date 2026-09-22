@@ -1,15 +1,7 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
+import { Api, ApiProject } from './api';
 import { ComponentChange, summariseChange } from './diff';
 import { daysToEol, statusOf, SupportStatus } from './lifecycle';
-import { CYCLES, TECHNOLOGIES, UPGRADE_ACTIONS } from './mock-data';
-import {
-  ALL_DEPLOYMENTS,
-  ALL_TOPOLOGIES,
-  ENGINEERS,
-  PROJECTS,
-  buildDeployment,
-  buildTopology,
-} from './projects.mock';
 import {
   Cycle,
   Deployment,
@@ -21,69 +13,6 @@ import {
   Technology,
   UpgradeAction,
 } from './models';
-
-/**
- * Seeds a starting history so the timeline is not empty: every environment
- * gets its "recorded" commit, and the two flagship environments get the real
- * change that followed — a node added, and a database upgraded.
- */
-function seedRevisions(topologies: EnvTopology[]): Revision[] {
-  const out: Revision[] = [];
-
-  for (const topology of topologies) {
-    const id = topology.deploymentId;
-
-    if (id === 'acme-prod') {
-      // Before the Kafka tier was introduced.
-      const before: EnvTopology = {
-        ...topology,
-        nodes: topology.nodes.filter((n) => n.id !== 'kafka'),
-        links: topology.links.filter((l) => l.to !== 'kafka'),
-      };
-      out.push(revision(id, 1, 'Record environment as built', 'Nadun Perera', '2026-04-02T09:12:00Z', before));
-      out.push(revision(id, 2, 'Add Kafka broker tier (LIME-0912)', 'Ishara Fernando', '2026-06-18T14:40:00Z', topology));
-      continue;
-    }
-
-    if (id === 'nwnd-prod') {
-      // Before this customer moved off the Lime default MongoDB.
-      const before: EnvTopology = {
-        ...topology,
-        nodes: topology.nodes.map((n) =>
-          n.id === 'mongo'
-            ? { ...n, stack: [{ technology: 'MongoDB', version: '8.2.12' }] }
-            : n,
-        ),
-      };
-      out.push(revision(id, 1, 'Record environment as built', 'Dilshan Silva', '2026-03-11T08:05:00Z', before));
-      out.push(revision(id, 2, 'Upgrade MongoDB 8.2.12 to 8.3.11 (LIME-0987)', 'Dilshan Silva', '2026-08-04T21:30:00Z', topology));
-      continue;
-    }
-
-    out.push(revision(id, 1, 'Record environment as built', 'Platform Admin', '2026-05-20T10:00:00Z', topology));
-  }
-
-  return out;
-}
-
-function revision(
-  deploymentId: string,
-  number: number,
-  message: string,
-  author: string,
-  createdAt: string,
-  content: EnvTopology,
-): Revision {
-  return {
-    id: `${deploymentId}-r${number}`,
-    deploymentId,
-    number,
-    message,
-    author,
-    createdAt,
-    content: structuredClone(content),
-  };
-}
 
 /** Everything, or one project. The switcher writes this. */
 export type ProjectScope = 'all' | string;
@@ -100,7 +29,6 @@ export interface NewProject {
   locationDetail: string;
 }
 
-/** A technology+version resolved against the registry. */
 export interface ResolvedComponent {
   technology: string;
   version: string;
@@ -117,25 +45,122 @@ export interface InboxItem {
   action: UpgradeAction | null;
 }
 
+/**
+ * Application state.
+ *
+ * Reads come from the API and are held in linked signals, so the server is the
+ * source of truth but the UI can still edit locally. Anything the API does not
+ * serve yet — upgrade actions, environment revisions — lives in plain signals
+ * and is clearly marked as unsaved in the screens that write it.
+ */
 @Injectable({ providedIn: 'root' })
 export class RegistryStore {
-  private readonly _cycles = signal<Cycle[]>(CYCLES);
-  private readonly _deployments = signal<Deployment[]>(ALL_DEPLOYMENTS);
-  private readonly _topologies = signal<EnvTopology[]>(ALL_TOPOLOGIES);
-  private readonly _actions = signal<UpgradeAction[]>(UPGRADE_ACTIONS);
-  private readonly _projects = signal<Project[]>(PROJECTS);
+  private readonly api = inject(Api);
 
-  /**
-   * The project the app is scoped to. Every derived list below respects it, so
-   * switching project re-scopes the whole application from one signal.
-   */
+  readonly isLoading = this.api.isLoading;
+  readonly loadError = this.api.error;
+
+  /** True while writes are not yet persisted anywhere. */
+  readonly writesArePersisted = false;
+
+  // ---- server-derived state ------------------------------------------------
+
+  private readonly _technologies = linkedSignal<Technology[]>(() =>
+    this.api.technologies().map((t) => ({
+      id: t.id,
+      name: t.name,
+      componentType: t.componentType as Technology['componentType'],
+      vendor: t.vendor,
+      eolSlug: t.eolSlug,
+      cycleRule: t.cycleRule as Technology['cycleRule'],
+      notes: t.notes,
+    })),
+  );
+
+  private readonly _cycles = linkedSignal<Cycle[]>(() =>
+    this.api.technologies().flatMap((technology) =>
+      technology.cycles.map((cycle) => ({
+        id: cycle.id,
+        technology: technology.name,
+        componentType: technology.componentType as Cycle['componentType'],
+        cycle: cycle.cycle,
+        label: cycle.label ?? cycle.cycle,
+        releaseDate: cycle.releaseDate,
+        eolDate: cycle.eolDate,
+        activeSupportEnd: cycle.activeSupportEnd,
+        isLts: cycle.isLts,
+        isMaintained: cycle.isMaintained,
+        latestPatch: cycle.latestPatch,
+        eolSource: cycle.eolSource,
+        versions: cycle.versions,
+      })),
+    ),
+  );
+
+  private readonly _projects = linkedSignal<Project[]>(() =>
+    this.api.projects().map((p) => ({
+      id: p.id,
+      name: p.name,
+      customer: p.customer,
+      code: p.code,
+      limeVersion: p.limeVersion ?? '—',
+      status: p.status,
+      engineerIds: p.engineers.map((e) => e.id),
+      startedAt: p.startedAt ?? '',
+    })),
+  );
+
+  private readonly _deployments = linkedSignal<Deployment[]>(() =>
+    this.api.projects().flatMap((project) =>
+      project.environments.map((env) => ({
+        id: env.id,
+        projectId: project.id,
+        customer: project.customer,
+        customerCode: project.code,
+        name: `${project.name} ${env.environment}`,
+        environment: env.environment,
+        location: env.location as Deployment['location'],
+        locationDetail: env.locationDetail ?? '',
+        limeVersion: project.limeVersion,
+        owners: env.owners,
+        components: env.components.map((c) => ({
+          technology: c.technology,
+          version: c.version,
+          source: 'LIME_DEFAULT' as const,
+        })),
+      })),
+    ),
+  );
+
+  private readonly _engineers = linkedSignal<Engineer[]>(() => {
+    const seen = new Map<string, Engineer>();
+    for (const project of this.api.projects()) {
+      for (const engineer of project.engineers) {
+        seen.set(engineer.id, {
+          id: engineer.id,
+          name: engineer.name,
+          initials: engineer.initials,
+          role: engineer.isLead ? 'Lead' : 'Engineer',
+        });
+      }
+    }
+    return [...seen.values()];
+  });
+
+  // ---- client-only state (no API yet) --------------------------------------
+
+  private readonly _actions = signal<UpgradeAction[]>([]);
+  private readonly _revisions = signal<Revision[]>([]);
+  private readonly _topologies = signal<EnvTopology[]>([]);
+
   readonly scope = signal<ProjectScope>('all');
 
+  readonly technologies = this._technologies.asReadonly();
   readonly cycles = this._cycles.asReadonly();
-  readonly topologies = this._topologies.asReadonly();
-  readonly actions = this._actions.asReadonly();
   readonly projects = this._projects.asReadonly();
-
+  readonly engineers = this._engineers.asReadonly();
+  readonly actions = this._actions.asReadonly();
+  readonly topologies = this._topologies.asReadonly();
   readonly allDeployments = this._deployments.asReadonly();
 
   /** Deployments in scope — what every screen reads. */
@@ -152,18 +177,21 @@ export class RegistryStore {
       : (this._projects().find((p) => p.id === scope) ?? null);
   });
 
+  /** The API's own view of a project, for screens that want it whole. */
+  apiProject(id: string): ApiProject | undefined {
+    return this.api.projects().find((p) => p.id === id);
+  }
+
   engineersFor(project: Project): Engineer[] {
     return project.engineerIds
-      .map((id) => this.engineers().find((e) => e.id === id))
+      .map((id) => this._engineers().find((e) => e.id === id))
       .filter((e): e is Engineer => e !== undefined);
   }
 
-  /** Deployments belonging to a project, regardless of current scope. */
   deploymentsOf(projectId: string): Deployment[] {
     return this._deployments().filter((d) => d.projectId === projectId);
   }
 
-  /** How many components in a project are at or near end of life. */
   riskOf(projectId: string): { eol: number; near: number } {
     const seen = new Set<string>();
     let eol = 0;
@@ -178,46 +206,13 @@ export class RegistryStore {
         seen.add(key);
 
         const status = this.resolve(component.technology, component.version).status;
-        if (status === 'EOL') {
-          eol++;
-        } else if (status === 'NEAR') {
-          near++;
-        }
+        if (status === 'EOL') eol++;
+        else if (status === 'NEAR') near++;
       }
     }
     return { eol, near };
   }
 
-  /**
-   * Creates a project and the environments it starts with, each inheriting the
-   * component set of its Lime release.
-   */
-  addProject(input: NewProject): Project {
-    const id = `${input.code.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString(36)}`;
-    const project: Project = {
-      id,
-      name: input.name,
-      customer: input.customer,
-      code: input.code.toUpperCase(),
-      limeVersion: input.limeVersion,
-      status: input.status,
-      engineerIds: input.engineerIds,
-      startedAt: new Date().toISOString().slice(0, 10),
-    };
-
-    const deployments = input.environments.map((env) =>
-      buildDeployment(project, env, input.location, input.locationDetail),
-    );
-
-    this._projects.update((all) => [...all, project]);
-    this._deployments.update((all) => [...all, ...deployments]);
-    this._topologies.update((all) => [...all, ...deployments.map(buildTopology)]);
-    this.scope.set(project.id);
-
-    return project;
-  }
-
-  /** Cycle plus computed lifecycle state, sorted most urgent first. */
   readonly cyclesByUrgency = computed(() =>
     this._cycles()
       .map((cycle) => {
@@ -227,7 +222,6 @@ export class RegistryStore {
       .sort((a, b) => (a.days ?? 1e9) - (b.days ?? 1e9)),
   );
 
-  /** Only cycles actually deployed somewhere count as risk. */
   readonly cyclesInUse = computed(() => {
     const inUse = new Set(
       this.deployments().flatMap((d) =>
@@ -240,28 +234,23 @@ export class RegistryStore {
     );
   });
 
-  /** Which deployments run a given cycle — the impact question. */
   deploymentsUsing(cycle: Cycle): Deployment[] {
     return this.deployments().filter((d) =>
       d.components.some(
-        (c) =>
-          c.technology === cycle.technology && cycle.versions.includes(c.version),
+        (c) => c.technology === cycle.technology && cycle.versions.includes(c.version),
       ),
     );
   }
 
-  /** Resolves a stack entry on a topology node against the registry. */
   resolve(technology: string, version: string): ResolvedComponent {
     const cycle =
       this._cycles().find(
         (c) => c.technology === technology && c.versions.includes(version),
       ) ?? null;
     const days = cycle ? daysToEol(cycle.eolDate) : null;
-
     return { technology, version, cycle, days, status: statusOf(days) };
   }
 
-  /** Worst status among a node's stack — what the node header reports. */
   worstStatus(stack: { technology: string; version: string }[]): SupportStatus {
     const order: SupportStatus[] = ['EOL', 'NEAR', 'UNKNOWN', 'SUPPORTED'];
     const found = stack.map((s) => this.resolve(s.technology, s.version).status);
@@ -279,7 +268,6 @@ export class RegistryStore {
     );
   }
 
-  /** "Needs you": in-use cycles at or near EOL, worst first. */
   readonly inbox = computed<InboxItem[]>(() =>
     this.cyclesInUse()
       .filter(({ status }) => status === 'EOL' || status === 'NEAR')
@@ -295,37 +283,19 @@ export class RegistryStore {
       }),
   );
 
-  // ---- writes --------------------------------------------------------------
-  //
-  // Deletes are guarded rather than cascading: removing something still in use
-  // would destroy the history this tool exists to keep, so a guarded delete
-  // returns a reason instead. Same rule as the database (see db-design-notes).
-
-  private readonly _technologies = signal<Technology[]>(TECHNOLOGIES);
-  private readonly _engineers = signal<Engineer[]>(ENGINEERS);
-
-  readonly technologies = this._technologies.asReadonly();
-  readonly engineers = this._engineers.asReadonly();
-
-  // Technologies -------------------------------------------------------------
+  // ---- writes (local until the write API lands) -----------------------------
 
   saveTechnology(input: Omit<Technology, 'id'> & { id?: string }): Technology {
     const technology: Technology = { ...input, id: input.id ?? newId('t') };
-
     this._technologies.update((all) =>
-      input.id
-        ? all.map((t) => (t.id === input.id ? technology : t))
-        : [...all, technology],
+      input.id ? all.map((t) => (t.id === input.id ? technology : t)) : [...all, technology],
     );
     return technology;
   }
 
-  /** Blocked while any environment still runs it. */
   deleteTechnology(id: string): string | null {
     const technology = this._technologies().find((t) => t.id === id);
-    if (!technology) {
-      return 'That technology no longer exists.';
-    }
+    if (!technology) return 'That technology no longer exists.';
 
     const users = this._deployments().filter((d) =>
       d.components.some((c) => c.technology === technology.name),
@@ -339,12 +309,8 @@ export class RegistryStore {
     return null;
   }
 
-  // Cycles -------------------------------------------------------------------
-
-  /** Manual entry for anything endoflife.date does not publish. */
   saveCycle(input: Omit<Cycle, 'id'> & { id?: string }): Cycle {
     const cycle: Cycle = { ...input, id: input.id ?? newId('c') };
-
     this._cycles.update((all) =>
       input.id ? all.map((c) => (c.id === input.id ? cycle : c)) : [...all, cycle],
     );
@@ -353,22 +319,16 @@ export class RegistryStore {
 
   deleteCycle(id: string): string | null {
     const cycle = this._cycles().find((c) => c.id === id);
-    if (!cycle) {
-      return 'That cycle no longer exists.';
-    }
+    if (!cycle) return 'That cycle no longer exists.';
     if (this.deploymentsUsing(cycle).length > 0) {
       return `${cycle.technology} ${cycle.cycle} is still deployed. Remove it from those environments first.`;
     }
-
     this._cycles.update((all) => all.filter((c) => c.id !== id));
     return null;
   }
 
-  // Engineers ----------------------------------------------------------------
-
   saveEngineer(input: Omit<Engineer, 'id'> & { id?: string }): Engineer {
     const engineer: Engineer = { ...input, id: input.id ?? newId('e') };
-
     this._engineers.update((all) =>
       input.id ? all.map((e) => (e.id === input.id ? engineer : e)) : [...all, engineer],
     );
@@ -380,12 +340,41 @@ export class RegistryStore {
     if (staffed.length > 0) {
       return `Still assigned to ${staffed.length} project(s). Unassign them first.`;
     }
-
     this._engineers.update((all) => all.filter((e) => e.id !== id));
     return null;
   }
 
-  // Projects -----------------------------------------------------------------
+  addProject(input: NewProject): Project {
+    const project: Project = {
+      id: newId('p'),
+      name: input.name,
+      customer: input.customer,
+      code: input.code.toUpperCase(),
+      limeVersion: input.limeVersion,
+      status: input.status,
+      engineerIds: input.engineerIds,
+      startedAt: new Date().toISOString().slice(0, 10),
+    };
+
+    const deployments: Deployment[] = input.environments.map((environment) => ({
+      id: `${project.id}-${environment.toLowerCase()}`,
+      projectId: project.id,
+      customer: project.customer,
+      customerCode: project.code,
+      name: `${project.name} ${environment}`,
+      environment,
+      location: input.location,
+      locationDetail: input.locationDetail,
+      limeVersion: project.limeVersion,
+      owners: ['DevOps'],
+      components: [],
+    }));
+
+    this._projects.update((all) => [...all, project]);
+    this._deployments.update((all) => [...all, ...deployments]);
+    this.scope.set(project.id);
+    return project;
+  }
 
   updateProject(id: string, patch: Partial<Project>): void {
     this._projects.update((all) =>
@@ -393,28 +382,13 @@ export class RegistryStore {
     );
   }
 
-  /**
-   * Removes a project and everything recorded against it. Destructive, so the
-   * UI confirms first and says exactly what will go.
-   */
   deleteProject(id: string): void {
-    const deploymentIds = this.deploymentsOf(id).map((d) => d.id);
-
     this._projects.update((all) => all.filter((p) => p.id !== id));
     this._deployments.update((all) => all.filter((d) => d.projectId !== id));
-    this._topologies.update((all) =>
-      all.filter((t) => !deploymentIds.includes(t.deploymentId)),
-    );
-    this._revisions.update((all) =>
-      all.filter((r) => !deploymentIds.includes(r.deploymentId)),
-    );
-
     if (this.scope() === id) {
       this.scope.set('all');
     }
   }
-
-  // Environments -------------------------------------------------------------
 
   addEnvironment(
     projectId: string,
@@ -423,26 +397,25 @@ export class RegistryStore {
     locationDetail: string,
   ): string | null {
     const project = this._projects().find((p) => p.id === projectId);
-    if (!project) {
-      return 'That project no longer exists.';
-    }
+    if (!project) return 'That project no longer exists.';
     if (this.deploymentsOf(projectId).some((d) => d.environment === environment)) {
       return `${project.customer} already has a ${environment} environment.`;
     }
 
-    const deployment = buildDeployment(project, environment, location, locationDetail);
-    this._deployments.update((all) => [...all, deployment]);
-    this._topologies.update((all) => [...all, buildTopology(deployment)]);
-    this._revisions.update((all) => [
+    this._deployments.update((all) => [
       ...all,
       {
-        id: `${deployment.id}-r1`,
-        deploymentId: deployment.id,
-        number: 1,
-        message: `Create ${environment} from Lime ${project.limeVersion}`,
-        author: 'Platform Admin',
-        createdAt: new Date().toISOString(),
-        content: buildTopology(deployment),
+        id: `${projectId}-${environment.toLowerCase()}`,
+        projectId,
+        customer: project.customer,
+        customerCode: project.code,
+        name: `${project.name} ${environment}`,
+        environment,
+        location,
+        locationDetail,
+        limeVersion: project.limeVersion,
+        owners: ['DevOps'],
+        components: [],
       },
     ]);
     return null;
@@ -456,28 +429,19 @@ export class RegistryStore {
 
   deleteDeployment(id: string): void {
     this._deployments.update((all) => all.filter((d) => d.id !== id));
-    this._topologies.update((all) => all.filter((t) => t.deploymentId !== id));
-    this._revisions.update((all) => all.filter((r) => r.deploymentId !== id));
     this._actions.update((all) =>
-      all.map((a) => ({
-        ...a,
-        deploymentIds: a.deploymentIds.filter((d) => d !== id),
-      })),
+      all.map((a) => ({ ...a, deploymentIds: a.deploymentIds.filter((x) => x !== id) })),
     );
   }
 
-  // Upgrade actions ----------------------------------------------------------
-
   saveAction(input: Omit<UpgradeAction, 'id'> & { id?: string }): UpgradeAction {
     const action: UpgradeAction = { ...input, id: input.id ?? newId('act') };
-
     this._actions.update((all) =>
       input.id ? all.map((a) => (a.id === input.id ? action : a)) : [...all, action],
     );
     return action;
   }
 
-  /** Completing sets the date, mirroring the database check constraint. */
   completeAction(id: string, completedDate: string): void {
     this._actions.update((all) =>
       all.map((a) =>
@@ -490,59 +454,8 @@ export class RegistryStore {
     this._actions.update((all) => all.filter((a) => a.id !== id));
   }
 
-  // ---- revision history ----------------------------------------------------
+  // ---- revision history (awaiting a write API) ------------------------------
 
-  private readonly _revisions = signal<Revision[]>(seedRevisions(ALL_TOPOLOGIES));
-
-  /** Commits for one environment, newest first. */
-  revisionsFor(deploymentId: string): Revision[] {
-    return this._revisions()
-      .filter((r) => r.deploymentId === deploymentId)
-      .sort((a, b) => b.number - a.number);
-  }
-
-  /** The revision a given one is compared against — its parent. */
-  parentOf(revision: Revision): Revision | null {
-    return (
-      this._revisions().find(
-        (r) =>
-          r.deploymentId === revision.deploymentId &&
-          r.number === revision.number - 1,
-      ) ?? null
-    );
-  }
-
-  /**
-   * Saves a new state of an environment as a commit, and makes it current.
-   * Nothing is overwritten, so any earlier state stays readable.
-   */
-  commit(
-    deploymentId: string,
-    content: EnvTopology,
-    message: string,
-    author = 'Platform Admin',
-  ): Revision {
-    const previous = this.revisionsFor(deploymentId)[0];
-    const revision: Revision = {
-      id: `${deploymentId}-r${(previous?.number ?? 0) + 1}`,
-      deploymentId,
-      number: (previous?.number ?? 0) + 1,
-      message: message.trim() || 'Update environment',
-      author,
-      createdAt: new Date().toISOString(),
-      content: structuredClone(content),
-    };
-
-    this._revisions.update((all) => [...all, revision]);
-    this.replaceTopology(content);
-    return revision;
-  }
-
-  /**
-   * Every component change recorded across the environments in scope, derived
-   * from the revision history rather than stored separately — the commits are
-   * the source of truth, so this can never drift from what the diffs show.
-   */
   readonly changeEvents = computed(() => {
     const out: {
       at: Date;
@@ -570,22 +483,56 @@ export class RegistryStore {
         }
       }
     }
-
     return out;
   });
+
+  revisionsFor(deploymentId: string): Revision[] {
+    return this._revisions()
+      .filter((r) => r.deploymentId === deploymentId)
+      .sort((a, b) => b.number - a.number);
+  }
+
+  parentOf(revision: Revision): Revision | null {
+    return (
+      this._revisions().find(
+        (r) =>
+          r.deploymentId === revision.deploymentId && r.number === revision.number - 1,
+      ) ?? null
+    );
+  }
+
+  commit(
+    deploymentId: string,
+    content: EnvTopology,
+    message: string,
+    author = 'Platform Admin',
+  ): Revision {
+    const previous = this.revisionsFor(deploymentId)[0];
+    const revision: Revision = {
+      id: `${deploymentId}-r${(previous?.number ?? 0) + 1}`,
+      deploymentId,
+      number: (previous?.number ?? 0) + 1,
+      message: message.trim() || 'Update environment',
+      author,
+      createdAt: new Date().toISOString(),
+      content: structuredClone(content),
+    };
+    this._revisions.update((all) => [...all, revision]);
+    this.replaceTopology(content);
+    return revision;
+  }
 
   topologyFor(deploymentId: string): EnvTopology | undefined {
     return this._topologies().find((t) => t.deploymentId === deploymentId);
   }
 
-  /**
-   * Replaces one environment's topology — used by both the JSON editor and
-   * direct canvas edits, so the two views can never disagree.
-   */
   replaceTopology(next: EnvTopology): void {
-    this._topologies.update((all) =>
-      all.map((t) => (t.deploymentId === next.deploymentId ? next : t)),
-    );
+    this._topologies.update((all) => {
+      const exists = all.some((t) => t.deploymentId === next.deploymentId);
+      return exists
+        ? all.map((t) => (t.deploymentId === next.deploymentId ? next : t))
+        : [...all, next];
+    });
   }
 }
 

@@ -1,5 +1,9 @@
 import { Routes } from '@angular/router';
 
+/**
+ * Four sections, each answering one question. Older paths redirect, so links
+ * shared before the consolidation still work.
+ */
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'overview' },
   {
@@ -15,36 +19,24 @@ export const routes: Routes = [
       import('./features/projects/projects').then((m) => m.Projects),
   },
   {
-    path: 'registry',
-    title: 'Registry · Lime Lifecycle',
+    path: 'lifecycle',
+    title: 'Lifecycle · Lime Lifecycle',
     loadComponent: () =>
-      import('./features/registry/registry').then((m) => m.Registry),
+      import('./features/lifecycle/lifecycle-page').then((m) => m.LifecyclePage),
   },
   {
-    path: 'actions',
-    title: 'Actions · Lime Lifecycle',
+    path: 'plan',
+    title: 'Plan · Lime Lifecycle',
     loadComponent: () =>
-      import('./features/actions/actions').then((m) => m.Actions),
+      import('./features/plan/plan-page').then((m) => m.PlanPage),
   },
-  {
-    path: 'schedule',
-    title: 'Schedule · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/schedule/schedule').then((m) => m.Schedule),
-  },
-  {
-    path: 'environments',
-    title: 'Environments · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/environments/environments').then(
-        (m) => m.Environments,
-      ),
-  },
-  {
-    path: 'calendar',
-    title: 'Calendar · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/calendar/calendar').then((m) => m.Calendar),
-  },
+
+  // consolidated away
+  { path: 'environments', redirectTo: 'projects' },
+  { path: 'schedule', redirectTo: 'lifecycle' },
+  { path: 'registry', redirectTo: 'lifecycle' },
+  { path: 'actions', redirectTo: 'plan' },
+  { path: 'calendar', redirectTo: 'plan' },
+
   { path: '**', redirectTo: 'overview' },
 ];

@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Api, ApiComponent, ApiEnvironment, ApiProject } from '../../core/api';
+import { RegistryStore } from '../../core/registry.store';
 import { formatDate, formatDays, statusFill, statusLabel } from '../../core/lifecycle';
 import { TechIcon } from '../../shared/tech-icon';
 
@@ -161,8 +162,14 @@ import { TechIcon } from '../../shared/tech-icon';
 })
 export class Environments {
   protected readonly api = inject(Api);
+  private readonly store = inject(RegistryStore);
 
-  protected readonly projects = computed(() => this.api.projects());
+  /** Respects the project switcher: one project, or all of them. */
+  protected readonly projects = computed(() => {
+    const scope = this.store.scope();
+    const all = this.api.projects();
+    return scope === 'all' ? all : all.filter((p) => p.id === scope);
+  });
   protected readonly selectedId = signal<string | null>(null);
 
   protected selected(project: ApiProject): ApiEnvironment | null {

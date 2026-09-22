@@ -126,11 +126,8 @@ export class App {
   protected readonly nav = [
     { path: '/overview', label: 'Overview', badge: false },
     { path: '/projects', label: 'Projects', badge: false },
-    { path: '/schedule', label: 'Schedule', badge: true },
-    { path: '/actions', label: 'Actions', badge: false },
-    { path: '/registry', label: 'Registry', badge: false },
-    { path: '/environments', label: 'Environments', badge: false },
-    { path: '/calendar', label: 'Calendar', badge: false },
+    { path: '/lifecycle', label: 'Lifecycle', badge: true },
+    { path: '/plan', label: 'Plan', badge: false },
   ];
 
   protected readonly projects = this.store.projects;
