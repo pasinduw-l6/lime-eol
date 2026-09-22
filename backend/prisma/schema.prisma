@@ -99,6 +99,13 @@ enum Channel {
   TEAMS
 }
 
+enum ComponentChangeType {
+  INSTALL
+  UPGRADE
+  DOWNGRADE
+  REMOVE
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -123,6 +130,7 @@ model Technology {
 
   cycles   TechnologyCycle[]
   syncLogs EolSyncLog[]
+  changes  ComponentChange[]
 
   @@index([archivedAt])
   @@map("technology")
@@ -185,6 +193,8 @@ model TechnologyVersion {
   cycle               TechnologyCycle        @relation(fields: [technologyCycleId], references: [id], onDelete: Restrict)
   limeVersions        LimeVersionComponent[]
   deploymentOverrides DeploymentComponent[]
+  changesFrom         ComponentChange[]      @relation("ChangeFrom")
+  changesTo           ComponentChange[]      @relation("ChangeTo")
 
   @@unique([technologyCycleId, fullVersion])
   @@index([technologyCycleId, major, minor, patch])
@@ -324,6 +334,7 @@ model Deployment {
   owners         DeploymentOwner[]
   overrides      DeploymentComponent[]
   upgradeActions UpgradeActionDeployment[]
+  changes        ComponentChange[]
 
   @@unique([projectId, environment])
   @@index([environment])
@@ -361,6 +372,39 @@ model DeploymentComponent {
   @@map("deployment_component")
 }
 
+/// What actually changed in an environment, and when.
+///
+/// Append-only: corrections are new rows, never edits, because history that
+/// can be rewritten is not history. Version strings are stored alongside the
+/// foreign keys so a change still reads after a version row is removed.
+model ComponentChange {
+  id            String              @id @default(uuid(7)) @db.Uuid
+  deploymentId  String              @map("deployment_id") @db.Uuid
+  technologyId  String              @map("technology_id") @db.Uuid
+  fromVersionId String?             @map("from_version_id") @db.Uuid
+  toVersionId   String?             @map("to_version_id") @db.Uuid
+  /// Denormalised so history survives the version being deleted.
+  fromVersion   String?             @map("from_version")
+  toVersion     String?             @map("to_version")
+  changeType    ComponentChangeType @map("change_type")
+  /// When it happened in the environment — not when someone typed it in.
+  /// Reports use this; recordedAt only says when the paperwork caught up.
+  effectiveAt   DateTime            @map("effective_at") @db.Date
+  recordedAt    DateTime            @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  recordedById  String?             @map("recorded_by_id") @db.Uuid
+  note          String?
+
+  deployment  Deployment         @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  technology  Technology         @relation(fields: [technologyId], references: [id], onDelete: Restrict)
+  fromVersion_ TechnologyVersion? @relation("ChangeFrom", fields: [fromVersionId], references: [id], onDelete: SetNull)
+  toVersion_   TechnologyVersion? @relation("ChangeTo", fields: [toVersionId], references: [id], onDelete: SetNull)
+  recordedBy  AppUser?           @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([deploymentId, effectiveAt])
+  @@index([technologyId, effectiveAt])
+  @@map("component_change")
+}
+
 // ---------------------------------------------------------------------------
 // Teams and users
 // ---------------------------------------------------------------------------
@@ -396,6 +440,7 @@ model AppUser {
   teams           TeamMember[]
   projects        ProjectEngineer[]
   assignedActions UpgradeAction[]
+  recordedChanges ComponentChange[]
   auditLogs       AuditLog[]
 
   @@map("app_user")

@@ -1,5 +1,5 @@
-import { httpResource } from '@angular/common/http';
-import { Injectable, computed } from '@angular/core';
+import { HttpClient, httpResource } from '@angular/common/http';
+import { Injectable, computed, inject } from '@angular/core';
 
 /**
  * The API, as the UI sees it.
@@ -78,8 +78,55 @@ export interface ApiTechnology {
   cycles: ApiCycle[];
 }
 
+export interface ApiChange {
+  id: string;
+  technology: string;
+  fromVersion: string | null;
+  toVersion: string | null;
+  changeType: 'INSTALL' | 'UPGRADE' | 'DOWNGRADE' | 'REMOVE';
+  effectiveAt: string;
+  recordedAt: string;
+  recordedBy: string | null;
+  note: string | null;
+}
+
+export interface ApiVersionOption {
+  cycle: string;
+  eolDate: string | null;
+  latestPatch: string | null;
+  versions: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class Api {
+  private readonly http = inject(HttpClient);
+
+  /** Records the version an environment now runs, and the change itself. */
+  changeComponent(
+    deploymentId: string,
+    body: {
+      technology: string;
+      toVersion: string;
+      effectiveAt?: string;
+      note?: string;
+    },
+  ) {
+    return this.http.patch<ApiChange>(
+      `/api/v1/deployments/${deploymentId}/components`,
+      body,
+    );
+  }
+
+  history(deploymentId: string) {
+    return this.http.get<ApiChange[]>(`/api/v1/deployments/${deploymentId}/history`);
+  }
+
+  /** What the version picker offers: known versions, grouped by cycle. */
+  versionsFor(technology: string) {
+    return this.http.get<ApiVersionOption[]>(
+      `/api/v1/deployments/versions/available?technology=${encodeURIComponent(technology)}`,
+    );
+  }
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
   readonly technologiesResource = httpResource<ApiTechnology[]>(
     () => '/api/v1/technologies',

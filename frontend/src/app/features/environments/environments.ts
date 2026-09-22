@@ -3,6 +3,7 @@ import { Api, ApiComponent, ApiEnvironment, ApiProject } from '../../core/api';
 import { RegistryStore } from '../../core/registry.store';
 import { formatDate, formatDays, statusFill, statusLabel } from '../../core/lifecycle';
 import { TechIcon } from '../../shared/tech-icon';
+import { UpdateComponent } from './update-component';
 
 /**
  * Environments.
@@ -14,7 +15,7 @@ import { TechIcon } from '../../shared/tech-icon';
  */
 @Component({
   selector: 'lime-environments',
-  imports: [TechIcon],
+  imports: [TechIcon, UpdateComponent],
   host: { class: 'block' },
   template: `
     @if (api.isLoading()) {
@@ -96,8 +97,11 @@ import { TechIcon } from '../../shared/tech-icon';
             <!-- one card per technology -->
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               @for (component of env.components; track component.technology) {
-                <article
-                  class="overflow-hidden rounded-[14px] border border-rule bg-elevated"
+                <button
+                  type="button"
+                  class="overflow-hidden rounded-[14px] border border-rule bg-elevated text-left transition-colors hover:border-accent"
+                  (click)="edit(env, component)"
+                  [attr.aria-label]="'Update ' + component.technology + ' on ' + env.environment"
                 >
                   <span
                     class="block h-[3px] w-full"
@@ -146,8 +150,12 @@ import { TechIcon } from '../../shared/tech-icon';
                         <dd class="m-0 text-ink-faint">entered by hand</dd>
                       </div>
                     }
+                    <div class="flex justify-between gap-2 pt-1">
+                      <dt class="text-ink-soft">Recorded changes</dt>
+                      <dd class="tabular m-0 text-accent-bright">update →</dd>
+                    </div>
                   </dl>
-                </article>
+                </button>
               }
             </div>
           </section>
@@ -156,6 +164,15 @@ import { TechIcon } from '../../shared/tech-icon';
         <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
           No projects yet.
         </p>
+      }
+
+      @if (editing(); as target) {
+        <lime-update-component
+          [environment]="target.environment"
+          [component]="target.component"
+          (close)="editing.set(null)"
+          (saved)="api.reload()"
+        />
       }
     }
   `,
@@ -171,6 +188,14 @@ export class Environments {
     return scope === 'all' ? all : all.filter((p) => p.id === scope);
   });
   protected readonly selectedId = signal<string | null>(null);
+  protected readonly editing = signal<{
+    environment: ApiEnvironment;
+    component: ApiComponent;
+  } | null>(null);
+
+  protected edit(environment: ApiEnvironment, component: ApiComponent): void {
+    this.editing.set({ environment, component });
+  }
 
   protected selected(project: ApiProject): ApiEnvironment | null {
     const chosen = project.environments.find((e) => e.id === this.selectedId());

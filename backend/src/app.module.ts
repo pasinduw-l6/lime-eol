@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/config.module';
+import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { EolSyncModule } from './modules/eol-sync/eol-sync.module';
 import { HealthModule } from './modules/health/health.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -18,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
     EolSyncModule,
     ProjectsModule,
     TechnologiesModule,
+    DeploymentsModule,
   ],
 })
 export class AppModule {}
