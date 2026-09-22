@@ -135,6 +135,25 @@ export class Api {
     );
   }
 
+  /** Creates a project, its environments and what each of them runs. */
+  createProject(body: {
+    name: string;
+    customer: string;
+    code: string;
+    status?: string;
+    limeVersion?: string;
+    startedAt?: string;
+    engineerIds?: string[];
+    environments: {
+      environment: string;
+      location: string;
+      locationDetail?: string;
+    }[];
+    stack: { technology: string; version: string }[];
+  }) {
+    return this.http.post<ApiProject>('/api/v1/projects', body);
+  }
+
   history(deploymentId: string) {
     return this.http.get<ApiChange[]>(`/api/v1/deployments/${deploymentId}/history`);
   }

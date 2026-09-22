@@ -1,5 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DeploymentsService } from '../deployments/deployments.service';
+import { CreateProjectDto } from './dto/create-project.dto';
 import {
   ComponentDto,
   EnvironmentDto,
@@ -18,7 +25,10 @@ const NOTICE_DAYS = 180;
  */
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly deployments: DeploymentsService,
+  ) {}
 
   async findAll(): Promise<ProjectDto[]> {
     const projects = await this.prisma.project.findMany({
@@ -69,6 +79,90 @@ export class ProjectsService {
         risk: riskOf(environments),
       };
     });
+  }
+
+  /**
+   * Creates a project, its environments, and what each of them runs.
+   *
+   * Components are installed through the same path a later upgrade takes, so
+   * every environment begins with a complete change history rather than
+   * appearing fully formed with no record of how it got that way.
+   */
+  async create(input: CreateProjectDto, actorId?: string): Promise<ProjectDto> {
+    const existing = await this.prisma.project.findUnique({
+      where: { code: input.code.toUpperCase() },
+    });
+    if (existing) {
+      throw new ConflictException(`A project with code ${input.code} already exists.`);
+    }
+
+    // Technologies must exist first: a stack entry naming something unknown
+    // would create an environment with a component nobody tracks.
+    for (const entry of input.stack) {
+      const known = await this.prisma.technology.findUnique({
+        where: { name: entry.technology },
+      });
+      if (!known) {
+        throw new BadRequestException(
+          `"${entry.technology}" is not in the registry. Add it under Lifecycle → Registry first.`,
+        );
+      }
+    }
+
+    const customer = await this.prisma.customer.upsert({
+      where: { name: input.customer },
+      update: {},
+      create: { name: input.customer, code: input.code.toUpperCase() },
+    });
+
+    const project = await this.prisma.project.create({
+      data: {
+        customerId: customer.id,
+        name: input.name,
+        code: input.code.toUpperCase(),
+        limeVersion: input.limeVersion,
+        status: input.status ?? 'ONBOARDING',
+        startedAt: input.startedAt
+          ? new Date(`${input.startedAt}T00:00:00.000Z`)
+          : new Date(),
+        engineers: {
+          create: (input.engineerIds ?? []).map((userId, index) => ({
+            userId,
+            isLead: index === 0,
+          })),
+        },
+        deployments: {
+          create: input.environments.map((env) => ({
+            customerId: customer.id,
+            name: `${input.name} ${env.environment}`,
+            environment: env.environment,
+            location: env.location,
+            locationDetail: env.locationDetail,
+          })),
+        },
+      },
+      include: { deployments: true },
+    });
+
+    const effectiveAt = input.startedAt ?? new Date().toISOString().slice(0, 10);
+
+    for (const deployment of project.deployments) {
+      for (const entry of input.stack) {
+        await this.deployments.changeComponent(
+          deployment.id,
+          {
+            technology: entry.technology,
+            toVersion: entry.version,
+            effectiveAt,
+            reason: 'INITIAL_RECORD',
+            note: `Recorded when ${project.name} was created`,
+          },
+          actorId,
+        );
+      }
+    }
+
+    return this.findOne(project.id);
   }
 
   async findOne(id: string): Promise<ProjectDto> {

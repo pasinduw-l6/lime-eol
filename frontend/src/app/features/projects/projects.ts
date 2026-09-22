@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Api } from '../../core/api';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
 import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
@@ -173,10 +174,57 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
               </div>
             </fieldset>
 
+            <!-- what every environment starts with -->
+            <fieldset class="m-0 border-0 p-0">
+              <legend class="mb-2 p-0 text-[12px] text-ink-soft">
+                Technology stack
+              </legend>
+
+              @for (row of form.stack; track $index) {
+                <div class="mb-2 grid grid-cols-[1fr_130px_32px] gap-2">
+                  <select
+                    class="input mt-0"
+                    [(ngModel)]="row.technology"
+                    [name]="'tech' + $index"
+                  >
+                    <option value="">Technology…</option>
+                    @for (t of technologies(); track t.id) {
+                      <option [value]="t.name">{{ t.name }}</option>
+                    }
+                  </select>
+                  <input
+                    class="input tabular mt-0"
+                    [(ngModel)]="row.version"
+                    [name]="'ver' + $index"
+                    [attr.list]="'versions-' + $index"
+                    placeholder="version"
+                  />
+                  <datalist [id]="'versions-' + $index">
+                    @for (v of versionsFor(row.technology); track v) {
+                      <option [value]="v"></option>
+                    }
+                  </datalist>
+                  <button
+                    type="button"
+                    class="text-[16px] text-ink-soft hover:text-overdue"
+                    (click)="removeStackRow($index)"
+                    [attr.aria-label]="'Remove ' + (row.technology || 'row')"
+                  >
+                    ×
+                  </button>
+                </div>
+              }
+
+              <button type="button" class="btn mt-1" (click)="addStackRow()">
+                Add component
+              </button>
+            </fieldset>
+
             <p class="m-0 text-[12px] text-ink-soft">
-              The project inherits the component set of Lime
-              {{ form.limeVersion }}, so its EOL risk appears on every screen as
-              soon as it is created.
+              Every environment starts with this stack, and each component is
+              recorded as an install in its change history — so the project has a
+              complete record from day one. Anything missing here can be added
+              per environment afterwards.
             </p>
 
             @if (error()) {
@@ -437,6 +485,8 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 })
 export class Projects {
   private readonly store = inject(RegistryStore);
+  private readonly api = inject(Api);
+  protected readonly saving = signal(false);
   private readonly router = inject(Router);
 
   protected readonly projects = this.store.projects;
@@ -461,7 +511,31 @@ export class Projects {
     environments: ['PROD'] as EnvironmentName[],
     location: 'EC2' as 'EC2' | 'CUSTOMER_SITE',
     locationDetail: '',
+    stack: [{ technology: '', version: '' }] as {
+      technology: string;
+      version: string;
+    }[],
   };
+
+  protected readonly technologies = this.store.technologies;
+
+  /** Versions already known for a technology, offered as suggestions. */
+  protected versionsFor(technology: string): string[] {
+    return this.store
+      .cycles()
+      .filter((c) => c.technology === technology)
+      .flatMap((c) => [...c.versions, c.latestPatch ?? ''])
+      .filter(Boolean)
+      .filter((v, i, all) => all.indexOf(v) === i);
+  }
+
+  protected addStackRow(): void {
+    this.form.stack = [...this.form.stack, { technology: '', version: '' }];
+  }
+
+  protected removeStackRow(index: number): void {
+    this.form.stack = this.form.stack.filter((_, i) => i !== index);
+  }
 
   protected readonly rows = computed(() =>
     this.store.projects().map((project) => ({
@@ -586,19 +660,54 @@ export class Projects {
       return;
     }
 
-    const project = this.store.addProject({ ...this.form });
-    this.showForm.set(false);
-    this.error.set(null);
-    this.form = {
-      ...this.form,
-      name: '',
-      customer: '',
-      code: '',
-      engineerIds: [],
-      locationDetail: '',
-    };
-    void this.router.navigate(['/overview']);
-    void project;
+    const stack = this.form.stack.filter(
+      (row) => row.technology.trim() && row.version.trim(),
+    );
+
+    this.saving.set(true);
+    this.api
+      .createProject({
+        name: this.form.name.trim(),
+        customer: this.form.customer.trim(),
+        code: this.form.code.trim().toUpperCase(),
+        status: this.form.status,
+        limeVersion: this.form.limeVersion,
+        engineerIds: this.form.engineerIds,
+        environments: this.form.environments.map((environment) => ({
+          environment,
+          location: this.form.location,
+          locationDetail: this.form.locationDetail || undefined,
+        })),
+        stack,
+      })
+      .subscribe({
+        next: (created) => {
+          this.saving.set(false);
+          this.showForm.set(false);
+          this.error.set(null);
+          this.form = {
+            ...this.form,
+            name: '',
+            customer: '',
+            code: '',
+            engineerIds: [],
+            locationDetail: '',
+            stack: [{ technology: '', version: '' }],
+          };
+          // Pull the server's copy and focus the new project.
+          this.api.reload();
+          this.store.scope.set(created.id);
+        },
+        error: (err: { error?: { message?: string | string[] } }) => {
+          this.saving.set(false);
+          const message = err.error?.message;
+          this.error.set(
+            Array.isArray(message)
+              ? message.join('. ')
+              : (message ?? 'Could not create that project.'),
+          );
+        },
+      });
   }
 
   /** Selecting a project scopes the whole app to it. */
