@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, input, signal } from '@angular/core';
 import { Actions } from '../actions/actions';
 import { Calendar } from '../calendar/calendar';
 
@@ -30,13 +30,17 @@ import { Calendar } from '../calendar/calendar';
     </nav>
 
     @if (view() === 'actions') {
-      <lime-actions />
+      <lime-actions [technology]="technology()" [cycle]="cycle()" />
     } @else {
       <lime-calendar />
     }
   `,
 })
 export class PlanPage {
+  /** Passed straight through from the URL to pre-fill a new action. */
+  readonly technology = input<string>('');
+  readonly cycle = input<string>('');
+
   protected readonly tabs = [
     { key: 'actions' as const, label: 'Actions' },
     { key: 'calendar' as const, label: 'Calendar' },

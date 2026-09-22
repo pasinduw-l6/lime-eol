@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { NOTICE_DAYS, formatDays, parseDate, statusFill, today } from '../../core/lifecycle';
+import { NOTICE_DAYS, parseDate, statusFill, today } from '../../core/lifecycle';
+import { humanGap } from '../../core/relative-time';
+import { TechIcon } from '../../shared/tech-icon';
 import { RegistryStore } from '../../core/registry.store';
 
 const BODY_H = 176;
@@ -33,7 +35,7 @@ interface Bucket {
  */
 @Component({
   selector: 'lime-overview',
-  imports: [RouterLink],
+  imports: [RouterLink, TechIcon],
   host: { class: 'block' },
   template: `
     <!-- headline -->
@@ -117,8 +119,68 @@ interface Bucket {
       </div>
     </section>
 
+    <!-- needs you: the one panel that asks for a decision -->
+    @if (alerts().length > 0) {
+      <section class="card mb-5 px-7 py-6" aria-labelledby="needs-you">
+        <header class="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+          <h2 id="needs-you" class="m-0 text-[17px] font-semibold">Needs you</h2>
+          <span class="text-[13px] text-ink-soft">
+            {{ unplannedCount() }} of {{ alerts().length }} have nobody on them
+          </span>
+        </header>
+
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          @for (alert of alerts(); track alert.id) {
+            <article class="overflow-hidden rounded-[14px] border border-rule bg-elevated">
+              <span
+                class="block h-[3px] w-full"
+                [style.background]="alert.colour"
+                aria-hidden="true"
+              ></span>
+
+              <div class="flex items-start gap-3 px-4 pt-4">
+                <lime-tech-icon [technology]="alert.technology" [size]="28" />
+                <div class="min-w-0 flex-1">
+                  <p
+                    class="m-0 text-[13px] font-semibold"
+                    [style.color]="alert.colour"
+                  >
+                    {{ alert.exposure }}
+                  </p>
+                  <p class="m-0 truncate text-[15px] font-semibold">
+                    {{ alert.technology }} {{ alert.cycle }}
+                  </p>
+                </div>
+              </div>
+
+              <p class="m-0 px-4 pt-2 text-[12px] text-ink-soft">
+                {{ alert.where }}
+              </p>
+
+              <div class="flex items-center justify-between gap-2 px-4 pt-3 pb-4">
+                <span
+                  class="text-[12px]"
+                  [class.text-overdue]="!alert.plan"
+                  [class.text-ink-soft]="alert.plan"
+                >
+                  {{ alert.plan ?? 'No plan' }}
+                </span>
+                <a
+                  [routerLink]="['/plan']"
+                  [queryParams]="{ technology: alert.technology, cycle: alert.cycle }"
+                  class="rounded-full border border-accent px-3 py-1 text-[12px] text-accent-bright no-underline hover:bg-accent hover:text-white"
+                >
+                  {{ alert.plan ? 'Open plan' : 'Plan upgrade' }}
+                </a>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
+
     <!-- panels: equal columns, each header / body / footer -->
-    <div class="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
+    <div class="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
       <!-- 1. when support ends -->
       <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
@@ -222,42 +284,7 @@ interface Bucket {
         </footer>
       </section>
 
-      <!-- 3. what to do -->
-      <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
-        <header class="mb-4 flex items-baseline justify-between gap-3">
-          <h2 class="m-0 text-[15px] font-semibold">Needs you</h2>
-          <span class="tabular text-[12px] text-ink-soft">{{ inbox().length }}</span>
-        </header>
-
-        <ul class="m-0 flex list-none flex-col p-0" [style.min-height.px]="bodyH">
-          @for (item of inboxRows(); track item.id) {
-            <li class="flex h-[52px] items-center gap-3 border-b border-rule last:border-b-0">
-              <span
-                class="h-2 w-2 shrink-0 rounded-full"
-                [style.background]="item.colour"
-                aria-hidden="true"
-              ></span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-[13px]">{{ item.title }}</span>
-                <span class="block truncate text-[11px] text-ink-soft">{{ item.sub }}</span>
-              </span>
-              <span class="tabular shrink-0 text-[12px]" [style.color]="item.colour">
-                {{ item.days }}
-              </span>
-            </li>
-          } @empty {
-            <li class="py-3 text-[13px] text-ink-soft">Nothing needs attention.</li>
-          }
-        </ul>
-
-        <footer class="mt-3 border-t border-rule pt-3">
-          <a routerLink="/schedule" class="text-[12px] text-accent-bright no-underline hover:underline">
-            Open the schedule
-          </a>
-        </footer>
-      </section>
-
-      <!-- 4. are we gaining or losing ground -->
+      <!-- 3. are we gaining or losing ground -->
       <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
           <h2 class="m-0 text-[15px] font-semibold">Upgrade velocity</h2>
@@ -461,23 +488,42 @@ export class Overview {
     Math.max(1, ...this.projectRisk().map((r) => r.eol + r.near)),
   );
 
-  protected readonly inboxRows = computed(() =>
+  /**
+   * The things asking for a decision, stated as consequences.
+   *
+   * "Unsupported for 7 years" lands where "−2588 d" does not: the number is
+   * precise but says nothing about whether to care. The signed day count still
+   * exists on the Schedule for people doing arithmetic.
+   */
+  protected readonly alerts = computed(() =>
     this.inbox()
-      .slice(0, 3)
+      .slice(0, 8)
       .map((item) => {
         const customers = [...new Set(item.deployments.map((d) => d.customer))];
+        const environments = item.deployments.length;
+        const days = item.days ?? 0;
+
         return {
           id: item.cycle.id,
-          title: `${item.cycle.technology} ${item.cycle.cycle}`,
-          sub: item.action
-            ? `${item.action.jiraKey} · ${customers.length} customer(s)`
-            : `no plan · ${customers.join(', ') || 'not deployed'}`,
-          days: formatDays(item.days),
+          technology: item.cycle.technology,
+          cycle: item.cycle.cycle,
+          exposure:
+            days <= 0
+              ? `Unsupported for ${humanGap(days)}`
+              : `Support ends in ${humanGap(days)}`,
+          where: `${customers.join(', ') || 'not deployed'} · ${environments} environment${environments === 1 ? '' : 's'}`,
+          plan: item.action
+            ? `${item.action.jiraKey ?? 'Planned'} · ${item.action.assignee ?? 'unassigned'}`
+            : null,
           colour: statusFill(
             item.days === null ? 'UNKNOWN' : item.days <= 0 ? 'EOL' : 'NEAR',
           ),
         };
       }),
+  );
+
+  protected readonly unplannedCount = computed(
+    () => this.alerts().filter((a) => !a.plan).length,
   );
 
   /**

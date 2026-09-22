@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { formatDate, formatDays, parseDate, statusFill, today } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
@@ -279,6 +279,25 @@ function blank(): Omit<UpgradeAction, 'id'> & { id?: string } {
 })
 export class Actions {
   private readonly store = inject(RegistryStore);
+
+  /**
+   * Bound from ?technology= and ?cycle=, so "Plan upgrade" on the Overview
+   * opens this form already filled in rather than dropping you on a list to
+   * find the thing you just clicked.
+   */
+  readonly technology = input<string>('');
+  readonly cycle = input<string>('');
+
+  constructor() {
+    effect(() => {
+      const technology = this.technology();
+      const cycle = this.cycle();
+
+      if (technology && cycle && !this.draft()) {
+        this.draft.set({ ...blank(), technology, cycle });
+      }
+    });
+  }
 
   protected readonly statuses = STATUSES;
   protected readonly filters = ['ALL', 'OPEN', 'OVERDUE', 'COMPLETED'] as const;
