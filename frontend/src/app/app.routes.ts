@@ -25,10 +25,18 @@ export const routes: Routes = [
       import('./features/lifecycle/lifecycle-page').then((m) => m.LifecyclePage),
   },
   {
+    // Query params bind straight to the component's inputs, so
+    // /plan?technology=…&cycle=… opens the form already filled in.
     path: 'plan',
     title: 'Plan · Lime Lifecycle',
     loadComponent: () =>
-      import('./features/plan/plan-page').then((m) => m.PlanPage),
+      import('./features/actions/actions').then((m) => m.Actions),
+  },
+  {
+    path: 'calendar',
+    title: 'Calendar · Lime Lifecycle',
+    loadComponent: () =>
+      import('./features/calendar/calendar').then((m) => m.Calendar),
   },
 
   // consolidated away
@@ -36,7 +44,6 @@ export const routes: Routes = [
   { path: 'schedule', redirectTo: 'lifecycle' },
   { path: 'registry', redirectTo: 'lifecycle' },
   { path: 'actions', redirectTo: 'plan' },
-  { path: 'calendar', redirectTo: 'plan' },
 
   { path: '**', redirectTo: 'overview' },
 ];

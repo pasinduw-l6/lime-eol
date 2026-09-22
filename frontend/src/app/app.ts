@@ -143,6 +143,7 @@ export class App {
     { path: '/projects', label: 'Projects', badge: false },
     { path: '/lifecycle', label: 'Lifecycle', badge: true },
     { path: '/plan', label: 'Plan', badge: false },
+    { path: '/calendar', label: 'Calendar', badge: false },
   ];
 
   protected readonly projects = this.store.projects;
