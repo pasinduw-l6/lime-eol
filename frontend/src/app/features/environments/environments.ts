@@ -1,408 +1,189 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { formatDays, statusFill, statusLabel } from '../../core/lifecycle';
-import { RegistryStore } from '../../core/registry.store';
-import { Deployment, EnvNode, EnvTopology } from '../../core/models';
-import { History } from './history';
-
-const NODE_WIDTH = 210;
-const HEADER_HEIGHT = 30;
-const ROW_HEIGHT = 22;
-
-interface PlacedNode {
-  node: EnvNode;
-  height: number;
-  worst: string;
-  rows: {
-    technology: string;
-    version: string;
-    /** Already formatted for display, e.g. "−681 d". */
-    days: string;
-    fill: string;
-    title: string;
-  }[];
-}
+import { Component, computed, inject, signal } from '@angular/core';
+import { Api, ApiComponent, ApiEnvironment, ApiProject } from '../../core/api';
+import { formatDate, formatDays, statusFill, statusLabel } from '../../core/lifecycle';
+import { TechIcon } from '../../shared/tech-icon';
 
 /**
- * Environment topology.
+ * Environments.
  *
- * Servers and their installed stack, drawn as a diagram, with every entry
- * resolved against the registry so EOL risk is visible on the machine that
- * carries it. The same topology is editable two ways — on the canvas or as
- * JSON — and both write through one store method, so they cannot disagree.
+ * One card per technology rather than per server: engineers think in "what
+ * version of MongoDB is this customer on", and the answer should be readable
+ * without opening anything. The card's top edge carries its support status,
+ * so a wall of cards reads as a risk summary at a glance.
  */
 @Component({
   selector: 'lime-environments',
-  imports: [FormsModule, History],
+  imports: [TechIcon],
   host: { class: 'block' },
   template: `
-    <div class="flex flex-wrap gap-5 xl:flex-nowrap">
-      <!-- environment tree -->
-      <aside class="card w-[240px] shrink-0 overflow-hidden" aria-label="Environments">
-        <h1 class="m-0 px-5 pt-5 pb-3 text-[17px] font-semibold">Environments</h1>
-        @for (group of grouped(); track group.customer) {
-          <div class="border-t border-rule px-5 py-3">
-            <h2 class="m-0 mb-1 text-[13px] font-semibold">{{ group.customer }}</h2>
-            <ul class="m-0 flex list-none flex-col gap-px p-0">
-              @for (d of group.deployments; track d.id) {
-                <li>
-                  <button
-                    type="button"
-                    (click)="selectDeployment(d)"
-                    class="flex w-full items-center justify-between gap-2 py-1 text-left text-[13px]"
-                    [class.font-semibold]="d.id === deployment().id"
+    @if (api.isLoading()) {
+      <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
+        Loading environments…
+      </p>
+    } @else if (api.error()) {
+      <p class="card px-7 py-10 text-center text-[14px] text-overdue" role="alert">
+        Could not load projects from the API.
+      </p>
+    } @else {
+      @for (project of projects(); track project.id) {
+        <section class="card mb-5 px-7 py-6">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">
+                {{ project.name }}
+              </h1>
+              <p class="m-0 text-[14px] text-ink-soft">
+                {{ project.environments.length }} environments ·
+                {{ project.engineers.length }} engineers ·
+                since {{ project.startedAt }}
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="flex -space-x-1.5">
+                @for (e of project.engineers; track e.id) {
+                  <span
+                    class="grid h-8 w-8 place-items-center rounded-full border border-surface bg-accent-deep text-[11px]"
+                    [attr.title]="e.name + (e.isLead ? ' · lead' : '')"
+                    >{{ e.initials }}</span
                   >
-                    <span>{{ d.environment }}</span>
-                    <span class="tabular text-[11px]" [style.color]="worstColour(d)">
-                      {{ riskCount(d) }}
-                    </span>
-                  </button>
-                </li>
+                }
+              </span>
+              @if (project.risk.eol > 0) {
+                <span class="tabular rounded-full border border-overdue px-3 py-1 text-[13px] text-overdue">
+                  {{ project.risk.eol }} past EOL
+                </span>
               }
-            </ul>
-          </div>
-        }
-      </aside>
-
-      <!-- canvas -->
-      <section class="card min-w-0 flex-1 overflow-hidden">
-        <header class="flex flex-wrap items-baseline justify-between gap-3 border-b border-rule px-6 py-4">
-          <div>
-            <h2 class="m-0 text-[17px] font-semibold">
-              {{ deployment().customer }} · {{ deployment().environment }}
-            </h2>
-            <p class="m-0 text-[13px] text-ink-soft">
-              {{ deployment().location === 'EC2' ? 'AWS' : 'Customer site' }} ·
-              {{ deployment().locationDetail }} · Lime {{ deployment().limeVersion }} ·
-              owned by {{ deployment().owners.join(' and ') }}
-            </p>
-          </div>
-          <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
-            @for (m of ['visual', 'json', 'history']; track m) {
-              <button
-                type="button"
-                class="rounded-full px-4 py-1 text-[13px] capitalize"
-                [class.bg-ink]="mode() === m"
-                [class.text-ground]="mode() === m"
-                [class.text-ink-soft]="mode() !== m"
-                (click)="mode.set($any(m))"
-              >
-                {{ m }}
-              </button>
-            }
-          </div>
-        </header>
-
-        @if (mode() === 'history') {
-          <div class="p-6">
-            <lime-history [deploymentId]="deployment().id" />
-          </div>
-        } @else {
-        <div class="overflow-auto p-6">
-          <svg
-            [attr.width]="canvasWidth()" [attr.height]="canvasHeight()"
-            role="img"
-            [attr.aria-label]="'Topology of ' + deployment().name"
-          >
-            @for (link of topology().links; track link.from + link.to) {
-              <g>
-                <line
-                  [attr.x1]="linkX1(link.from)" [attr.y1]="linkY(link.from)"
-                  [attr.x2]="linkX2(link.to)" [attr.y2]="linkY(link.to)"
-                  stroke="var(--color-rule)" stroke-width="1.5"
-                />
-                @if (link.label) {
-                  <text
-                    [attr.x]="(linkX1(link.from) + linkX2(link.to)) / 2"
-                    [attr.y]="(linkY(link.from) + linkY(link.to)) / 2 - 4"
-                    font-size="10" text-anchor="middle" fill="var(--color-ink-soft)"
-                  >{{ link.label }}</text>
-                }
-              </g>
-            }
-
-            @for (p of placed(); track p.node.id) {
-              <g
-                [attr.transform]="'translate(' + p.node.x + ',' + p.node.y + ')'"
-                tabindex="0" role="button"
-                [attr.aria-label]="p.node.name + ', ' + p.rows.length + ' components'"
-                (click)="selectNode(p.node)"
-                (keydown.enter)="selectNode(p.node)"
-                class="cursor-pointer"
-              >
-                <rect
-                  [attr.width]="NODE_WIDTH" [attr.height]="p.height"
-                  fill="var(--color-surface)" stroke="var(--color-rule)"
-                  [attr.stroke-width]="selectedNode()?.id === p.node.id ? 2 : 1" rx="3"
-                />
-                <rect [attr.width]="NODE_WIDTH" height="3" [attr.fill]="p.worst" rx="1" />
-                <text x="10" y="21" font-size="13" font-weight="600" fill="var(--color-ink)">
-                  {{ p.node.name }}
-                </text>
-                <text x="10" y="21" font-size="11" fill="var(--color-ink-soft)" [attr.dx]="0" dy="14">
-                  {{ p.node.host }}
-                </text>
-
-                @for (row of p.rows; track row.technology; let i = $index) {
-                  <g [attr.transform]="'translate(0,' + (HEADER_HEIGHT + 16 + i * ROW_HEIGHT) + ')'">
-                    <rect x="10" y="4" width="3" height="12" [attr.fill]="row.fill" />
-                    <text x="20" y="14" font-size="12" fill="var(--color-ink)">{{ row.technology }}</text>
-                    <text x="120" y="14" font-size="11" class="tabular" fill="var(--color-ink-soft)">{{ row.version }}</text>
-                    <text
-                      [attr.x]="NODE_WIDTH - 10" y="14" font-size="11" text-anchor="end"
-                      class="tabular" [attr.fill]="row.fill"
-                    >{{ row.days }}</text>
-                    <title>{{ row.title }}</title>
-                  </g>
-                }
-              </g>
-            }
-          </svg>
-        </div>
-        }
-      </section>
-
-      <!-- inspector -->
-      <aside class="card w-full shrink-0 xl:w-[340px]" aria-label="Details">
-        @if (mode() === 'json') {
-          <div class="flex h-full flex-col p-5">
-            <h2 class="m-0 mb-1 text-[15px] font-semibold">Environment as data</h2>
-            <p class="m-0 mb-3 text-[12px] text-ink-soft">
-              Edit and apply. This is the shape DevOps commits to the infrastructure repo.
-            </p>
-            <textarea
-              [(ngModel)]="draft"
-              spellcheck="false"
-              class="tabular h-[430px] w-full resize-none border border-rule bg-ground p-3 text-[11px] leading-[1.45]"
-              aria-label="Topology JSON"
-            ></textarea>
-            @if (error()) {
-              <p class="m-0 mt-2 text-[12px] text-overdue" role="alert">{{ error() }}</p>
-            }
-            <label class="mt-3 block text-[12px] text-ink-soft">
-              Change description
-              <input
-                [(ngModel)]="message"
-                placeholder="Upgrade MongoDB to 8.3.11 (LIME-1042)"
-                class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[13px] text-ink"
-              />
-            </label>
-            <div class="mt-3 flex gap-2">
-              <button type="button" class="btn btn-primary" (click)="applyJson()">
-                Commit change
-              </button>
-              <button type="button" class="btn" (click)="resetJson()">Revert</button>
             </div>
           </div>
-        } @else if (selectedNode(); as node) {
-          <div class="p-5">
-            <h2 class="m-0 mb-3 text-[15px] font-semibold">{{ node.name }}</h2>
-            <label class="mb-3 block text-[12px] text-ink-soft">
-              Name
-              <input
-                class="mt-1 w-full border border-rule px-2 py-1 text-[13px] text-ink"
-                [value]="node.name" (change)="rename(node, $event)"
-              />
-            </label>
-            <label class="mb-4 block text-[12px] text-ink-soft">
-              Host
-              <input
-                class="tabular mt-1 w-full border border-rule px-2 py-1 text-[13px] text-ink"
-                [value]="node.host ?? ''" (change)="rehost(node, $event)"
-              />
-            </label>
 
-            <h3 class="m-0 mb-2 text-[13px] font-semibold">Installed</h3>
-            <ul class="m-0 flex list-none flex-col gap-2 p-0">
-              @for (row of rowsFor(node); track row.technology) {
-                <li class="flex items-baseline justify-between gap-2 text-[13px]">
-                  <span>{{ row.technology }}</span>
-                  <span class="tabular text-ink-soft">{{ row.version }}</span>
-                  <span class="tabular w-[64px] text-right" [style.color]="row.fill">{{ row.days }}</span>
-                </li>
+          <!-- environment tabs -->
+          <div class="mt-5 flex flex-wrap gap-1.5" role="tablist">
+            @for (env of project.environments; track env.id) {
+              <button
+                type="button"
+                role="tab"
+                [attr.aria-selected]="selectedId() === env.id"
+                class="flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px]"
+                [class.border-ink]="selectedId() === env.id"
+                [class.bg-ink]="selectedId() === env.id"
+                [class.text-ground]="selectedId() === env.id"
+                [class.border-rule]="selectedId() !== env.id"
+                [class.text-ink-soft]="selectedId() !== env.id"
+                (click)="selectedId.set(env.id)"
+              >
+                {{ env.environment }}
+                <span class="tabular text-[11px]" [class.text-overdue]="riskOf(env) > 0">
+                  {{ riskOf(env) ? riskOf(env) + ' at risk' : 'clear' }}
+                </span>
+              </button>
+            }
+          </div>
+        </section>
+
+        @if (selected(project); as env) {
+          <section class="card px-7 py-6">
+            <header class="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+              <h2 class="m-0 text-[17px] font-semibold">
+                {{ project.name }} · {{ env.environment }}
+              </h2>
+              <p class="m-0 text-[13px] text-ink-soft">
+                {{ env.location === 'EC2' ? 'AWS' : 'Customer site' }} ·
+                {{ env.locationDetail }} · owned by {{ env.owners.join(', ') || 'nobody' }}
+              </p>
+            </header>
+
+            <!-- one card per technology -->
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              @for (component of env.components; track component.technology) {
+                <article
+                  class="overflow-hidden rounded-[14px] border border-rule bg-elevated"
+                >
+                  <span
+                    class="block h-[3px] w-full"
+                    [style.background]="fill(component.status)"
+                    aria-hidden="true"
+                  ></span>
+
+                  <div class="flex items-start gap-3 px-4 pt-4">
+                    <lime-tech-icon [technology]="component.technology" [size]="28" />
+                    <div class="min-w-0 flex-1">
+                      <h3 class="m-0 truncate text-[15px] font-semibold">
+                        {{ component.technology }}
+                      </h3>
+                      <p class="m-0 text-[12px] text-ink-soft">
+                        {{ component.componentType.toLowerCase() }} · cycle
+                        <span class="tabular">{{ component.cycle }}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="flex items-baseline justify-between gap-2 px-4 pt-3">
+                    <span class="tabular text-[22px] font-semibold">
+                      {{ component.version }}
+                    </span>
+                    <span class="tabular text-[14px]" [style.color]="fill(component.status)">
+                      {{ days(component.daysToEol) }}
+                    </span>
+                  </div>
+
+                  <dl class="m-0 grid gap-1 px-4 pt-3 pb-4 text-[12px]">
+                    <div class="flex justify-between gap-2">
+                      <dt class="text-ink-soft">{{ label(component.status) }}</dt>
+                      <dd class="tabular m-0">{{ date(component.eolDate) }}</dd>
+                    </div>
+                    @if (component.latestPatch) {
+                      <div class="flex justify-between gap-2">
+                        <dt class="text-ink-soft">Latest in cycle</dt>
+                        <dd class="tabular m-0" [class.text-soon]="component.latestPatch !== component.version">
+                          {{ component.latestPatch }}
+                        </dd>
+                      </div>
+                    }
+                    @if (component.eolSource === 'MANUAL') {
+                      <div class="flex justify-between gap-2">
+                        <dt class="text-ink-soft">Source</dt>
+                        <dd class="m-0 text-ink-faint">entered by hand</dd>
+                      </div>
+                    }
+                  </dl>
+                </article>
               }
-            </ul>
-            <p class="mt-4 mb-0 text-[12px] text-ink-soft">
-              Switch to JSON to add or remove components.
-            </p>
-          </div>
-        } @else {
-          <div class="p-5 text-[13px] text-ink-soft">
-            Select a server to inspect it, or switch to JSON to edit the whole
-            environment.
-          </div>
+            </div>
+          </section>
         }
-      </aside>
-    </div>
+      } @empty {
+        <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
+          No projects yet.
+        </p>
+      }
+    }
   `,
 })
 export class Environments {
-  private readonly store = inject(RegistryStore);
+  protected readonly api = inject(Api);
 
-  protected readonly NODE_WIDTH = NODE_WIDTH;
-  protected readonly HEADER_HEIGHT = HEADER_HEIGHT;
-  protected readonly ROW_HEIGHT = ROW_HEIGHT;
+  protected readonly projects = computed(() => this.api.projects());
+  protected readonly selectedId = signal<string | null>(null);
 
-  protected readonly mode = signal<'visual' | 'json' | 'history'>('visual');
-  protected readonly message = signal('');
-  protected readonly deployment = signal<Deployment>(this.store.deployments()[0]);
-  protected readonly selectedNode = signal<EnvNode | null>(null);
-  protected readonly draft = signal('');
-  protected readonly error = signal<string | null>(null);
-
-  protected readonly topology = computed<EnvTopology>(
-    () =>
-      this.store.topologyFor(this.deployment().id) ?? {
-        deploymentId: this.deployment().id,
-        nodes: [],
-        links: [],
-      },
-  );
-
-  protected readonly grouped = computed(() => {
-    const byCustomer = new Map<string, Deployment[]>();
-    for (const d of this.store.deployments()) {
-      byCustomer.set(d.customer, [...(byCustomer.get(d.customer) ?? []), d]);
-    }
-    return [...byCustomer].map(([customer, deployments]) => ({
-      customer,
-      deployments,
-    }));
-  });
-
-  protected readonly placed = computed<PlacedNode[]>(() =>
-    this.topology().nodes.map((node) => ({
-      node,
-      height: HEADER_HEIGHT + 16 + node.stack.length * ROW_HEIGHT + 8,
-      worst: statusFill(this.store.worstStatus(node.stack)),
-      rows: this.rowsFor(node),
-    })),
-  );
-
-  protected readonly canvasWidth = computed(
-    () =>
-      Math.max(...this.topology().nodes.map((n) => n.x + NODE_WIDTH), 400) + 40,
-  );
-
-  protected readonly canvasHeight = computed(
-    () =>
-      Math.max(
-        ...this.placed().map((p) => p.node.y + p.height),
-        300,
-      ) + 40,
-  );
-
-  constructor() {
-    // Keep the JSON view in step with whichever environment is selected.
-    effect(() => {
-      const topology = this.topology();
-      this.draft.set(JSON.stringify(topology, null, 2));
-    });
+  protected selected(project: ApiProject): ApiEnvironment | null {
+    const chosen = project.environments.find((e) => e.id === this.selectedId());
+    // Default to production: the environment that matters most.
+    return (
+      chosen ??
+      project.environments.find((e) => e.environment === 'PROD') ??
+      project.environments[0] ??
+      null
+    );
   }
 
-  protected rowsFor(node: EnvNode) {
-    return node.stack.map((entry) => {
-      const resolved = this.store.resolve(entry.technology, entry.version);
-      return {
-        technology: entry.technology,
-        version: entry.version,
-        days: formatDays(resolved.days),
-        fill: statusFill(resolved.status),
-        title: `${entry.technology} ${entry.version} — ${statusLabel(resolved.status)}`,
-      };
-    });
+  protected riskOf(env: ApiEnvironment): number {
+    return env.components.filter(
+      (c: ApiComponent) => c.status === 'EOL' || c.status === 'NEAR',
+    ).length;
   }
 
-  protected selectDeployment(d: Deployment): void {
-    this.deployment.set(d);
-    this.selectedNode.set(null);
-    this.error.set(null);
-  }
-
-  protected selectNode(node: EnvNode): void {
-    this.selectedNode.set(this.selectedNode()?.id === node.id ? null : node);
-  }
-
-  /** How many components on this environment are EOL or near it. */
-  protected riskCount(d: Deployment): string {
-    const at = d.components.filter((c) => {
-      const status = this.store.resolve(c.technology, c.version).status;
-      return status === 'EOL' || status === 'NEAR';
-    }).length;
-    return at === 0 ? '' : `${at} at risk`;
-  }
-
-  protected worstColour(d: Deployment): string {
-    return statusFill(this.store.worstStatus(d.components));
-  }
-
-  protected linkX1(id: string): number {
-    const node = this.topology().nodes.find((n) => n.id === id);
-    return node ? node.x + NODE_WIDTH : 0;
-  }
-
-  protected linkX2(id: string): number {
-    return this.topology().nodes.find((n) => n.id === id)?.x ?? 0;
-  }
-
-  protected linkY(id: string): number {
-    const placed = this.placed().find((p) => p.node.id === id);
-    return placed ? placed.node.y + placed.height / 2 : 0;
-  }
-
-  protected rename(node: EnvNode, event: Event): void {
-    const name = (event.target as HTMLInputElement).value;
-    this.updateNode({ ...node, name });
-  }
-
-  protected rehost(node: EnvNode, event: Event): void {
-    const host = (event.target as HTMLInputElement).value;
-    this.updateNode({ ...node, host });
-  }
-
-  /** Visual edits write through the same store method as the JSON editor. */
-  private updateNode(next: EnvNode): void {
-    const topology = this.topology();
-    this.store.replaceTopology({
-      ...topology,
-      nodes: topology.nodes.map((n) => (n.id === next.id ? next : n)),
-    });
-    this.selectedNode.set(next);
-  }
-
-  protected applyJson(): void {
-    try {
-      const parsed = JSON.parse(this.draft()) as EnvTopology;
-
-      if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.links)) {
-        throw new Error('A topology needs a "nodes" array and a "links" array.');
-      }
-      for (const node of parsed.nodes) {
-        if (!node.id || !node.name || !Array.isArray(node.stack)) {
-          throw new Error(
-            `Node "${node.id ?? '(no id)'}" needs an id, a name and a stack array.`,
-          );
-        }
-      }
-
-      // Saved as a revision, never overwritten: the previous state stays
-      // readable and the change shows as a diff in History.
-      this.store.commit(
-        this.deployment().id,
-        { ...parsed, deploymentId: this.deployment().id },
-        this.message(),
-      );
-      this.message.set('');
-      this.error.set(null);
-      this.selectedNode.set(null);
-      this.mode.set('history');
-    } catch (e) {
-      this.error.set(e instanceof Error ? e.message : 'Invalid JSON.');
-    }
-  }
-
-  protected resetJson(): void {
-    this.draft.set(JSON.stringify(this.topology(), null, 2));
-    this.error.set(null);
-  }
+  protected fill = statusFill;
+  protected days = formatDays;
+  protected date = formatDate;
+  protected label = statusLabel;
 }

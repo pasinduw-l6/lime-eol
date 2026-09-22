@@ -88,6 +88,12 @@ enum Role {
   VIEWER
 }
 
+enum ProjectStatus {
+  ACTIVE
+  ONBOARDING
+  PAUSED
+}
+
 enum Channel {
   EMAIL
   TEAMS
@@ -248,16 +254,58 @@ model Customer {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  projects    Project[]
   deployments Deployment[]
 
   @@index([archivedAt])
   @@map("customer")
 }
 
+/// One customer installation of the Lime platform — the unit engineers work
+/// in. A customer may run more than one (a second brand, a separate region),
+/// so this is deliberately not the same record as the customer.
+model Project {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  customerId  String        @map("customer_id") @db.Uuid
+  name        String
+  code        String        @unique
+  /// Which Lime release this customer is on. Differs per project.
+  limeVersion String?       @map("lime_version")
+  status      ProjectStatus @default(ACTIVE)
+  startedAt   DateTime?     @map("started_at") @db.Date
+  notes       String?
+  archivedAt  DateTime?     @map("archived_at") @db.Timestamptz(3)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  customer    Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  deployments Deployment[]
+  engineers   ProjectEngineer[]
+
+  @@index([customerId])
+  @@map("project")
+}
+
+/// Who is staffed on a project. Plural on purpose — notifications go to all of
+/// them, and is_lead marks who to escalate to.
+model ProjectEngineer {
+  projectId String  @map("project_id") @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  isLead    Boolean @default(false) @map("is_lead")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    AppUser @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@map("project_engineer")
+}
+
 /// One environment of one customer: "Acme UAT".
 model Deployment {
   id             String             @id @default(uuid(7)) @db.Uuid
   customerId     String             @map("customer_id") @db.Uuid
+  projectId      String             @map("project_id") @db.Uuid
   limeVersionId  String?            @map("lime_version_id") @db.Uuid
   name           String
   environment    Environment
@@ -271,13 +319,15 @@ model Deployment {
   updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   customer       Customer                  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  project        Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   limeVersion    LimeVersion?              @relation(fields: [limeVersionId], references: [id], onDelete: Restrict)
   owners         DeploymentOwner[]
   overrides      DeploymentComponent[]
   upgradeActions UpgradeActionDeployment[]
 
-  @@unique([customerId, name, environment])
+  @@unique([projectId, environment])
   @@index([environment])
+  @@index([projectId])
   @@index([archivedAt])
   @@map("deployment")
 }
@@ -344,6 +394,7 @@ model AppUser {
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   teams           TeamMember[]
+  projects        ProjectEngineer[]
   assignedActions UpgradeAction[]
   auditLogs       AuditLog[]
 

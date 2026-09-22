@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker build *)",
+      "Bash(docker run *)",
+      "Bash(pwd -W)",
+      "Bash(MSYS_NO_PATHCONV=1 timeout 280 docker run --rm -v \"$\\(pwd -W\\)/backend/prisma:/app/prisma\" -v \"$\\(pwd -W\\)/backend/src:/app/src\" -w /app --network eol_default -e DATABASE_URL=\"postgresql://lime:yl123@db:5432/lime_eol?schema=public\" eol-backend-dev npx prisma migrate reset --force)"
+    ]
+  }
+}

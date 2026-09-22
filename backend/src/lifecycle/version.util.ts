@@ -37,13 +37,20 @@ export function parseVersion(raw: string): ParsedVersion {
  * MAJOR_MINOR: 6.0.14  -> '6.0'   (MongoDB, Kubernetes, OpenSSL)
  */
 export function deriveCycle(raw: string, rule: CycleRule): string {
-  const { major, minor } = parseVersion(raw);
+  const match = VERSION_PATTERN.exec(raw);
 
-  if (rule === 'MAJOR_MINOR') {
-    return `${major}.${minor ?? 0}`;
+  if (!match) {
+    throw new Error(`Cannot parse version "${raw}"`);
   }
 
-  return String(major);
+  // Built from the captured text, not from the parsed numbers: Docker ships
+  // zero-padded minors (18.09, 19.03, 20.10), and rebuilding "09" from the
+  // number 9 would produce a cycle that does not exist upstream.
+  if (rule === 'MAJOR_MINOR') {
+    return `${match[1]}.${match[2] ?? '0'}`;
+  }
+
+  return match[1];
 }
 
 /** Orders two versions numerically. Negative when a is older than b. */

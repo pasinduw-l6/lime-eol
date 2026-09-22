@@ -1,0 +1,202 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import {
+  ComponentDto,
+  EnvironmentDto,
+  ProjectDto,
+} from './dto/project-response.dto';
+
+const MS_PER_DAY = 86_400_000;
+const NOTICE_DAYS = 180;
+
+/**
+ * Reads projects with everything the UI needs in one call: environments, the
+ * components each runs, and the lifecycle state of those components.
+ *
+ * Deliberately one query per screen rather than one per row — the client
+ * should not have to fan out to render a list.
+ */
+@Injectable()
+export class ProjectsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll(): Promise<ProjectDto[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { archivedAt: null },
+      orderBy: { name: 'asc' },
+      include: {
+        customer: true,
+        engineers: { include: { user: true } },
+        deployments: {
+          where: { archivedAt: null },
+          orderBy: { environment: 'asc' },
+          include: {
+            owners: { include: { team: true } },
+            overrides: {
+              include: {
+                techVersion: {
+                  include: { cycle: { include: { technology: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return projects.map((project) => {
+      const environments = project.deployments.map((deployment) =>
+        this.toEnvironment(deployment),
+      );
+
+      return {
+        id: project.id,
+        name: project.name,
+        customer: project.customer.name,
+        code: project.code,
+        limeVersion: project.limeVersion,
+        status: project.status,
+        startedAt: project.startedAt
+          ? project.startedAt.toISOString().slice(0, 10)
+          : null,
+        engineers: project.engineers.map((link) => ({
+          id: link.user.id,
+          name: link.user.displayName ?? link.user.email,
+          initials: initialsOf(link.user.displayName ?? link.user.email),
+          isLead: link.isLead,
+        })),
+        environments,
+        risk: riskOf(environments),
+      };
+    });
+  }
+
+  async findOne(id: string): Promise<ProjectDto> {
+    const projects = await this.findAll();
+    const project = projects.find((p) => p.id === id || p.code === id);
+
+    if (!project) {
+      throw new NotFoundException(`No project "${id}"`);
+    }
+    return project;
+  }
+
+  private toEnvironment(deployment: {
+    id: string;
+    environment: string;
+    location: string;
+    locationDetail: string | null;
+    owners: { team: { name: string } }[];
+    overrides: {
+      techVersion: {
+        fullVersion: string;
+        cycle: {
+          cycle: string;
+          eolDate: Date | null;
+          activeSupportEnd: Date | null;
+          latestPatch: string | null;
+          eolSource: string;
+          technology: { name: string; componentType: string };
+        };
+      };
+    }[];
+  }): EnvironmentDto {
+    return {
+      id: deployment.id,
+      environment: deployment.environment,
+      location: deployment.location,
+      locationDetail: deployment.locationDetail,
+      owners: deployment.owners.map((o) => o.team.name),
+      components: deployment.overrides
+        .map((entry) => this.toComponent(entry.techVersion))
+        .sort((a, b) => (a.daysToEol ?? 1e9) - (b.daysToEol ?? 1e9)),
+    };
+  }
+
+  private toComponent(version: {
+    fullVersion: string;
+    cycle: {
+      cycle: string;
+      eolDate: Date | null;
+      activeSupportEnd: Date | null;
+      latestPatch: string | null;
+      eolSource: string;
+      technology: { name: string; componentType: string };
+    };
+  }): ComponentDto {
+    const days = daysUntil(version.cycle.eolDate);
+
+    return {
+      technology: version.cycle.technology.name,
+      componentType: version.cycle.technology.componentType,
+      version: version.fullVersion,
+      cycle: version.cycle.cycle,
+      eolDate: isoDate(version.cycle.eolDate),
+      activeSupportEnd: isoDate(version.cycle.activeSupportEnd),
+      latestPatch: version.cycle.latestPatch,
+      daysToEol: days,
+      status: statusOf(days),
+      eolSource: version.cycle.eolSource,
+    };
+  }
+}
+
+function statusOf(days: number | null): string {
+  if (days === null) {
+    return 'UNKNOWN';
+  }
+  if (days <= 0) {
+    return 'EOL';
+  }
+  return days <= NOTICE_DAYS ? 'NEAR' : 'SUPPORTED';
+}
+
+function daysUntil(date: Date | null): number | null {
+  if (!date) {
+    return null;
+  }
+  const now = new Date();
+  const todayUtc = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  return Math.round((date.getTime() - todayUtc) / MS_PER_DAY);
+}
+
+function isoDate(date: Date | null): string | null {
+  return date ? date.toISOString().slice(0, 10) : null;
+}
+
+/** Counts each technology+version once, however many environments run it. */
+function riskOf(environments: EnvironmentDto[]): { eol: number; near: number } {
+  const seen = new Set<string>();
+  let eol = 0;
+  let near = 0;
+
+  for (const environment of environments) {
+    for (const component of environment.components) {
+      const key = `${component.technology}@${component.version}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+
+      if (component.status === 'EOL') {
+        eol++;
+      } else if (component.status === 'NEAR') {
+        near++;
+      }
+    }
+  }
+  return { eol, near };
+}
+
+function initialsOf(name: string): string {
+  return name
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}

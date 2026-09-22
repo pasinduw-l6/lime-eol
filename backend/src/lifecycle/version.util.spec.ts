@@ -33,6 +33,17 @@ describe('deriveCycle', () => {
   it('treats a missing minor as zero for major.minor products', () => {
     expect(deriveCycle('8', 'MAJOR_MINOR')).toBe('8.0');
   });
+
+  it.each([
+    ['18.09.4', '18.09'],
+    ['19.03.15', '19.03'],
+    ['20.10.24', '20.10'],
+  ])('keeps a zero-padded minor: %s -> %s', (input, expected) => {
+    // Docker's cycles are 18.09 and 19.03, not 18.9 and 19.3. Rebuilding the
+    // string from parsed numbers would silently invent a cycle that upstream
+    // has never published.
+    expect(deriveCycle(input, 'MAJOR_MINOR')).toBe(expected);
+  });
 });
 
 describe('compareVersions', () => {
