@@ -46,7 +46,16 @@ export class DeploymentsController {
     description: 'What the version picker shows when recording a change.',
   })
   @ApiQuery({ name: 'technology', example: 'MongoDB' })
-  versions(@Query('technology') technology: string) {
-    return this.deployments.versionsFor(technology);
+  @ApiQuery({
+    name: 'currentVersion',
+    required: false,
+    example: '8.0.32',
+    description: 'Only versions newer than this are returned',
+  })
+  versions(
+    @Query('technology') technology: string,
+    @Query('currentVersion') currentVersion?: string,
+  ) {
+    return this.deployments.versionsFor(technology, currentVersion);
   }
 }

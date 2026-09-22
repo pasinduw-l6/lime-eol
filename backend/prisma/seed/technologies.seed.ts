@@ -86,7 +86,7 @@ const TECHNOLOGIES: TechnologySeed[] = [
         versions: ['18.09.4'],
       },
       {
-        cycle: '28.0',
+        cycle: '28',
         releaseDate: '2025-02-20',
         eolDate: '2026-05-13',
         isMaintained: false,

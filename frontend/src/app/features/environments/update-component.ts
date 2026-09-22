@@ -44,20 +44,20 @@ import { TechIcon } from '../../shared/tech-icon';
           <label class="field">
             New version
             <select class="input" [(ngModel)]="version" name="version">
-              <option value="">Choose a known version…</option>
+              <option value="">Choose a newer version…</option>
               @for (group of options(); track group.cycle) {
-                <optgroup [label]="'Cycle ' + group.cycle + ' — ends ' + date(group.eolDate)">
+                <optgroup [label]="cycleLabel(group)">
                   @for (v of group.versions; track v) {
                     <option [value]="v">{{ v }}</option>
-                  }
-                  @if (group.latestPatch && !group.versions.includes(group.latestPatch)) {
-                    <option [value]="group.latestPatch">
-                      {{ group.latestPatch }} (latest in cycle)
-                    </option>
                   }
                 </optgroup>
               }
             </select>
+            @if (options().length === 0) {
+              <span class="mt-1 block text-[11.5px] text-ink-soft">
+                Nothing newer is published. Type a version below if you know one.
+              </span>
+            }
           </label>
 
           <label class="field">
@@ -161,7 +161,7 @@ export class UpdateComponent {
 
   private load(): void {
     this.api
-      .versionsFor(this.component().technology)
+      .versionsFor(this.component().technology, this.component().version)
       .subscribe({ next: (options) => this.allOptions.set(options) });
     this.api
       .history(this.environment().id)
@@ -199,6 +199,21 @@ export class UpdateComponent {
           );
         },
       });
+  }
+
+  /** Says what moving to this cycle actually buys you. */
+  protected cycleLabel(group: ApiVersionOption): string {
+    if (!group.eolDate) {
+      return `Cycle ${group.cycle} — no published end of life`;
+    }
+
+    const days = Math.round(
+      (Date.parse(`${group.eolDate}T00:00:00Z`) - Date.now()) / 86_400_000,
+    );
+
+    return days <= 0
+      ? `Cycle ${group.cycle} — already ended ${group.eolDate}`
+      : `Cycle ${group.cycle} — supported until ${group.eolDate} (${days} days)`;
   }
 
   protected date = formatDate;

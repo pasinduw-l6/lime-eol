@@ -93,7 +93,8 @@ export interface ApiChange {
 export interface ApiVersionOption {
   cycle: string;
   eolDate: string | null;
-  latestPatch: string | null;
+  /** False when the cycle comes from the source but is not in our registry. */
+  registered: boolean;
   versions: string[];
 }
 
@@ -121,10 +122,13 @@ export class Api {
     return this.http.get<ApiChange[]>(`/api/v1/deployments/${deploymentId}/history`);
   }
 
-  /** What the version picker offers: known versions, grouped by cycle. */
-  versionsFor(technology: string) {
+  /** Upgrade targets: versions newer than the one running, grouped by cycle. */
+  versionsFor(technology: string, currentVersion?: string) {
+    const current = currentVersion
+      ? `&currentVersion=${encodeURIComponent(currentVersion)}`
+      : '';
     return this.http.get<ApiVersionOption[]>(
-      `/api/v1/deployments/versions/available?technology=${encodeURIComponent(technology)}`,
+      `/api/v1/deployments/versions/available?technology=${encodeURIComponent(technology)}${current}`,
     );
   }
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
