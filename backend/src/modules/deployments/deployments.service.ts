@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EOL_DATA_SOURCE, EolDataSource } from '../eol-sync/ports/eol-data-source.port';
 import { compareVersions, deriveCycle, parseVersion } from '../../lifecycle/version.util';
 import { ChangeComponentDto, ComponentChangeDto } from './dto/change-component.dto';
+import { ChainEntry, hashEntry, verifyChain, VerificationResult } from './history.util';
 
 /**
  * Changing what an environment runs, and remembering that it changed.
@@ -27,6 +28,7 @@ export class DeploymentsService {
   async changeComponent(
     deploymentId: string,
     input: ChangeComponentDto,
+    actorId?: string,
   ): Promise<ComponentChangeDto> {
     const deployment = await this.prisma.deployment.findUnique({
       where: { id: deploymentId },
@@ -105,6 +107,26 @@ export class DeploymentsService {
     );
 
     const change = await this.prisma.$transaction(async (tx) => {
+      // Sequence and hash are computed inside the transaction so two
+      // simultaneous recordings cannot claim the same position; the unique
+      // index on (deployment_id, sequence) is the backstop.
+      const previous = await tx.componentChange.findFirst({
+        where: { deploymentId },
+        orderBy: { sequence: 'desc' },
+      });
+
+      const sequence = (previous?.sequence ?? 0) + 1;
+      const hash = hashEntry(
+        {
+          deploymentId,
+          fromVersion: current?.techVersion.fullVersion ?? null,
+          toVersion,
+          changeType,
+          effectiveAt: effectiveAt.toISOString().slice(0, 10),
+        },
+        previous?.hash ?? null,
+      );
+
       if (current) {
         await tx.deploymentComponent.delete({
           where: {
@@ -131,6 +153,14 @@ export class DeploymentsService {
           changeType,
           effectiveAt,
           note: input.note,
+          reason: input.reason ?? (current ? 'PLANNED_UPGRADE' : 'INITIAL_RECORD'),
+          ticketRef: input.ticketRef,
+          evidenceUrl: input.evidenceUrl,
+          correctsId: input.correctsId,
+          recordedById: actorId ?? null,
+          sequence,
+          hash,
+          previousHash: previous?.hash ?? null,
         },
         include: { technology: true, recordedBy: true },
       });
@@ -212,14 +242,87 @@ export class DeploymentsService {
     }
   }
 
-  async history(deploymentId: string): Promise<ComponentChangeDto[]> {
+  async history(
+    deploymentId: string,
+    filters: { technology?: string; from?: string; to?: string; reason?: string } = {},
+  ): Promise<ComponentChangeDto[]> {
     const changes = await this.prisma.componentChange.findMany({
-      where: { deploymentId },
-      orderBy: [{ effectiveAt: 'desc' }, { recordedAt: 'desc' }],
+      where: {
+        deploymentId,
+        technology: filters.technology ? { name: filters.technology } : undefined,
+        reason: filters.reason ? (filters.reason as never) : undefined,
+        effectiveAt: {
+          gte: filters.from ? new Date(`${filters.from}T00:00:00.000Z`) : undefined,
+          lte: filters.to ? new Date(`${filters.to}T00:00:00.000Z`) : undefined,
+        },
+      },
+      orderBy: [{ sequence: 'desc' }],
       include: { technology: true, recordedBy: true },
     });
 
     return changes.map(toDto);
+  }
+
+  /** Recomputes the chain and reports whether anything was altered. */
+  async verify(deploymentId: string): Promise<VerificationResult> {
+    const entries = await this.prisma.componentChange.findMany({
+      where: { deploymentId },
+      orderBy: { sequence: 'asc' },
+    });
+
+    return verifyChain(
+      entries.map(
+        (e): ChainEntry => ({
+          id: e.id,
+          sequence: e.sequence,
+          hash: e.hash,
+          previousHash: e.previousHash,
+          deploymentId: e.deploymentId,
+          fromVersion: e.fromVersion,
+          toVersion: e.toVersion,
+          changeType: e.changeType,
+          effectiveAt: e.effectiveAt.toISOString().slice(0, 10),
+        }),
+      ),
+    );
+  }
+
+  /** The change log as CSV, which is how auditors want to receive it. */
+  async historyCsv(deploymentId: string): Promise<string> {
+    const changes = await this.history(deploymentId);
+    const header = [
+      'sequence',
+      'effective_at',
+      'recorded_at',
+      'technology',
+      'from_version',
+      'to_version',
+      'change_type',
+      'reason',
+      'ticket',
+      'recorded_by',
+      'note',
+      'hash',
+    ];
+
+    const rows = changes.map((c) =>
+      [
+        c.sequence,
+        c.effectiveAt,
+        c.recordedAt,
+        c.technology,
+        c.fromVersion ?? '',
+        c.toVersion ?? '',
+        c.changeType,
+        c.reason,
+        c.ticketRef ?? '',
+        c.recordedBy ?? '',
+        c.note ?? '',
+        c.hash,
+      ].map(csvCell),
+    );
+
+    return [header.join(','), ...rows.map((r) => r.join(','))].join('\n');
   }
 
   /**
@@ -315,9 +418,22 @@ function toDate(value: string | null): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
+/** Quotes a CSV cell only when it needs it. */
+function csvCell(value: string | number): string {
+  const text = String(value);
+  const needsQuoting = text.includes(',') || text.includes('"') || text.includes('\n');
+  return needsQuoting ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
 function toDto(change: ChangeRow): ComponentChangeDto {
   return {
     id: change.id,
+    sequence: change.sequence,
+    reason: change.reason,
+    ticketRef: change.ticketRef,
+    evidenceUrl: change.evidenceUrl,
+    correctsId: change.correctsId,
+    hash: change.hash,
     technology: change.technology.name,
     fromVersion: change.fromVersion,
     toVersion: change.toVersion,

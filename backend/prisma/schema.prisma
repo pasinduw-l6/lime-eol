@@ -106,6 +106,17 @@ enum ComponentChangeType {
   REMOVE
 }
 
+/// Why a component changed. Auditors ask this before they ask what changed:
+/// an emergency patch and a planned upgrade are different kinds of event.
+enum ChangeReason {
+  INITIAL_RECORD
+  PLANNED_UPGRADE
+  SECURITY_PATCH
+  ROLLBACK
+  DRIFT_CORRECTION
+  DECOMMISSION
+}
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -387,6 +398,20 @@ model ComponentChange {
   fromVersion   String?             @map("from_version")
   toVersion     String?             @map("to_version")
   changeType    ComponentChangeType @map("change_type")
+  reason        ChangeReason        @default(PLANNED_UPGRADE)
+  /// Change request or ticket this was carried out under.
+  ticketRef     String?             @map("ticket_ref")
+  /// Runbook, PR or pipeline run that evidences it.
+  evidenceUrl   String?             @map("evidence_url")
+  /// Position in this environment's chain, 1-based and gap-free.
+  sequence      Int
+  /// SHA-256 over this entry and the one before it. A silently edited or
+  /// deleted row breaks the chain, which /history/verify reports.
+  hash          String
+  previousHash  String?             @map("previous_hash")
+  /// Set when this entry exists to correct an earlier one. Entries are never
+  /// edited or deleted; a mistake is answered with a compensating entry.
+  correctsId    String?             @map("corrects_id") @db.Uuid
   /// When it happened in the environment — not when someone typed it in.
   /// Reports use this; recordedAt only says when the paperwork caught up.
   effectiveAt   DateTime            @map("effective_at") @db.Date
@@ -399,7 +424,10 @@ model ComponentChange {
   fromVersion_ TechnologyVersion? @relation("ChangeFrom", fields: [fromVersionId], references: [id], onDelete: SetNull)
   toVersion_   TechnologyVersion? @relation("ChangeTo", fields: [toVersionId], references: [id], onDelete: SetNull)
   recordedBy  AppUser?           @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  corrects    ComponentChange?   @relation("Corrections", fields: [correctsId], references: [id], onDelete: SetNull)
+  correctedBy ComponentChange[]  @relation("Corrections")
 
+  @@unique([deploymentId, sequence])
   @@index([deploymentId, effectiveAt])
   @@index([technologyId, effectiveAt])
   @@map("component_change")

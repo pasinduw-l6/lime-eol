@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ActingUser } from './core/acting-user';
 import { RegistryStore } from './core/registry.store';
 
 /**
@@ -107,11 +108,20 @@ import { RegistryStore } from './core/registry.store';
           }
         </nav>
 
-        <span
-          class="grid h-9 w-9 place-items-center rounded-full bg-elevated text-[13px] font-medium text-ink-soft"
-          title="Mock data — no sign-in yet"
-          >PA</span
-        >
+        <!-- who is acting: every recorded change is attributed to this person -->
+        <label class="flex items-center gap-2">
+          <span class="sr-only">Acting as</span>
+          <select
+            class="rounded-full border border-rule bg-elevated px-3 py-1.5 text-[13px] text-ink"
+            [value]="acting.current()?.id ?? ''"
+            (change)="chooseActor($event)"
+            title="Changes you record are attributed to this person"
+          >
+            @for (person of acting.people(); track person.id) {
+              <option [value]="person.id">{{ person.name }}</option>
+            }
+          </select>
+        </label>
       </header>
 
       <main class="flex-1" (click)="open.set(false)">
@@ -122,6 +132,11 @@ import { RegistryStore } from './core/registry.store';
 })
 export class App {
   private readonly store = inject(RegistryStore);
+  protected readonly acting = inject(ActingUser);
+
+  protected chooseActor(event: Event): void {
+    this.acting.choose((event.target as HTMLSelectElement).value);
+  }
 
   protected readonly nav = [
     { path: '/overview', label: 'Overview', badge: false },

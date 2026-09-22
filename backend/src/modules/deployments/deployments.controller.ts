@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Get, Header, Headers, Param, Patch, Query } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -25,8 +25,11 @@ export class DeploymentsController {
   change(
     @Param('id') id: string,
     @Body() body: ChangeComponentDto,
+    // Stands in for the signed-in user until Entra lands; the service only
+    // ever sees an id, so swapping the header for a token changes nothing here.
+    @Headers('x-acting-user') actingUser?: string,
   ): Promise<ComponentChangeDto> {
-    return this.deployments.changeComponent(id, body);
+    return this.deployments.changeComponent(id, body, actingUser);
   }
 
   @Get(':id/history')
@@ -36,8 +39,36 @@ export class DeploymentsController {
   })
   @ApiParam({ name: 'id', description: 'Environment (deployment) id' })
   @ApiOkResponse({ type: [ComponentChangeDto] })
-  history(@Param('id') id: string): Promise<ComponentChangeDto[]> {
-    return this.deployments.history(id);
+  @ApiQuery({ name: 'technology', required: false })
+  @ApiQuery({ name: 'from', required: false, example: '2026-01-01' })
+  @ApiQuery({ name: 'to', required: false, example: '2026-12-31' })
+  @ApiQuery({ name: 'reason', required: false })
+  history(
+    @Param('id') id: string,
+    @Query('technology') technology?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('reason') reason?: string,
+  ): Promise<ComponentChangeDto[]> {
+    return this.deployments.history(id, { technology, from, to, reason });
+  }
+
+  @Get(':id/history/verify')
+  @ApiOperation({
+    summary: 'Check the change log has not been altered',
+    description:
+      'Recomputes the hash chain. Reports the sequence numbers where the stored hash stops matching, so tampering or a bad restore is visible.',
+  })
+  verify(@Param('id') id: string) {
+    return this.deployments.verify(id);
+  }
+
+  @Get(':id/history.csv')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="change-history.csv"')
+  @ApiOperation({ summary: 'The change log as CSV, for auditors' })
+  csv(@Param('id') id: string): Promise<string> {
+    return this.deployments.historyCsv(id);
   }
 
   @Get('versions/available')

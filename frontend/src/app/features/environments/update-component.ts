@@ -5,8 +5,10 @@ import {
   ApiChange,
   ApiComponent,
   ApiEnvironment,
+  ApiVerification,
   ApiVersionOption,
 } from '../../core/api';
+import { ActingUser } from '../../core/acting-user';
 import { formatDate, formatDays } from '../../core/lifecycle';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
@@ -76,15 +78,51 @@ import { TechIcon } from '../../shared/tech-icon';
               <input type="date" class="input" [(ngModel)]="effectiveAt" name="effective" />
             </label>
             <label class="field">
-              Note
+              Reason
+              <select class="input" [(ngModel)]="reason" name="reason">
+                @for (r of reasons; track r.key) {
+                  <option [value]="r.key">{{ r.label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="field">
+              Change request
+              <input
+                class="input tabular"
+                [(ngModel)]="ticketRef"
+                name="ticket"
+                placeholder="LIME-1042"
+              />
+            </label>
+            <label class="field">
+              Evidence link
               <input
                 class="input"
-                [(ngModel)]="note"
-                name="note"
-                placeholder="Rolled out in the September window"
+                [(ngModel)]="evidenceUrl"
+                name="evidence"
+                placeholder="https://git.example.com/infra/pull/218"
               />
             </label>
           </div>
+
+          <label class="field">
+            Note
+            <input
+              class="input"
+              [(ngModel)]="note"
+              name="note"
+              placeholder="Rolled out in the September window"
+            />
+          </label>
+
+          <p class="m-0 text-[11.5px] text-ink-faint">
+            Recorded as {{ actor()?.name ?? 'an unknown user' }}. Entries cannot be
+            edited or deleted afterwards — a mistake is answered with a correcting
+            entry.
+          </p>
 
           @if (error()) {
             <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
@@ -98,23 +136,66 @@ import { TechIcon } from '../../shared/tech-icon';
           </div>
         </form>
 
-        <!-- history for this technology on this environment -->
+        <!-- audit trail -->
         <div class="border-t border-rule pt-4">
-          <h3 class="m-0 mb-2 text-[13px] font-semibold">History</h3>
-          <ul class="m-0 flex list-none flex-col gap-2 p-0">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="m-0 text-[13px] font-semibold">Change history</h3>
+            <span class="flex items-center gap-3 text-[11.5px]">
+              @if (verification(); as check) {
+                <span [style.color]="check.intact ? 'var(--color-good)' : 'var(--color-overdue)'">
+                  @if (check.intact) {
+                    {{ check.entries }} entries verified
+                  } @else {
+                    altered at entry {{ check.brokenAt.join(', ') }}
+                  }
+                </span>
+              }
+              <a [href]="csvUrl()" class="text-accent-bright no-underline hover:underline" download>
+                Export CSV
+              </a>
+            </span>
+          </div>
+
+          <ol class="m-0 flex list-none flex-col p-0">
             @for (change of history(); track change.id) {
-              <li class="flex gap-3 text-[13px]">
-                <span class="tabular shrink-0 text-ink-soft">{{ change.effectiveAt }}</span>
+              <li class="flex gap-3 border-b border-rule py-2.5 last:border-b-0">
+                <span
+                  class="tabular mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-elevated text-[10px] text-ink-soft"
+                  [attr.title]="'Entry ' + change.sequence"
+                  >{{ change.sequence }}</span
+                >
                 <span class="min-w-0 flex-1">
-                  <span class="tabular block">
-                    @if (change.fromVersion) {
-                      {{ change.fromVersion }} → {{ change.toVersion }}
-                    } @else {
-                      installed {{ change.toVersion }}
-                    }
-                    <span class="text-[11px] text-ink-faint">
-                      {{ change.changeType.toLowerCase() }}
+                  <span class="flex flex-wrap items-baseline gap-x-2">
+                    <span class="tabular text-[13px]">
+                      @if (change.fromVersion) {
+                        {{ change.fromVersion }} → {{ change.toVersion }}
+                      } @else {
+                        installed {{ change.toVersion }}
+                      }
                     </span>
+                    <span
+                      class="rounded-full border px-2 py-0.5 text-[10.5px]"
+                      [style.border-color]="reasonColour(change.reason)"
+                      [style.color]="reasonColour(change.reason)"
+                      >{{ reasonLabel(change.reason) }}</span
+                    >
+                    @if (change.ticketRef) {
+                      <span class="tabular text-[11px] text-ink-soft">{{ change.ticketRef }}</span>
+                    }
+                  </span>
+                  <span class="block text-[11.5px] text-ink-soft">
+                    {{ change.effectiveAt }} · recorded by
+                    {{ change.recordedBy ?? 'unknown' }}
+                    @if (change.evidenceUrl) {
+                      ·
+                      <a
+                        [href]="change.evidenceUrl"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-accent-bright no-underline hover:underline"
+                        >evidence</a
+                      >
+                    }
                   </span>
                   @if (change.note) {
                     <span class="block text-[11.5px] text-ink-soft">{{ change.note }}</span>
@@ -122,11 +203,11 @@ import { TechIcon } from '../../shared/tech-icon';
                 </span>
               </li>
             } @empty {
-              <li class="text-[13px] text-ink-soft">
+              <li class="py-2 text-[13px] text-ink-soft">
                 Nothing recorded yet for {{ component().technology }} here.
               </li>
             }
-          </ul>
+          </ol>
         </div>
       </div>
     </lime-modal>
@@ -140,6 +221,21 @@ export class UpdateComponent {
   readonly close = output<void>();
   readonly saved = output<void>();
 
+  private readonly acting = inject(ActingUser);
+
+  protected readonly reasons = [
+    { key: 'PLANNED_UPGRADE', label: 'Planned upgrade' },
+    { key: 'SECURITY_PATCH', label: 'Security patch' },
+    { key: 'ROLLBACK', label: 'Rollback' },
+    { key: 'DRIFT_CORRECTION', label: 'Drift correction' },
+    { key: 'DECOMMISSION', label: 'Decommission' },
+  ];
+
+  protected readonly actor = this.acting.current;
+  protected readonly reason = signal('PLANNED_UPGRADE');
+  protected readonly ticketRef = signal('');
+  protected readonly evidenceUrl = signal('');
+  protected readonly verification = signal<ApiVerification | null>(null);
   protected readonly version = signal('');
   protected readonly effectiveAt = signal(new Date().toISOString().slice(0, 10));
   protected readonly note = signal('');
@@ -166,6 +262,9 @@ export class UpdateComponent {
     this.api
       .history(this.environment().id)
       .subscribe({ next: (changes) => this.allChanges.set(changes) });
+    this.api
+      .verifyHistory(this.environment().id)
+      .subscribe({ next: (result) => this.verification.set(result) });
   }
 
   protected save(event: Event): void {
@@ -184,6 +283,9 @@ export class UpdateComponent {
         toVersion: version,
         effectiveAt: this.effectiveAt(),
         note: this.note() || undefined,
+        reason: this.reason(),
+        ticketRef: this.ticketRef() || undefined,
+        evidenceUrl: this.evidenceUrl() || undefined,
       })
       .subscribe({
         next: () => {
@@ -199,6 +301,32 @@ export class UpdateComponent {
           );
         },
       });
+  }
+
+  protected csvUrl(): string {
+    return this.api.historyCsvUrl(this.environment().id);
+  }
+
+  protected reasonLabel(reason: string): string {
+    return (
+      this.reasons.find((r) => r.key === reason)?.label ??
+      reason.toLowerCase().replace(/_/g, ' ')
+    );
+  }
+
+  /** Security patches and rollbacks should stand out in a long list. */
+  protected reasonColour(reason: string): string {
+    switch (reason) {
+      case 'SECURITY_PATCH':
+        return 'var(--color-overdue)';
+      case 'ROLLBACK':
+      case 'DRIFT_CORRECTION':
+        return 'var(--color-soon)';
+      case 'INITIAL_RECORD':
+        return 'var(--color-ink-faint)';
+      default:
+        return 'var(--color-accent-bright)';
+    }
   }
 
   /** Says what moving to this cycle actually buys you. */

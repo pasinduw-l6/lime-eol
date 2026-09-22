@@ -78,8 +78,21 @@ export interface ApiTechnology {
   cycles: ApiCycle[];
 }
 
+export interface ApiVerification {
+  intact: boolean;
+  entries: number;
+  brokenAt: number[];
+  checkedAt: string;
+}
+
 export interface ApiChange {
   id: string;
+  sequence: number;
+  reason: string;
+  ticketRef: string | null;
+  evidenceUrl: string | null;
+  correctsId: string | null;
+  hash: string;
   technology: string;
   fromVersion: string | null;
   toVersion: string | null;
@@ -110,6 +123,10 @@ export class Api {
       toVersion: string;
       effectiveAt?: string;
       note?: string;
+      reason?: string;
+      ticketRef?: string;
+      evidenceUrl?: string;
+      correctsId?: string;
     },
   ) {
     return this.http.patch<ApiChange>(
@@ -120,6 +137,17 @@ export class Api {
 
   history(deploymentId: string) {
     return this.http.get<ApiChange[]>(`/api/v1/deployments/${deploymentId}/history`);
+  }
+
+  /** Recomputes the hash chain, so the UI can say whether it is intact. */
+  verifyHistory(deploymentId: string) {
+    return this.http.get<ApiVerification>(
+      `/api/v1/deployments/${deploymentId}/history/verify`,
+    );
+  }
+
+  historyCsvUrl(deploymentId: string): string {
+    return `/api/v1/deployments/${deploymentId}/history.csv`;
   }
 
   /** Upgrade targets: versions newer than the one running, grouped by cycle. */
