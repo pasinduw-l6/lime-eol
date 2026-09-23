@@ -17,13 +17,14 @@ import { RegistryStore } from './core/registry.store';
   template: `
     <div class="mx-auto flex min-h-screen max-w-[1500px] flex-col px-5 py-5">
       <header class="card mb-5 flex flex-wrap items-center gap-4 px-5 py-3" role="banner">
-        <a routerLink="/overview" class="flex items-center gap-2.5 no-underline">
-          <span
-            class="grid h-8 w-8 place-items-center rounded-full"
-            style="background: linear-gradient(135deg, var(--color-accent-bright), var(--color-accent-deep))"
-            aria-hidden="true"
-          ></span>
-          <span class="text-[17px] font-semibold text-ink">Lime</span>
+        <!-- The wordmark is navy, so it needs a light plate to read on the
+             dark ground. A light-wordmark version would let this go. -->
+        <a
+          routerLink="/overview"
+          class="flex items-center rounded-xl bg-white px-3 py-1.5 no-underline"
+          aria-label="Lime Lifecycle — overview"
+        >
+          <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
         </a>
 
         <!-- project switcher -->

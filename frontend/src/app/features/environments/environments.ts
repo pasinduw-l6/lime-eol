@@ -44,7 +44,7 @@ import { UpdateComponent } from './update-component';
               <span class="flex -space-x-1.5">
                 @for (e of project.engineers; track e.id) {
                   <span
-                    class="grid h-8 w-8 place-items-center rounded-full border border-surface bg-accent-deep text-[11px]"
+                    class="grid h-8 w-8 place-items-center rounded-full border border-surface brand-gradient text-[11px]"
                     [attr.title]="e.name + (e.isLead ? ' · lead' : '')"
                     >{{ e.initials }}</span
                   >

@@ -193,7 +193,7 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
         <ul class="m-0 list-none p-0">
           @for (e of engineers(); track e.id) {
             <li class="flex items-center gap-3 border-b border-rule px-6 py-3 last:border-b-0">
-              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent-deep text-[11px]">
+              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full brand-gradient text-[11px]">
                 {{ e.initials }}
               </span>
               <span class="min-w-0 flex-1">

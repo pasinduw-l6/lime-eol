@@ -17,8 +17,15 @@
             "browser": "src/main.ts",
             "polyfills": [],
             "tsConfig": "tsconfig.app.json",
-            "assets": [],
-            "styles": ["src/styles.css"]
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "styles": [
+              "src/styles.css"
+            ]
           },
           "configurations": {
             "production": {
@@ -42,8 +49,12 @@
         "serve": {
           "builder": "@angular/build:dev-server",
           "configurations": {
-            "production": { "buildTarget": "lime-lifecycle:build:production" },
-            "development": { "buildTarget": "lime-lifecycle:build:development" }
+            "production": {
+              "buildTarget": "lime-lifecycle:build:production"
+            },
+            "development": {
+              "buildTarget": "lime-lifecycle:build:development"
+            }
           },
           "defaultConfiguration": "development"
         }

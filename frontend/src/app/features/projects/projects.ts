@@ -165,7 +165,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                     (click)="toggleEngineer(e.id)"
                   >
                     <span
-                      class="grid h-6 w-6 place-items-center rounded-full bg-accent-deep text-[10px] text-ink"
+                      class="grid h-6 w-6 place-items-center rounded-full brand-gradient text-[10px] text-ink"
                       >{{ e.initials }}</span
                     >
                     {{ e.name }}
@@ -304,7 +304,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 <span class="flex -space-x-1.5">
                   @for (e of row.engineers; track e.id) {
                     <span
-                      class="grid h-7 w-7 place-items-center rounded-full border border-surface bg-accent-deep text-[10px]"
+                      class="grid h-7 w-7 place-items-center rounded-full border border-surface brand-gradient text-[10px]"
                       [attr.title]="e.name + ' · ' + e.role"
                       >{{ e.initials }}</span
                     >

@@ -11,26 +11,30 @@
    without colour vision.
 --------------------------------------------------------------------------- */
 @theme {
-  /* surfaces, darkest to lightest */
-  --color-ground: #08080c;
-  --color-surface: #13131c;
-  --color-elevated: #1c1c28;
-  --color-rule: #272736;
+  /* Surfaces: the navy of the Lime wordmark, deepened into a ground.
+     Not a neutral near-black — the whole app should feel like the logo. */
+  --color-ground: #071a23;
+  --color-surface: #0d2430;
+  --color-elevated: #14323f;
+  --color-rule: #1f4353;
 
   /* text */
-  --color-ink: #f3f4f8;
-  --color-ink-soft: #9ba2b4;
-  --color-ink-faint: #666e82;
+  --color-ink: #e9f4f5;
+  --color-ink-soft: #9bb8c2;
+  --color-ink-faint: #648793;
 
-  /* brand */
-  --color-accent: #7c5cff;
-  --color-accent-bright: #a78bff;
-  --color-accent-deep: #4c33c4;
+  /* Brand: the teal→lime gradient of the mark, split into roles. */
+  --color-accent: #00b3a4;
+  --color-accent-bright: #3fd9c2;
+  --color-accent-deep: #0a6f66;
+  --color-lime: #8dc63f;
+  --color-lime-bright: #a8d957;
 
-  /* status — brighter than the light theme so they hold up on near-black */
-  --color-overdue: #ff5f57;
-  --color-soon: #ffb020;
-  --color-good: #4ade80;
+  /* Status. Warm hues only, so nothing competes with the brand teal/lime —
+     except "good", which *is* the brand lime: healthy things look like Lime. */
+  --color-overdue: #ff6f61;
+  --color-soon: #ffb547;
+  --color-good: #8dc63f;
 
   --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
@@ -101,8 +105,8 @@ body {
 
 .pill-active,
 .pill-active:hover {
-  background: var(--color-ink);
-  color: var(--color-ground);
+  background: var(--color-accent);
+  color: #04222a;
   font-weight: 500;
 }
 
@@ -211,11 +215,17 @@ body {
 .btn-primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #ffffff;
+  color: #04222a;
+  font-weight: 500;
 }
 
 .btn-primary:hover {
   background: var(--color-accent-bright);
+}
+
+/* The mark’s gradient, reused wherever a brand flourish earns its place. */
+.brand-gradient {
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-lime) 100%);
 }
 
 :where(a, button, [tabindex], input, select, textarea):focus-visible {
