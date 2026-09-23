@@ -154,9 +154,16 @@ body {
   height: 100%;
 }
 
+html {
+  background: var(--color-ground);
+}
+
 body {
   margin: 0;
-  background: var(--color-ground);
+  /* The ground colour lives on html so the shader canvas, which sits behind
+     the page at -z-10, is not painted over. It also means the correct colour
+     is already there before WebGL starts, and stays if it never does. */
+  background: transparent;
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 16px;
@@ -189,19 +196,64 @@ body {
    stutter — there are a dozen cards on the Overview alone. The blur is now
    spent on the two single elements that earn it: the app bar and the dialog
    backdrop. */
+/* Glass, without the blur.
+
+   The shader background behind these is all soft gradient, so a translucent
+   fill already reads as glass — there is nothing sharp behind that would need
+   blurring out. What sells it is the light: a one-pixel inner highlight along
+   the top edge, which is how a real pane catches a room.
+
+   Deliberately no backdrop-filter. Blurring a dozen of these per screen is
+   what made the app stutter; the blur is spent on the three elements that
+   overlay live content and genuinely earn it. */
 .card {
-  background: var(--color-surface);
-  border: 1px solid color-mix(in oklab, var(--color-rule) 70%, transparent);
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--color-surface) 86%, transparent),
+      color-mix(in oklab, var(--color-surface) 95%, transparent)
+    );
+  border: 1px solid color-mix(in oklab, #ffffff 9%, transparent);
   border-radius: var(--radius-card);
   box-shadow:
+    inset 0 1px 0 color-mix(in oklab, #ffffff 7%, transparent),
     0 1px 1px rgb(0 0 0 / 14%),
     0 8px 24px -12px rgb(0 0 0 / 40%);
 }
 
 :root[data-theme='light'] .card {
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in oklab, var(--color-surface) 82%, transparent),
+      color-mix(in oklab, var(--color-surface) 93%, transparent)
+    );
+  border-color: color-mix(in oklab, var(--color-rule) 60%, transparent);
   box-shadow:
+    inset 0 1px 0 color-mix(in oklab, #ffffff 70%, transparent),
     0 1px 1px rgb(13 36 48 / 5%),
     0 10px 24px -14px rgb(13 36 48 / 22%);
+}
+
+/* The same treatment for the smaller rounded surfaces, so the whole interface
+   is made of one material rather than glass panes holding solid boxes. */
+.input,
+.btn,
+.pill {
+  background: color-mix(in oklab, var(--color-elevated) 72%, transparent);
+  border-color: color-mix(in oklab, #ffffff 8%, transparent);
+}
+
+:root[data-theme='light'] .input,
+:root[data-theme='light'] .btn,
+:root[data-theme='light'] .pill {
+  background: color-mix(in oklab, var(--color-elevated) 78%, transparent);
+  border-color: color-mix(in oklab, var(--color-rule) 65%, transparent);
+}
+
+/* bg-elevated is used inline all over the app for inner tiles and chips. */
+.bg-elevated {
+  background: color-mix(in oklab, var(--color-elevated) 70%, transparent) !important;
 }
 
 /* The bar stays put and the content slides under it, frosted. */

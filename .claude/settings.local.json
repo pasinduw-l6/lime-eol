@@ -10,7 +10,8 @@
       "Bash(rm -f frontend/src/app/features/plan/plan-page.ts)",
       "Bash(rmdir frontend/src/app/features/plan)",
       "Bash(docker compose *)",
-      "Bash(curl -s \"https://endoflife.date/api/v1/categories/\")"
+      "Bash(curl -s \"https://endoflife.date/api/v1/categories/\")",
+      "Bash(py -3 -c ' *)"
     ]
   }
 }

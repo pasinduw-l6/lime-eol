@@ -5,6 +5,7 @@ import { RegistryStore } from './core/registry.store';
 import { SessionStore } from './core/session';
 import { Theme } from './core/theme';
 import { Celebrate } from './shared/celebrate';
+import { ShaderBackground } from './shared/shader-background';
 
 /**
  * The signed-in chrome: brand, project switcher, sections, theme, identity.
@@ -18,9 +19,16 @@ import { Celebrate } from './shared/celebrate';
  */
 @Component({
   selector: 'lime-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Celebrate],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Celebrate, ShaderBackground],
   host: { class: 'block min-h-screen' },
   template: `
+    <!-- Deferred until the browser is idle: this is decoration, and OGL should
+         not sit in the critical path of showing someone what is expiring. The
+         ground colour is already on <html>, so there is nothing to see arrive. -->
+    @defer (on idle) {
+      <lime-shader-background />
+    }
+
     <div class="mx-auto flex min-h-screen max-w-[1500px] flex-col px-5 py-5">
       <header
         class="card app-bar mb-5 flex flex-wrap items-center gap-4 px-5 py-3"
