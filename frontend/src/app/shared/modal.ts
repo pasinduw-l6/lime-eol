@@ -19,7 +19,6 @@ import gsap from 'gsap';
   host: { class: 'block' },
   template: `
     <div
-      #backdrop
       class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-10"
       style="background: rgb(0 0 0 / 45%); backdrop-filter: blur(6px)"
       (click)="dismiss.emit()"
@@ -61,37 +60,38 @@ export class Modal implements AfterViewInit, OnDestroy {
   readonly subtitle = input<string>('');
   readonly dismiss = output<void>();
 
-  private readonly backdrop = viewChild<ElementRef<HTMLElement>>('backdrop');
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
-  private readonly media = gsap.matchMedia();
+  private tween?: gsap.core.Tween;
 
   /**
    * The sheet springs up rather than appearing, which is what makes a dialog
-   * feel like it came from somewhere. One movement, and only when motion is
-   * welcome.
+   * feel like it came from somewhere.
+   *
+   * Only the panel moves. Animating the blurred backdrop as well meant
+   * compositing a full-screen blur on every frame, and an interrupted tween
+   * could leave it stuck at opacity 0 — an invisible layer still swallowing
+   * clicks, which is exactly how a close button appears to "not work".
    */
   ngAfterViewInit(): void {
-    const backdrop = this.backdrop()?.nativeElement;
     const panel = this.panel()?.nativeElement;
 
-    if (!backdrop || !panel) {
+    if (!panel || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       return;
     }
 
-    this.media.add('(prefers-reduced-motion: no-preference)', () => {
-      gsap.from(backdrop, { opacity: 0, duration: 0.18, ease: 'power1.out' });
-      gsap.from(panel, {
-        opacity: 0,
-        y: 18,
-        scale: 0.97,
-        duration: 0.42,
-        ease: 'back.out(1.4)',
-        clearProps: 'transform',
-      });
+    this.tween = gsap.from(panel, {
+      opacity: 0,
+      y: 18,
+      scale: 0.97,
+      duration: 0.38,
+      ease: 'back.out(1.4)',
+      clearProps: 'opacity,transform',
     });
   }
 
   ngOnDestroy(): void {
-    this.media.revert();
+    // kill(), not revert(): reverting a .from() would restore its start state,
+    // leaving the panel invisible on the way out.
+    this.tween?.kill();
   }
 }

@@ -143,9 +143,13 @@ body {
 /* Surfaces are layered rather than outlined: a hairline, a soft lift, and a
    little translucency, so panels feel stacked on the ground instead of drawn
    onto it. */
+/* Opaque on purpose. A backdrop-filter here looked right but cost a blur pass
+   per card on every frame, which is what made scrolling and the dialog spring
+   stutter — there are a dozen cards on the Overview alone. The blur is now
+   spent on the two single elements that earn it: the app bar and the dialog
+   backdrop. */
 .card {
-  background: color-mix(in oklab, var(--color-surface) 92%, transparent);
-  backdrop-filter: saturate(160%) blur(18px);
+  background: var(--color-surface);
   border: 1px solid color-mix(in oklab, var(--color-rule) 70%, transparent);
   border-radius: var(--radius-card);
   box-shadow:
@@ -154,7 +158,6 @@ body {
 }
 
 :root[data-theme='light'] .card {
-  background: color-mix(in oklab, var(--color-surface) 94%, transparent);
   box-shadow:
     0 1px 1px rgb(13 36 48 / 5%),
     0 10px 24px -14px rgb(13 36 48 / 22%);
