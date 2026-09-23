@@ -2,8 +2,10 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { FormsModule } from '@angular/forms';
 import { Api, ApiEnvironment, ApiVersionOption } from '../../core/api';
 import { ActingUser } from '../../core/acting-user';
+import { Celebrations } from '../../core/celebration.service';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
+import { Working } from '../../shared/working';
 
 /**
  * Add a technology this environment was not known to run.
@@ -15,7 +17,7 @@ import { TechIcon } from '../../shared/tech-icon';
  */
 @Component({
   selector: 'lime-add-component',
-  imports: [FormsModule, Modal, TechIcon],
+  imports: [FormsModule, Modal, TechIcon, Working],
   host: { class: 'block' },
   template: `
     <lime-modal
@@ -23,6 +25,8 @@ import { TechIcon } from '../../shared/tech-icon';
       [subtitle]="environment().environment + ' · ' + available().length + ' technologies not yet recorded here'"
       (dismiss)="close.emit()"
     >
+      <lime-working [active]="saving()" label="Recording the component…" />
+
       <form class="grid gap-4" (submit)="save($event)">
         <label class="field">
           Technology
@@ -150,6 +154,7 @@ import { TechIcon } from '../../shared/tech-icon';
 export class AddComponent {
   private readonly api = inject(Api);
   private readonly acting = inject(ActingUser);
+  private readonly celebrations = inject(Celebrations);
 
   readonly environment = input.required<ApiEnvironment>();
   readonly close = output<void>();
@@ -243,6 +248,12 @@ export class AddComponent {
       .subscribe({
         next: () => {
           this.saving.set(false);
+          // A first record is bookkeeping, not a rescue — acknowledged, not cheered.
+          this.celebrations.show({
+            tier: 'ROUTINE',
+            title: `${technology} recorded`,
+            detail: `${version} · ${this.environment().environment}`,
+          });
           this.saved.emit();
           this.close.emit();
         },

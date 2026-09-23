@@ -4,6 +4,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ActingUser } from './core/acting-user';
 import { RegistryStore } from './core/registry.store';
 import { Theme } from './core/theme';
+import { Celebrate } from './shared/celebrate';
 
 /**
  * The signed-in chrome: brand, project switcher, sections, theme, identity.
@@ -17,7 +18,7 @@ import { Theme } from './core/theme';
  */
 @Component({
   selector: 'lime-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Celebrate],
   host: { class: 'block min-h-screen' },
   template: `
     <div class="mx-auto flex min-h-screen max-w-[1500px] flex-col px-5 py-5">
@@ -167,6 +168,9 @@ import { Theme } from './core/theme';
         <router-outlet />
       </main>
     </div>
+
+    <!-- mounted once, fired from anywhere -->
+    <lime-celebrate />
   `,
 })
 export class Shell {

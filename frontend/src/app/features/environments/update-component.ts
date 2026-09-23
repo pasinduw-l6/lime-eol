@@ -9,10 +9,12 @@ import {
   ApiVersionOption,
 } from '../../core/api';
 import { ActingUser } from '../../core/acting-user';
-import { formatDate, formatDays } from '../../core/lifecycle';
+import { Celebrations, celebrationFor } from '../../core/celebration.service';
+import { formatDate, formatDays, SupportStatus } from '../../core/lifecycle';
 import { ChangeTimeline } from '../../shared/change-timeline';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
+import { Working } from '../../shared/working';
 
 /**
  * Record the version an environment now runs.
@@ -23,7 +25,7 @@ import { TechIcon } from '../../shared/tech-icon';
  */
 @Component({
   selector: 'lime-update-component',
-  imports: [FormsModule, Modal, TechIcon, ChangeTimeline],
+  imports: [FormsModule, Modal, TechIcon, ChangeTimeline, Working],
   host: { class: 'block' },
   template: `
     <lime-modal
@@ -31,6 +33,8 @@ import { TechIcon } from '../../shared/tech-icon';
       [subtitle]="environment().environment + ' · currently ' + component().version"
       (dismiss)="close.emit()"
     >
+      <lime-working [active]="saving()" />
+
       <div class="grid gap-5">
         <div class="flex items-center gap-3 rounded-xl border border-rule bg-elevated px-4 py-3">
           <lime-tech-icon [technology]="component().technology" [size]="32" />
@@ -178,6 +182,7 @@ export class UpdateComponent {
   readonly saved = output<void>();
 
   private readonly acting = inject(ActingUser);
+  private readonly celebrations = inject(Celebrations);
 
   protected readonly reasons = [
     { key: 'PLANNED_UPGRADE', label: 'Planned upgrade' },
@@ -246,6 +251,7 @@ export class UpdateComponent {
       .subscribe({
         next: () => {
           this.saving.set(false);
+          this.celebrations.show(this.earned(version));
           this.saved.emit();
           this.close.emit();
         },
@@ -257,6 +263,37 @@ export class UpdateComponent {
           );
         },
       });
+  }
+
+  /**
+   * What this change earned, worked out before the reload lands.
+   *
+   * Everything needed is already on screen: where the component stood, which
+   * cycle the new version belongs to, and how the rest of the environment is
+   * doing — so there is no second request just to decide whether to cheer.
+   */
+  private earned(version: string) {
+    const group = this.options().find((option) =>
+      option.versions.includes(version),
+    );
+
+    const days = group?.eolDate
+      ? Math.round(
+          (Date.parse(`${group.eolDate}T00:00:00Z`) - Date.now()) / 86_400_000,
+        )
+      : null;
+
+    return celebrationFor({
+      technology: this.component().technology,
+      environment: this.environment().environment,
+      fromVersion: this.component().version,
+      toVersion: version,
+      previousStatus: this.component().status as SupportStatus,
+      daysOnNewVersion: days,
+      otherStatuses: this.environment()
+        .components.filter((c) => c.technology !== this.component().technology)
+        .map((c) => c.status as SupportStatus),
+    });
   }
 
   protected csvUrl(): string {
