@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   OnDestroy,
+  effect,
   inject,
   viewChild,
 } from '@angular/core';
@@ -116,17 +117,20 @@ const FRAGMENT = /* glsl */ `
 const PALETTE = {
   dark: {
     ground: [0.027, 0.102, 0.137],
-    teal: [0.0, 0.42, 0.40],
-    lime: [0.35, 0.58, 0.18],
+    teal: [0.0, 0.50, 0.47],
+    lime: [0.40, 0.64, 0.20],
     strength: 1.0,
   },
   light: {
     ground: [0.855, 0.898, 0.91],
-    teal: [0.62, 0.78, 0.78],
-    lime: [0.72, 0.83, 0.62],
-    // Far weaker: the same flow that reads as atmosphere on navy turns the
-    // light theme muddy and eats the contrast the text needs.
-    strength: 0.55,
+    // Deeper than the light theme's own tokens. Tinting a pale ground with
+    // equally pale colour produces nothing anyone can see, so these carry
+    // enough saturation to read through a translucent card.
+    teal: [0.42, 0.70, 0.69],
+    lime: [0.60, 0.78, 0.45],
+    // Still held back from full: the flow that reads as atmosphere on navy
+    // turns the light theme muddy and eats the contrast the text needs.
+    strength: 0.85,
   },
 } as const;
 
@@ -144,6 +148,30 @@ const PALETTE = {
 export class ShaderBackground implements AfterViewInit, OnDestroy {
   private readonly theme = inject(Theme);
   private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
+
+  constructor() {
+    // Follows the theme switch. Read once at startup, the canvas stayed navy
+    // behind a light interface — the background and the cards disagreeing about
+    // which theme was on.
+    effect(() => {
+      const mode = this.theme.mode();
+      const program = this.program;
+
+      if (!program) {
+        return;
+      }
+
+      const palette = PALETTE[mode === 'light' ? 'light' : 'dark'];
+      program.uniforms['uGround'].value = [...palette.ground];
+      program.uniforms['uTeal'].value = [...palette.teal];
+      program.uniforms['uLime'].value = [...palette.lime];
+      program.uniforms['uStrength'].value = palette.strength;
+
+      if (this.still()) {
+        this.draw(0);
+      }
+    });
+  }
 
   private renderer?: Renderer;
   private program?: Program;
