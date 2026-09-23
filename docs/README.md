@@ -25,6 +25,7 @@ Start here.
 | [folder-structure.md](folder-structure.md) | Where does this file belong, and what is each folder for? | A folder is added, removed or changes purpose |
 | [api-reference.md](api-reference.md) | What endpoints exist, what do they take and return? | An endpoint is added, changed or removed |
 | [db-design-notes.md](db-design-notes.md) | What must be decided before writing the schema, and why? | A schema decision is taken or revisited |
+| [accounts.md](accounts.md) | Who can sign in, with what, and how passwords are held | An account is issued, or the auth model changes |
 | [findings.md](findings.md) | What did we learn about the external systems? | Something surprising turns up |
 | [postman/](postman/) | How do I call the API by hand or run the whole suite? | An endpoint is added |
 | [api-examples.http](api-examples.http) | Same, for the VS Code REST Client | An endpoint is added |

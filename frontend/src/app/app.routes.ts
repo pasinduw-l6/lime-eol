@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { signedIn, signedOut } from './core/auth.guard';
 import { Shell } from './shell';
 
 /**
@@ -11,6 +12,7 @@ export const routes: Routes = [
   {
     path: 'login',
     title: 'Sign in · Lime Lifecycle',
+    canActivate: [signedOut],
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },
   {
@@ -22,6 +24,7 @@ export const routes: Routes = [
   {
     path: '',
     component: Shell,
+    canActivate: [signedIn],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'overview' },
       {

@@ -1,6 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { SessionStore } from '../../core/session';
 import { AuthLayout } from './auth-layout';
 
 /**
@@ -77,8 +78,12 @@ import { AuthLayout } from './auth-layout';
           <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
         }
 
-        <button type="submit" class="btn btn-primary w-full justify-center py-2.5">
-          Sign in
+        <button
+          type="submit"
+          class="btn btn-primary w-full justify-center py-2.5"
+          [disabled]="busy()"
+        >
+          {{ busy() ? 'Signing in…' : 'Sign in' }}
         </button>
 
         <p class="m-0 text-center text-[13px] text-ink-soft">
@@ -93,7 +98,12 @@ import { AuthLayout } from './auth-layout';
 })
 export class Login {
   private readonly router = inject(Router);
+  private readonly session = inject(SessionStore);
 
+  /** Where to go after signing in, set by the guard that sent them here. */
+  readonly next = input<string>('');
+
+  protected readonly busy = signal(false);
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly remember = signal(true);
@@ -131,7 +141,25 @@ export class Login {
       return;
     }
 
-    // TODO: POST /api/v1/auth/login, keep the session, then navigate.
-    void this.router.navigateByUrl('/overview');
+    this.busy.set(true);
+
+    this.session.signIn(this.email().trim(), this.password()).subscribe({
+      next: () => {
+        this.busy.set(false);
+        void this.router.navigateByUrl(this.next() || '/overview');
+      },
+      error: (err: { status?: number; error?: { message?: string | string[] } }) => {
+        this.busy.set(false);
+        const message = err.error?.message;
+
+        this.error.set(
+          err.status === 0
+            ? 'Could not reach the server. Check that the API is running.'
+            : Array.isArray(message)
+              ? message.join('. ')
+              : (message ?? 'That email and password do not match.'),
+        );
+      },
+    });
   }
 }

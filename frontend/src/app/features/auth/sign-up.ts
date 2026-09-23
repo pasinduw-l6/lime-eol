@@ -103,6 +103,18 @@ const MIN_LENGTH = 12;
           }
         </label>
 
+        <!-- Accounts are issued by an administrator, not self-service: this
+             tool records who changed a customer's production estate, and an
+             account anyone could create would make that record worthless. -->
+        <p
+          class="m-0 rounded-xl border border-rule px-4 py-3 text-[12.5px] text-ink-soft"
+          style="background: color-mix(in oklab, var(--color-soon) 10%, transparent)"
+        >
+          <span class="font-semibold text-ink">Not connected yet.</span>
+          Accounts are issued by an administrator. This form does not create one
+          — ask for access, then sign in.
+        </p>
+
         @if (error()) {
           <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
         }
@@ -211,7 +223,10 @@ export class SignUp {
       return;
     }
 
-    // TODO: POST /api/v1/auth/register, keep the session, then navigate.
-    void this.router.navigateByUrl('/overview');
+    // Deliberately not wired to the API. The form validates so it is ready for
+    // the day registration is opened up, but it cannot create an account today.
+    this.error.set(
+      'Registration is not open. Ask an administrator to issue your account, then sign in.',
+    );
   }
 }

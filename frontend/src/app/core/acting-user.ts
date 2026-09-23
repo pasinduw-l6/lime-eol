@@ -1,49 +1,42 @@
 import { HttpInterceptorFn } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { Api } from './api';
+import { Injectable, computed, inject } from '@angular/core';
+import { SessionStore } from './session';
 
 /**
- * Who is acting.
+ * Who a recorded change is attributed to.
  *
- * Stands in for the signed-in user until Entra ID lands. Every write carries
- * the chosen person's id in a header, which is the same shape a token-derived
- * identity will have — so the server keeps attributing changes exactly as it
- * does now, and only the source of the id changes.
+ * The signed-in account, now that there is one. This used to be a dropdown of
+ * project engineers because anyone could be anyone — which made the history it
+ * produced worth very little.
  */
 @Injectable({ providedIn: 'root' })
 export class ActingUser {
-  private readonly api = inject(Api);
+  private readonly session = inject(SessionStore);
 
-  /** Everyone staffed on any project can act. */
-  readonly people = computed(() => {
-    const seen = new Map<string, { id: string; name: string; initials: string }>();
-    for (const project of this.api.projects()) {
-      for (const engineer of project.engineers) {
-        seen.set(engineer.id, engineer);
-      }
-    }
-    return [...seen.values()];
+  readonly current = computed(() => {
+    const user = this.session.user();
+
+    return user
+      ? { id: user.id, name: user.displayName, initials: user.initials }
+      : { id: '', name: 'an unknown user', initials: '?' };
   });
-
-  private readonly chosenId = signal<string | null>(null);
-
-  readonly current = computed(
-    () => this.people().find((p) => p.id === this.chosenId()) ?? this.people()[0] ?? null,
-  );
-
-  choose(id: string): void {
-    this.chosenId.set(id);
-  }
 }
 
-/** Adds the acting user to every write, so the server can attribute it. */
+/**
+ * Names the acting user on every write.
+ *
+ * Belt and braces alongside the bearer token: the API reads the token when it
+ * has one, and this header keeps attribution working for endpoints that have
+ * not been moved behind the guard yet.
+ */
 export const actingUserInterceptor: HttpInterceptorFn = (request, next) => {
   if (request.method === 'GET') {
     return next(request);
   }
 
   const actor = inject(ActingUser).current();
+
   return next(
-    actor ? request.clone({ setHeaders: { 'x-acting-user': actor.id } }) : request,
+    actor.id ? request.clone({ setHeaders: { 'x-acting-user': actor.id } }) : request,
   );
 };

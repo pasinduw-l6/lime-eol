@@ -464,6 +464,9 @@ model AppUser {
   entraOid    String?   @unique @map("entra_oid")
   email       String    @unique
   displayName String?   @map("display_name")
+  /// scrypt digest, stored as "scrypt$N$r$p$salt$hash". Null for accounts that
+  /// sign in through Entra, which never hold a password here.
+  passwordHash String?  @map("password_hash")
   role        Role      @default(VIEWER)
   isActive    Boolean   @default(true) @map("is_active")
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)

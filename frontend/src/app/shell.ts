@@ -1,8 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { ActingUser } from './core/acting-user';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { RegistryStore } from './core/registry.store';
+import { SessionStore } from './core/session';
 import { Theme } from './core/theme';
 import { Celebrate } from './shared/celebrate';
 
@@ -140,28 +140,31 @@ import { Celebrate } from './shared/celebrate';
           }
         </button>
 
-        <!-- who is acting: every recorded change is attributed to this person -->
-        <label class="flex items-center gap-2">
-          <span class="sr-only">Acting as</span>
-          <select
-            class="rounded-full border border-rule bg-elevated px-3 py-1.5 text-[13px] text-ink"
-            [value]="acting.current().id"
-            (change)="chooseActor($event)"
-            title="Changes you record are attributed to this person"
+        <!-- who is signed in: every recorded change is attributed to them -->
+        @if (session.user(); as me) {
+          <span
+            class="flex items-center gap-2.5 rounded-full border border-rule bg-elevated py-1 pr-3 pl-1"
+            [title]="me.email + ' · ' + me.role.toLowerCase()"
           >
-            @for (person of acting.people(); track person.id) {
-              <option [value]="person.id">{{ person.name }}</option>
+            <span
+              class="grid h-7 w-7 place-items-center rounded-full brand-gradient text-[11px]"
+              aria-hidden="true"
+              >{{ me.initials }}</span
+            >
+            <span class="text-[13px]">{{ me.displayName }}</span>
+            @if (me.role === 'VIEWER') {
+              <span class="text-[11px] text-ink-faint">read only</span>
             }
-          </select>
-        </label>
+          </span>
+        }
 
-        <a
-          routerLink="/login"
-          class="text-[13px] text-ink-soft no-underline hover:text-ink"
-          title="Sign out"
+        <button
+          type="button"
+          class="text-[13px] text-ink-soft hover:text-ink"
+          (click)="signOut()"
         >
           Sign out
-        </a>
+        </button>
       </header>
 
       <main class="flex-1" (click)="open.set(false)">
@@ -175,11 +178,13 @@ import { Celebrate } from './shared/celebrate';
 })
 export class Shell {
   private readonly store = inject(RegistryStore);
-  protected readonly acting = inject(ActingUser);
+  private readonly router = inject(Router);
+  protected readonly session = inject(SessionStore);
   protected readonly theme = inject(Theme);
 
-  protected chooseActor(event: Event): void {
-    this.acting.choose((event.target as HTMLSelectElement).value);
+  protected signOut(): void {
+    this.session.signOut();
+    void this.router.navigateByUrl('/login');
   }
 
   protected readonly nav = [

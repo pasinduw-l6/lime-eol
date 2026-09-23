@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { seedNotificationRules } from './notification-rules.seed';
 import { seedSampleData } from './sample-data.seed';
 import { seedTechnologies } from './technologies.seed';
+import { seedUsers } from './users.seed';
 
 /**
  * Seeds reference data and a small sample estate.
@@ -14,6 +15,7 @@ const prisma = new PrismaClient();
 async function main(): Promise<void> {
   console.log('Seeding:');
 
+  await seedUsers(prisma);
   await seedNotificationRules(prisma);
   await seedTechnologies(prisma);
   await seedSampleData(prisma);

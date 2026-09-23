@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './config/config.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { EolSyncModule } from './modules/eol-sync/eol-sync.module';
 import { HealthModule } from './modules/health/health.module';
@@ -15,6 +16,7 @@ import { PrismaModule } from './prisma/prisma.module';
   imports: [
     AppConfigModule,
     PrismaModule,
+    AuthModule,
     HealthModule,
     EolSyncModule,
     ProjectsModule,
