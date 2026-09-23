@@ -620,8 +620,26 @@ export class Projects {
     this.store.deleteDeployment(id);
   }
 
+  /**
+   * Staffing is saved to the database; the rest is still local.
+   *
+   * Name, Lime version and status have no update endpoint yet, so they are held
+   * in the browser as before. Who is assigned does persist — it decides whose
+   * name appears against a customer's environments, which is not something to
+   * lose on refresh.
+   */
   protected saveProject(id: string): void {
+    const { engineerIds } = this.editForm;
     this.store.updateProject(id, { ...this.editForm });
+
+    this.api.setEngineers(id, engineerIds).subscribe({
+      next: () => this.api.reload(),
+      error: () =>
+        this.manageError.set(
+          'Those details were kept in this browser, but the engineer list could not be saved.',
+        ),
+    });
+
     this.managed.set(null);
   }
 

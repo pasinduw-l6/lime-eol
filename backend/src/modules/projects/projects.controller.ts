@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiOkResponse,
@@ -7,6 +15,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { SetEngineersDto } from './dto/set-engineers.dto';
 import { ProjectDto } from './dto/project-response.dto';
 import { ProjectsService } from './projects.service';
 
@@ -38,6 +47,21 @@ export class ProjectsController {
     @Headers('x-acting-user') actingUser?: string,
   ): Promise<ProjectDto> {
     return this.projects.create(body, actingUser);
+  }
+
+  @Patch(':id/engineers')
+  @ApiOperation({
+    summary: 'Replace who is staffed on a project',
+    description:
+      'Takes the complete list, not a delta, so two people editing staffing at once cannot interleave into a set neither chose.',
+  })
+  @ApiParam({ name: 'id', example: 'SYP' })
+  @ApiOkResponse({ type: ProjectDto })
+  setEngineers(
+    @Param('id') id: string,
+    @Body() body: SetEngineersDto,
+  ): Promise<ProjectDto> {
+    return this.projects.setEngineers(id, body.engineerIds, body.leadId);
   }
 
   @Get(':id/activity')

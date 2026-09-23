@@ -63,7 +63,10 @@ export interface Engineer {
   id: string;
   name: string;
   initials: string;
-  role: 'Lead' | 'Engineer';
+  email: string;
+  /** False for viewers, who can be shown but not staffed on work. */
+  canEdit: boolean;
+  role: 'Engineer' | 'Viewer';
 }
 
 export type ProjectStatus = 'ACTIVE' | 'ONBOARDING' | 'PAUSED';

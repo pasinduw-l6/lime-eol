@@ -134,20 +134,23 @@ export class RegistryStore {
     ),
   );
 
-  private readonly _engineers = linkedSignal<Engineer[]>(() => {
-    const seen = new Map<string, Engineer>();
-    for (const project of this.api.projects()) {
-      for (const engineer of project.engineers) {
-        seen.set(engineer.id, {
-          id: engineer.id,
-          name: engineer.name,
-          initials: engineer.initials,
-          role: engineer.isLead ? 'Lead' : 'Engineer',
-        });
-      }
-    }
-    return [...seen.values()];
-  });
+  /**
+   * Everyone who could be staffed, from the accounts API.
+   *
+   * Previously read off the projects themselves, which meant the picker only
+   * ever offered people who were already assigned — a closed loop in which
+   * nobody new could be added to anything.
+   */
+  private readonly _engineers = linkedSignal<Engineer[]>(() =>
+    this.api.users().map((user) => ({
+      id: user.id,
+      name: user.name,
+      initials: user.initials,
+      email: user.email,
+      canEdit: user.canEdit,
+      role: user.canEdit ? ('Engineer' as const) : ('Viewer' as const),
+    })),
+  );
 
   // ---- client-only state (no API yet) --------------------------------------
 

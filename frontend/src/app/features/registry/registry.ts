@@ -3,13 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Api, ApiCatalogueProduct } from '../../core/api';
 import { formatDate, formatDays, statusFill } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
-import {
-  ComponentType,
-  Cycle,
-  CycleRule,
-  Engineer,
-  Technology,
-} from '../../core/models';
+import { ComponentType, Cycle, CycleRule, Technology } from '../../core/models';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
 
@@ -42,10 +36,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
   };
 }
 
-function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
-  return { name: '', initials: '', role: 'Engineer' };
-}
-
 /**
  * Registry.
  *
@@ -66,14 +56,9 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
           {{ engineers().length }} engineers
         </p>
       </div>
-      <div class="flex gap-2">
-        <button type="button" class="btn" (click)="engineerDraft.set(newEngineer())">
-          Add engineer
-        </button>
-        <button type="button" class="btn btn-primary" (click)="openCatalogue()">
-          Add technology
-        </button>
-      </div>
+      <button type="button" class="btn btn-primary" (click)="openCatalogue()">
+        Add technology
+      </button>
     </section>
 
     @if (error(); as message) {
@@ -176,27 +161,40 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
         }
       </section>
 
-      <!-- team -->
+      <!-- team: real accounts, not editable here -->
       <section class="card overflow-hidden">
         <header class="border-b border-rule px-6 py-4">
           <h2 class="m-0 text-[15px] font-semibold">Team</h2>
+          <p class="m-0 text-[12px] text-ink-soft">
+            Accounts are issued by an administrator. Assign people to work on
+            the <span class="text-ink">Projects</span> screen.
+          </p>
         </header>
         <ul class="m-0 list-none p-0">
           @for (e of engineers(); track e.id) {
             <li class="flex items-center gap-3 border-b border-rule px-6 py-3 last:border-b-0">
-              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full brand-gradient text-[11px]">
+              <span
+                class="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px]"
+                [class.brand-gradient]="e.canEdit"
+                [style.background]="e.canEdit ? null : 'var(--color-elevated)'"
+                [style.color]="e.canEdit ? null : 'var(--color-ink-soft)'"
+              >
                 {{ e.initials }}
               </span>
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-[14px]">{{ e.name }}</span>
-                <span class="block text-[12px] text-ink-soft">
-                  {{ e.role }} · {{ projectCount(e.id) }} project(s)
+                <span class="block truncate text-[12px] text-ink-soft">{{ e.email }}</span>
+              </span>
+              <span class="shrink-0 text-right text-[12px] text-ink-soft">
+                <span class="block">{{ e.canEdit ? 'Engineer' : 'Read only' }}</span>
+                <span class="tabular block text-ink-faint">
+                  {{ projectCount(e.id) }} project{{ projectCount(e.id) === 1 ? '' : 's' }}
                 </span>
               </span>
-              <span class="flex gap-2 text-[12px]">
-                <button type="button" class="text-accent-bright" (click)="engineerDraft.set({ ...e })">Edit</button>
-                <button type="button" class="text-overdue" (click)="removeEngineer(e)">Delete</button>
-              </span>
+            </li>
+          } @empty {
+            <li class="px-6 py-6 text-center text-[13px] text-ink-soft">
+              No accounts yet.
             </li>
           }
         </ul>
@@ -442,40 +440,6 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
       </lime-modal>
     }
 
-    <!-- engineer form -->
-    @if (engineerDraft(); as form) {
-      <lime-modal
-        [title]="form.id ? 'Edit engineer' : 'Add engineer'"
-        subtitle="People who can be assigned to projects and upgrade actions."
-        (dismiss)="engineerDraft.set(null)"
-      >
-        <form class="grid gap-4" (submit)="saveEngineer($event)">
-          <label class="field">
-            Name
-            <input class="input" [(ngModel)]="form.name" name="name" (change)="deriveInitials()" />
-          </label>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
-              Initials
-              <input class="input" [(ngModel)]="form.initials" name="initials" maxlength="3" />
-            </label>
-            <label class="field">
-              Role
-              <select class="input" [(ngModel)]="form.role" name="role">
-                <option value="Engineer">Engineer</option>
-                <option value="Lead">Lead</option>
-              </select>
-            </label>
-          </div>
-          <div class="flex justify-end gap-2">
-            <button type="button" class="btn" (click)="engineerDraft.set(null)">Cancel</button>
-            <button type="submit" class="btn btn-primary">
-              {{ form.id ? 'Save changes' : 'Add engineer' }}
-            </button>
-          </div>
-        </form>
-      </lime-modal>
-    }
   `,
 })
 export class Registry {
@@ -490,7 +454,6 @@ export class Registry {
   protected readonly error = signal<string | null>(null);
   protected readonly techDraft = signal<(Omit<Technology, 'id'> & { id?: string }) | null>(null);
   protected readonly cycleDraft = signal<(Omit<Cycle, 'id'> & { id?: string }) | null>(null);
-  protected readonly engineerDraft = signal<(Omit<Engineer, 'id'> & { id?: string }) | null>(null);
   protected readonly versionsText = signal('');
 
   protected readonly cycleCount = computed(() => this.store.cycles().length);
@@ -520,7 +483,6 @@ export class Registry {
     return this.store.projects().filter((p) => p.engineerIds.includes(engineerId)).length;
   }
 
-  protected newEngineer = blankEngineer;
 
   protected newCycle(technology: Technology) {
     this.versionsText.set('');
@@ -663,22 +625,7 @@ export class Registry {
     this.cycleDraft.set(null);
   }
 
-  protected saveEngineer(event: Event): void {
-    event.preventDefault();
-    const form = this.engineerDraft();
-    if (!form?.name.trim()) {
-      return;
-    }
-    this.store.saveEngineer({ ...form, initials: form.initials || initials(form.name) });
-    this.engineerDraft.set(null);
-  }
 
-  protected deriveInitials(): void {
-    const form = this.engineerDraft();
-    if (form && !form.initials) {
-      form.initials = initials(form.name);
-    }
-  }
 
   protected removeTechnology(technology: Technology): void {
     this.error.set(this.store.deleteTechnology(technology.id));
@@ -688,19 +635,8 @@ export class Registry {
     this.error.set(this.store.deleteCycle(cycle.id));
   }
 
-  protected removeEngineer(engineer: Engineer): void {
-    this.error.set(this.store.deleteEngineer(engineer.id));
-  }
 
   protected date = formatDate;
   protected days = formatDays;
 }
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}

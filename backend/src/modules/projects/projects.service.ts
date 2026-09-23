@@ -210,6 +210,59 @@ export class ProjectsService {
     }));
   }
 
+  /**
+   * Replaces who is staffed on a project.
+   *
+   * Sent whole rather than as add/remove calls: the picker already knows the
+   * final list, and two people editing staffing at once should not be able to
+   * interleave into a set neither of them chose.
+   */
+  async setEngineers(
+    projectId: string,
+    engineerIds: string[],
+    leadId?: string,
+  ): Promise<ProjectDto> {
+    const project = await this.prisma.project.findFirst({
+      where: isUuid(projectId)
+        ? { id: projectId }
+        : { code: projectId.toUpperCase() },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`No project "${projectId}"`);
+    }
+
+    const ids = [...new Set(engineerIds)];
+
+    const known = await this.prisma.appUser.findMany({
+      where: { id: { in: ids }, isActive: true },
+      select: { id: true },
+    });
+
+    if (known.length !== ids.length) {
+      throw new BadRequestException(
+        'One of those people is not an active account.',
+      );
+    }
+
+    // The first named is the lead unless one is chosen, so a project is never
+    // left with nobody answerable for it.
+    const lead = leadId && ids.includes(leadId) ? leadId : ids[0];
+
+    await this.prisma.$transaction([
+      this.prisma.projectEngineer.deleteMany({ where: { projectId: project.id } }),
+      this.prisma.projectEngineer.createMany({
+        data: ids.map((userId) => ({
+          projectId: project.id,
+          userId,
+          isLead: userId === lead,
+        })),
+      }),
+    ]);
+
+    return this.findOne(project.id);
+  }
+
   async findOne(id: string): Promise<ProjectDto> {
     const projects = await this.findAll();
     const project = projects.find((p) => p.id === id || p.code === id);

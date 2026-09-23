@@ -6,6 +6,7 @@ import { EolSyncModule } from './modules/eol-sync/eol-sync.module';
 import { HealthModule } from './modules/health/health.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TechnologiesModule } from './modules/technologies/technologies.module';
+import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 /**
@@ -22,6 +23,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ProjectsModule,
     TechnologiesModule,
     DeploymentsModule,
+    UsersModule,
   ],
 })
 export class AppModule {}

@@ -100,6 +100,19 @@ export interface ApiCatalogueProduct {
   registeredAs: string | null;
 }
 
+/** Someone who can be staffed on a project. */
+export interface ApiUser {
+  id: string;
+  email: string;
+  name: string;
+  initials: string;
+  role: 'ADMIN' | 'EDITOR' | 'VIEWER';
+  /** False for viewers, who can look but not record. */
+  canEdit: boolean;
+  projectCount: number;
+  lastLoginAt: string | null;
+}
+
 export interface ApiVerification {
   intact: boolean;
   entries: number;
@@ -260,7 +273,17 @@ export class Api {
       `/api/v1/deployments/versions/available?technology=${encodeURIComponent(technology)}${current}`,
     );
   }
+  /** Replaces who is staffed on a project, as the complete list. */
+  setEngineers(projectId: string, engineerIds: string[], leadId?: string) {
+    return this.http.patch<ApiProject>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/engineers`,
+      { engineerIds, leadId },
+    );
+  }
+
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
+  readonly usersResource = httpResource<ApiUser[]>(() => '/api/v1/users');
+  readonly users = computed(() => this.usersResource.value() ?? []);
   readonly technologiesResource = httpResource<ApiTechnology[]>(
     () => '/api/v1/technologies',
   );
@@ -279,6 +302,7 @@ export class Api {
   reload(): void {
     this.projectsResource.reload();
     this.technologiesResource.reload();
+    this.usersResource.reload();
     // The catalogue's "already registered" marks go stale on every add.
     this.catalogueResource.reload();
   }
