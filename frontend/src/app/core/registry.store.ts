@@ -73,6 +73,8 @@ export class RegistryStore {
       vendor: t.vendor,
       eolSlug: t.eolSlug,
       cycleRule: t.cycleRule as Technology['cycleRule'],
+      iconSlug: t.iconSlug,
+      iconColour: t.iconColour,
       notes: t.notes,
     })),
   );

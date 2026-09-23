@@ -1,40 +1,38 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { Api } from '../core/api';
 
-/** Technology name → Simple Icons slug and brand colour. */
-const BRANDS: Record<string, { slug: string; colour: string }> = {
-  mongodb: { slug: 'mongodb', colour: '47A248' },
-  docker: { slug: 'docker', colour: '2496ED' },
-  'docker engine': { slug: 'docker', colour: '2496ED' },
-  kubernetes: { slug: 'kubernetes', colour: '326CE5' },
-  rhel: { slug: 'redhat', colour: 'EE0000' },
-  'red hat enterprise linux': { slug: 'redhat', colour: 'EE0000' },
-  'node.js': { slug: 'nodedotjs', colour: '5FA04E' },
-  nodejs: { slug: 'nodedotjs', colour: '5FA04E' },
-  angular: { slug: 'angular', colour: 'DD0031' },
-  'apache kafka': { slug: 'apachekafka', colour: 'FFFFFF' },
-  kafka: { slug: 'apachekafka', colour: 'FFFFFF' },
-  postgresql: { slug: 'postgresql', colour: '4169E1' },
-  redis: { slug: 'redis', colour: 'FF4438' },
-  nginx: { slug: 'nginx', colour: '009639' },
-  openssl: { slug: 'openssl', colour: '721412' },
-  python: { slug: 'python', colour: '3776AB' },
-  java: { slug: 'openjdk', colour: 'FFFFFF' },
+/** Tint per component type, so a technology with no logo still reads as itself. */
+const TYPE_TINT: Record<string, string> = {
+  DATABASE: '47A248',
+  RUNTIME: '5FA04E',
+  FRAMEWORK: 'DD0031',
+  OS: 'EE0000',
+  CONTAINER: '2496ED',
+  ORCHESTRATION: '326CE5',
+  MESSAGING: 'FF6600',
+  LIBRARY: '8957E5',
+  OTHER: '648793',
 };
 
 /**
- * The real logo of a technology, from Simple Icons.
+ * The real logo of a technology.
  *
- * Falls back to a lettered tile when the brand is unknown or the icon fails to
- * load, so an unrecognised technology still renders something deliberate
- * rather than a broken image.
+ * The mark comes from the registry, which resolved it against Simple Icons when
+ * the technology was registered — so every one of the 477 products
+ * endoflife.date publishes can carry its own logo rather than only the handful
+ * that were once hardcoded here.
+ *
+ * Simple Icons carries about two thirds of that catalogue. The rest fall back
+ * to a lettered tile tinted by component type: deliberate, consistent, and
+ * never a broken image.
  */
 @Component({
   selector: 'lime-tech-icon',
   host: { class: 'inline-flex shrink-0' },
   template: `
-    @if (brand() && !failed()) {
+    @if (mark(); as brand) {
       <img
-        [src]="'https://cdn.simpleicons.org/' + brand()!.slug + '/' + brand()!.colour"
+        [src]="'https://cdn.simpleicons.org/' + brand.slug + '/' + brand.colour"
         [attr.width]="size()"
         [attr.height]="size()"
         [alt]="technology() + ' logo'"
@@ -43,10 +41,12 @@ const BRANDS: Record<string, { slug: string; colour: string }> = {
       />
     } @else {
       <span
-        class="grid place-items-center rounded-[5px] bg-elevated font-semibold text-ink-soft"
+        class="grid place-items-center rounded-[5px] font-semibold"
         [style.width.px]="size()"
         [style.height.px]="size()"
-        [style.font-size.px]="size() * 0.45"
+        [style.font-size.px]="size() * 0.42"
+        [style.background]="'#' + tint() + '22'"
+        [style.color]="'#' + tint()"
         [attr.aria-label]="technology()"
       >
         {{ letters() }}
@@ -55,18 +55,44 @@ const BRANDS: Record<string, { slug: string; colour: string }> = {
   `,
 })
 export class TechIcon {
+  private readonly api = inject(Api);
+
   readonly technology = input.required<string>();
   readonly size = input(20);
 
+  /**
+   * Overrides the registry lookup, for a product that is not registered yet —
+   * the catalogue picker draws rows the registry has never heard of.
+   */
+  readonly iconSlug = input<string | null>(null);
+  readonly iconColour = input<string | null>(null);
+  readonly componentType = input<string | null>(null);
+
   protected readonly failed = signal(false);
 
-  protected readonly brand = computed(
-    () => BRANDS[this.technology().trim().toLowerCase()] ?? null,
+  private readonly registered = computed(() =>
+    this.api.technologies().find((t) => t.name === this.technology()),
   );
+
+  protected readonly mark = computed(() => {
+    if (this.failed()) {
+      return null;
+    }
+
+    const slug = this.iconSlug() ?? this.registered()?.iconSlug;
+    const colour = this.iconColour() ?? this.registered()?.iconColour;
+
+    return slug ? { slug, colour: colour ?? '999999' } : null;
+  });
+
+  protected readonly tint = computed(() => {
+    const type = this.componentType() ?? this.registered()?.componentType ?? 'OTHER';
+    return TYPE_TINT[type] ?? TYPE_TINT['OTHER'];
+  });
 
   protected readonly letters = computed(() =>
     this.technology()
-      .split(/[\s.-]+/)
+      .split(/[\s._-]+/)
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() ?? '')

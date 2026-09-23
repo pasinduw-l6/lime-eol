@@ -8,7 +8,9 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(rm -f frontend/src/app/features/plan/plan-page.ts)",
-      "Bash(rmdir frontend/src/app/features/plan)"
+      "Bash(rmdir frontend/src/app/features/plan)",
+      "Bash(docker compose *)",
+      "Bash(curl -s \"https://endoflife.date/api/v1/categories/\")"
     ]
   }
 }

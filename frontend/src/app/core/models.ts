@@ -29,6 +29,9 @@ export interface Technology {
   /** endoflife.date slug; null for things it does not track. */
   eolSlug: string | null;
   cycleRule: CycleRule;
+  /** Simple Icons slug and brand colour, resolved when it was registered. */
+  iconSlug: string | null;
+  iconColour: string | null;
   notes: string | null;
 }
 

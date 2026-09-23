@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, ApiSourceProduct } from '../../core/api';
+import { Api, ApiCatalogueProduct } from '../../core/api';
 import { formatDate, formatDays, statusFill } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import {
@@ -11,6 +11,7 @@ import {
   Technology,
 } from '../../core/models';
 import { Modal } from '../../shared/modal';
+import { TechIcon } from '../../shared/tech-icon';
 
 const COMPONENT_TYPES: ComponentType[] = [
   'DATABASE',
@@ -23,17 +24,6 @@ const COMPONENT_TYPES: ComponentType[] = [
   'LIBRARY',
   'OTHER',
 ];
-
-function blankTechnology(): Omit<Technology, 'id'> & { id?: string } {
-  return {
-    name: '',
-    componentType: 'OTHER',
-    vendor: null,
-    eolSlug: null,
-    cycleRule: 'MAJOR',
-    notes: null,
-  };
-}
 
 function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
   return {
@@ -65,7 +55,7 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
  */
 @Component({
   selector: 'lime-registry',
-  imports: [FormsModule, Modal],
+  imports: [FormsModule, Modal, TechIcon],
   host: { class: 'block' },
   template: `
     <section class="card mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
@@ -80,7 +70,7 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
         <button type="button" class="btn" (click)="engineerDraft.set(newEngineer())">
           Add engineer
         </button>
-        <button type="button" class="btn btn-primary" (click)="techDraft.set(newTechnology())">
+        <button type="button" class="btn btn-primary" (click)="openCatalogue()">
           Add technology
         </button>
       </div>
@@ -213,18 +203,160 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
       </section>
     </div>
 
-    <!-- technology form -->
+    <!-- catalogue picker: the only way a technology enters the registry -->
+    @if (catalogueOpen()) {
+      <lime-modal
+        title="Add technology"
+        subtitle="Anything endoflife.date tracks. Its cycles and dates come with it."
+        (dismiss)="closeCatalogue()"
+      >
+        @if (chosen(); as product) {
+          <!-- confirm what was picked, with everything already filled in -->
+          <div class="grid gap-4">
+            <div class="flex items-center gap-3 rounded-xl border border-rule bg-elevated px-4 py-3">
+              <lime-tech-icon
+                [technology]="product.label"
+                [iconSlug]="product.iconSlug"
+                [iconColour]="product.iconColour"
+                [componentType]="product.suggestedType"
+                [size]="36"
+              />
+              <div class="min-w-0 flex-1">
+                <p class="m-0 text-[16px] font-semibold">{{ product.label }}</p>
+                <p class="tabular m-0 text-[12px] text-ink-soft">
+                  {{ product.slug }} · {{ product.category }}
+                </p>
+              </div>
+              <button type="button" class="btn" (click)="chosen.set(null)">Change</button>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="field">
+                Name in this registry
+                <input class="input" [(ngModel)]="draftName" name="dname" />
+              </label>
+              <label class="field">
+                Type
+                <select class="input" [(ngModel)]="draftType" name="dtype">
+                  @for (t of componentTypes; track t) {
+                    <option [value]="t">{{ t.toLowerCase() }}</option>
+                  }
+                </select>
+              </label>
+            </div>
+
+            <p class="m-0 text-[11.5px] text-ink-faint">
+              Type and cycle rule were read from the product. Change them only if
+              they are wrong for how you run it.
+            </p>
+
+            @if (error()) {
+              <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
+            }
+
+            <div class="flex justify-end gap-2">
+              <button type="button" class="btn" (click)="closeCatalogue()">Cancel</button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                [disabled]="saving()"
+                (click)="addFromCatalogue(product)"
+              >
+                {{ saving() ? 'Importing cycles…' : 'Add ' + draftName() }}
+              </button>
+            </div>
+          </div>
+        } @else {
+          <div class="grid gap-3">
+            <label class="field">
+              Search {{ api.catalogue().length }} tracked products
+              <input
+                class="input"
+                [(ngModel)]="catalogueQuery"
+                name="catq"
+                placeholder="redis, kafka, rhel, tomcat…"
+                autocomplete="off"
+              />
+            </label>
+
+            <div class="flex flex-wrap gap-1.5">
+              @for (c of categories(); track c) {
+                <button
+                  type="button"
+                  class="rounded-full border px-3 py-1 text-[12px]"
+                  [class.border-accent]="category() === c"
+                  [class.text-accent-bright]="category() === c"
+                  [class.border-rule]="category() !== c"
+                  [class.text-ink-soft]="category() !== c"
+                  (click)="category.set(category() === c ? null : c)"
+                >
+                  {{ c }}
+                </button>
+              }
+            </div>
+
+            @if (api.catalogueResource.isLoading()) {
+              <p class="m-0 py-6 text-center text-[13px] text-ink-soft">
+                Loading the catalogue…
+              </p>
+            } @else {
+              <ul class="m-0 grid max-h-[46vh] list-none gap-1 overflow-y-auto p-0">
+                @for (product of matches(); track product.slug) {
+                  <li>
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left disabled:opacity-45"
+                      [class.hover:bg-elevated]="!product.registeredAs"
+                      [disabled]="!!product.registeredAs"
+                      (click)="choose(product)"
+                    >
+                      <lime-tech-icon
+                        [technology]="product.label"
+                        [iconSlug]="product.iconSlug"
+                        [iconColour]="product.iconColour"
+                        [componentType]="product.suggestedType"
+                        [size]="24"
+                      />
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-[14px]">{{ product.label }}</span>
+                        <span class="tabular block truncate text-[11.5px] text-ink-faint">
+                          {{ product.slug }}
+                        </span>
+                      </span>
+                      <span class="shrink-0 text-[11.5px] text-ink-soft">
+                        {{
+                          product.registeredAs
+                            ? 'added as ' + product.registeredAs
+                            : product.suggestedType.toLowerCase()
+                        }}
+                      </span>
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="py-6 text-center text-[13px] text-ink-soft">
+                    Nothing in the catalogue matches. endoflife.date does not
+                    track it, so its dates would have to be entered by hand.
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+      </lime-modal>
+    }
+
+    <!-- technology form: editing only; adding goes through the catalogue -->
     @if (techDraft(); as form) {
       <lime-modal
-        [title]="form.id ? 'Edit technology' : 'Add technology'"
-        subtitle="Anything the platform depends on, whether or not endoflife.date tracks it."
+        title="Edit technology"
+        [subtitle]="form.eolSlug ? 'Tracking ' + form.eolSlug + ' on endoflife.date' : 'Not tracked upstream'"
         (dismiss)="techDraft.set(null)"
       >
         <form class="grid gap-4" (submit)="saveTechnology($event)">
           <div class="grid gap-3 sm:grid-cols-2">
             <label class="field">
               Name
-              <input class="input" [(ngModel)]="form.name" name="name" placeholder="Redis" />
+              <input class="input" [(ngModel)]="form.name" name="name" />
             </label>
             <label class="field">
               Type
@@ -235,67 +367,10 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
               </select>
             </label>
           </div>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
-              Vendor
-              <input class="input" [(ngModel)]="form.vendor" name="vendor" placeholder="Redis Ltd" />
-            </label>
-            <label class="field">
-              endoflife.date slug
-              <input class="input tabular" [(ngModel)]="form.eolSlug" name="slug" placeholder="redis" />
-            </label>
-          </div>
-
-          <!-- The slug is the one field nobody can guess: Red Hat Enterprise
-               Linux is "rhel". Search the source and pick it, and its cycles
-               arrive with real dates instead of a blank registry entry. -->
-          <div class="rounded-xl border border-rule bg-elevated px-4 py-3">
-            <label class="field">
-              Find it on endoflife.date
-              <span class="flex gap-2">
-                <input
-                  class="input"
-                  [(ngModel)]="sourceQuery"
-                  name="sourcequery"
-                  placeholder="redis, kafka, nginx…"
-                  (keydown.enter)="searchSource($event)"
-                />
-                <button type="button" class="btn" (click)="searchSource($event)">
-                  {{ searching() ? 'Searching…' : 'Search' }}
-                </button>
-              </span>
-            </label>
-
-            @if (sourceResults().length > 0) {
-              <ul class="m-0 mt-3 grid max-h-48 list-none gap-1 overflow-y-auto p-0">
-                @for (product of sourceResults(); track product.slug) {
-                  <li>
-                    <button
-                      type="button"
-                      class="flex w-full items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-surface"
-                      [disabled]="product.registered"
-                      (click)="useSource(product, form)"
-                    >
-                      <span class="min-w-0 truncate">
-                        {{ product.label }}
-                        <span class="tabular text-[11.5px] text-ink-faint">
-                          {{ product.slug }}
-                        </span>
-                      </span>
-                      <span class="shrink-0 text-[11.5px] text-ink-soft">
-                        {{ product.registered ? 'already added' : product.category }}
-                      </span>
-                    </button>
-                  </li>
-                }
-              </ul>
-            } @else if (searched()) {
-              <p class="m-0 mt-2 text-[12px] text-ink-soft">
-                Nothing matched. Leave the slug blank and add the cycle by hand —
-                the sync will then never overwrite your dates.
-              </p>
-            }
-          </div>
+          <label class="field">
+            Vendor
+            <input class="input" [(ngModel)]="form.vendor" name="vendor" />
+          </label>
           <label class="field">
             Cycle rule
             <select class="input" [(ngModel)]="form.cycleRule" name="rule">
@@ -307,22 +382,19 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
             Notes
             <input class="input" [(ngModel)]="form.notes" name="notes" />
           </label>
+
           @if (error()) {
             <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
           }
 
-          @if (form.id) {
-            <p class="m-0 text-[11.5px] text-ink-faint">
-              Edits are held in this browser only — the registry has no update
-              endpoint yet. A new technology is saved to the database.
-            </p>
-          }
+          <p class="m-0 text-[11.5px] text-ink-faint">
+            Edits are held in this browser only — the registry has no update
+            endpoint yet.
+          </p>
 
           <div class="flex justify-end gap-2">
             <button type="button" class="btn" (click)="techDraft.set(null)">Cancel</button>
-            <button type="submit" class="btn btn-primary" [disabled]="saving()">
-              {{ saving() ? 'Saving…' : form.id ? 'Save changes' : 'Add technology' }}
-            </button>
+            <button type="submit" class="btn btn-primary">Save changes</button>
           </div>
         </form>
       </lime-modal>
@@ -408,7 +480,7 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
 })
 export class Registry {
   private readonly store = inject(RegistryStore);
-  private readonly api = inject(Api);
+  protected readonly api = inject(Api);
 
   protected readonly componentTypes = COMPONENT_TYPES;
   protected readonly technologies = this.store.technologies;
@@ -448,7 +520,6 @@ export class Registry {
     return this.store.projects().filter((p) => p.engineerIds.includes(engineerId)).length;
   }
 
-  protected newTechnology = blankTechnology;
   protected newEngineer = blankEngineer;
 
   protected newCycle(technology: Technology) {
@@ -466,85 +537,83 @@ export class Registry {
     this.cycleDraft.set({ ...cycle });
   }
 
-  // ---- source lookup -------------------------------------------------------
+  // ---- catalogue -----------------------------------------------------------
 
-  protected readonly sourceQuery = signal('');
-  protected readonly sourceResults = signal<ApiSourceProduct[]>([]);
-  protected readonly searching = signal(false);
-  protected readonly searched = signal(false);
+  protected readonly catalogueOpen = signal(false);
+  protected readonly catalogueQuery = signal('');
+  protected readonly category = signal<string | null>(null);
+  protected readonly chosen = signal<ApiCatalogueProduct | null>(null);
+  protected readonly draftName = signal('');
+  protected readonly draftType = signal<ComponentType>('OTHER');
   protected readonly saving = signal(false);
 
-  protected searchSource(event: Event): void {
-    event.preventDefault();
-    this.searching.set(true);
-
-    this.api.searchSources(this.sourceQuery()).subscribe({
-      next: (results) => {
-        this.sourceResults.set(results);
-        this.searching.set(false);
-        this.searched.set(true);
-      },
-      error: () => {
-        this.searching.set(false);
-        this.searched.set(true);
-        this.error.set('Could not reach the lifecycle source. Enter the slug by hand.');
-      },
-    });
-  }
-
-  /** Fills the form from a picked product, so the slug always matches a real one. */
-  protected useSource(
-    product: ApiSourceProduct,
-    form: Omit<Technology, 'id'> & { id?: string },
-  ): void {
-    form.eolSlug = product.slug;
-    if (!form.name.trim()) {
-      form.name = product.label;
-    }
-    this.sourceResults.set([]);
-    this.searched.set(false);
-  }
+  protected readonly categories = computed(() =>
+    [...new Set(this.api.catalogue().map((p) => p.category))].sort(),
+  );
 
   /**
-   * Creating goes to the database; editing does not yet.
+   * Matching products, narrowed as you type.
    *
-   * A new technology must persist — an environment cannot record a component
-   * the server has never heard of — so creation is the path that was wired
-   * first. Edits stay local and the form says so rather than pretending.
+   * Filtered here rather than server-side: the catalogue is a few hundred rows
+   * loaded once, so a request per keystroke would buy nothing. Already-added
+   * products stay in the list, shown as added, so it is clear they exist.
    */
-  protected saveTechnology(event: Event): void {
-    event.preventDefault();
-    const form = this.techDraft();
+  protected readonly matches = computed(() => {
+    const term = this.catalogueQuery().trim().toLowerCase();
+    const category = this.category();
 
-    if (!form?.name.trim()) {
-      this.error.set('A technology needs a name.');
-      return;
-    }
+    return this.api
+      .catalogue()
+      .filter((p) => !category || p.category === category)
+      .filter(
+        (p) =>
+          !term ||
+          p.slug.includes(term) ||
+          p.label.toLowerCase().includes(term) ||
+          p.aliases.some((alias) => alias.toLowerCase().includes(term)),
+      )
+      .slice(0, 120);
+  });
 
-    if (form.id) {
-      this.store.saveTechnology(form);
-      this.techDraft.set(null);
-      this.error.set(null);
-      return;
-    }
+  protected openCatalogue(): void {
+    this.error.set(null);
+    this.chosen.set(null);
+    this.catalogueQuery.set('');
+    this.category.set(null);
+    this.catalogueOpen.set(true);
+  }
 
+  protected closeCatalogue(): void {
+    this.catalogueOpen.set(false);
+    this.chosen.set(null);
+    this.error.set(null);
+  }
+
+  /** Fills the confirm step from the product, so nothing has to be restated. */
+  protected choose(product: ApiCatalogueProduct): void {
+    this.draftName.set(product.label);
+    this.draftType.set(product.suggestedType as ComponentType);
+    this.chosen.set(product);
+  }
+
+  protected addFromCatalogue(product: ApiCatalogueProduct): void {
+    this.error.set(null);
     this.saving.set(true);
+
     this.api
       .createTechnology({
-        name: form.name.trim(),
-        componentType: form.componentType,
-        vendor: form.vendor?.trim() || undefined,
-        eolSlug: form.eolSlug?.trim() || undefined,
-        cycleRule: form.cycleRule,
-        notes: form.notes?.trim() || undefined,
+        slug: product.slug,
+        name: this.draftName().trim() || product.label,
+        componentType: this.draftType(),
       })
       .subscribe({
         next: (created) => {
           this.saving.set(false);
-          this.techDraft.set(null);
+          this.closeCatalogue();
+          // Cycles are what make it deployable; say so if none arrived.
           this.error.set(
-            created.cycles.length === 0 && form.eolSlug
-              ? `${created.name} was added, but no cycles came back from the source. Add one by hand so its end-of-life date is known.`
+            created.cycles.length === 0
+              ? `${created.name} was added, but no cycles came back. Add one by hand so its end-of-life date is known.`
               : null,
           );
           this.api.reload();
@@ -559,6 +628,21 @@ export class Registry {
           );
         },
       });
+  }
+
+  /** Editing is still local: the registry has no update endpoint yet. */
+  protected saveTechnology(event: Event): void {
+    event.preventDefault();
+    const form = this.techDraft();
+
+    if (!form?.name.trim()) {
+      this.error.set('A technology needs a name.');
+      return;
+    }
+
+    this.store.saveTechnology(form);
+    this.techDraft.set(null);
+    this.error.set(null);
   }
 
   protected saveCycle(event: Event): void {

@@ -1,10 +1,21 @@
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   EOL_DATA_SOURCE,
   EolDataSource,
 } from '../eol-sync/ports/eol-data-source.port';
 import { CreateTechnologyDto } from './dto/create-technology.dto';
+import {
+  iconFor,
+  suggestComponentType,
+  suggestCycleRule,
+} from './product-type.util';
 
 const MS_PER_DAY = 86_400_000;
 
@@ -41,34 +52,61 @@ export class TechnologiesService {
   }
 
   /**
-   * Registers a technology, with its cycles when the source publishes them.
+   * Registers one of the products endoflife.date publishes.
    *
-   * Creation succeeds even if the import does not: an unreachable source is a
-   * temporary condition, and the nightly sync will fill the cycles in. The
-   * response says how many arrived so the caller can tell the difference.
+   * The slug is the input; name, component type, cycle rule and logo are all
+   * read from the product. A technology invented here would have no published
+   * lifecycle dates, which is the blind spot this tool exists to remove — so
+   * the catalogue is the only way in, and its cycles are imported in the same
+   * call.
    */
   async create(input: CreateTechnologyDto) {
-    const existing = await this.prisma.technology.findUnique({
-      where: { name: input.name },
-    });
-    if (existing) {
-      throw new ConflictException(`"${input.name}" is already in the registry.`);
+    const product = await this.eol.getProduct(input.slug).catch(() => null);
+
+    if (!product) {
+      throw new BadRequestException(
+        `"${input.slug}" is not a product endoflife.date publishes. Pick one from the catalogue.`,
+      );
     }
+
+    const name = input.name?.trim() || product.label;
+
+    const clash = await this.prisma.technology.findFirst({
+      where: { OR: [{ name }, { eolSlug: input.slug }] },
+    });
+    if (clash) {
+      throw new ConflictException(
+        clash.eolSlug === input.slug
+          ? `${clash.name} already tracks ${input.slug}.`
+          : `"${name}" is already in the registry.`,
+      );
+    }
+
+    const icon = iconFor(product.slug);
 
     const technology = await this.prisma.technology.create({
       data: {
-        name: input.name,
-        componentType: input.componentType,
+        name,
+        componentType:
+          input.componentType ??
+          suggestComponentType({
+            slug: product.slug,
+            category: product.category,
+            tags: product.tags,
+          }),
         vendor: input.vendor ?? null,
-        eolSlug: input.eolSlug ?? null,
-        cycleRule: input.cycleRule ?? 'MAJOR_MINOR',
+        eolSlug: product.slug,
+        cycleRule:
+          input.cycleRule ??
+          suggestCycleRule(product.releases.map((release) => release.cycle)),
+        referenceUrl: product.htmlUrl,
+        iconSlug: icon?.iconSlug ?? null,
+        iconColour: icon?.iconColour ?? null,
         notes: input.notes ?? null,
       },
     });
 
-    if (input.eolSlug) {
-      await this.importCycles(technology.id, input.eolSlug);
-    }
+    await this.importCycles(technology.id, product.slug);
 
     const created = await this.prisma.technology.findUniqueOrThrow({
       where: { id: technology.id },
@@ -84,41 +122,46 @@ export class TechnologiesService {
   }
 
   /**
-   * Products the lifecycle source knows about, for picking the right slug.
+   * The whole endoflife.date catalogue, which is what you may add.
    *
-   * Engineers know the product, not its slug — "Red Hat Enterprise Linux" is
-   * `rhel` — so the slug is chosen from the source's own list rather than typed
-   * and silently mismatched.
+   * Returned in full rather than searched server-side: it is a few hundred
+   * products, so the picker filters as you type without a request per keystroke.
+   * Each row carries its logo and a suggested component type, so choosing a
+   * product fills the form instead of asking the engineer to restate it.
    */
-  async searchSource(query: string) {
-    const term = query.trim().toLowerCase();
+  async catalogue() {
     const products = await this.eol.listProducts();
 
-    const registered = new Set(
+    const registered = new Map(
       (
         await this.prisma.technology.findMany({
-          where: { eolSlug: { not: null } },
-          select: { eolSlug: true },
+          where: { eolSlug: { not: null }, archivedAt: null },
+          select: { eolSlug: true, name: true },
         })
-      ).map((t) => t.eolSlug),
+      ).map((t) => [t.eolSlug, t.name]),
     );
 
     return products
-      .filter(
-        (product) =>
-          !term ||
-          product.slug.includes(term) ||
-          product.label.toLowerCase().includes(term) ||
-          product.aliases.some((alias) => alias.toLowerCase().includes(term)),
-      )
-      .slice(0, 40)
-      .map((product) => ({
-        slug: product.slug,
-        label: product.label,
-        category: product.category,
-        /** Already registered — the UI shows it rather than offering it twice. */
-        registered: registered.has(product.slug),
-      }));
+      .map((product) => {
+        const icon = iconFor(product.slug);
+        return {
+          slug: product.slug,
+          label: product.label,
+          category: product.category,
+          tags: product.tags,
+          aliases: product.aliases,
+          iconSlug: icon?.iconSlug ?? null,
+          iconColour: icon?.iconColour ?? null,
+          suggestedType: suggestComponentType({
+            slug: product.slug,
+            category: product.category,
+            tags: product.tags,
+          }),
+          /** Already registered — shown as such rather than offered twice. */
+          registeredAs: registered.get(product.slug) ?? null,
+        };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
   }
 
   /** Every cycle the source publishes for a slug, with its real dates. */
@@ -158,6 +201,8 @@ export class TechnologiesService {
     vendor: string | null;
     eolSlug: string | null;
     cycleRule: string;
+    iconSlug: string | null;
+    iconColour: string | null;
     notes: string | null;
     cycles: {
       id: string;
@@ -188,6 +233,10 @@ export class TechnologiesService {
       vendor: technology.vendor,
       eolSlug: technology.eolSlug,
       cycleRule: technology.cycleRule,
+      // Falls back to the catalogue mark when the row predates the icon columns.
+      iconSlug: technology.iconSlug ?? iconOf(technology.eolSlug)?.iconSlug ?? null,
+      iconColour:
+        technology.iconColour ?? iconOf(technology.eolSlug)?.iconColour ?? null,
       notes: technology.notes,
       cycles: technology.cycles.map((cycle) => ({
         id: cycle.id,
@@ -208,6 +257,11 @@ export class TechnologiesService {
       })),
     };
   }
+}
+
+/** The catalogue's mark for a slug, for rows registered before icons were stored. */
+function iconOf(slug: string | null) {
+  return slug ? iconFor(slug) : null;
 }
 
 function isoDate(date: Date | null): string | null {

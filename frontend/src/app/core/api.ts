@@ -74,17 +74,30 @@ export interface ApiTechnology {
   vendor: string | null;
   eolSlug: string | null;
   cycleRule: string;
+  /** Simple Icons slug and brand colour, resolved when it was registered. */
+  iconSlug: string | null;
+  iconColour: string | null;
   notes: string | null;
   cycles: ApiCycle[];
 }
 
-/** A product endoflife.date publishes, for picking a slug rather than typing one. */
-export interface ApiSourceProduct {
+/**
+ * One product endoflife.date publishes.
+ *
+ * The registry can only hold these: a technology invented locally would have no
+ * published lifecycle dates, which is the blind spot this tool exists to close.
+ */
+export interface ApiCatalogueProduct {
   slug: string;
   label: string;
   category: string;
-  /** Already in our registry — offered for recognition, not for adding twice. */
-  registered: boolean;
+  tags: string[];
+  aliases: string[];
+  iconSlug: string | null;
+  iconColour: string | null;
+  suggestedType: string;
+  /** The local name it is already registered under, or null. */
+  registeredAs: string | null;
 }
 
 export interface ApiVerification {
@@ -189,26 +202,32 @@ export class Api {
   }
 
   /**
-   * Registers a technology. Given an eolSlug, the backend imports every
-   * published cycle in the same call, so it is immediately deployable.
+   * Registers a catalogue product. Name, type, cycle rule and logo come from
+   * the product; every published cycle is imported in the same call, so it is
+   * deployable immediately.
    */
   createTechnology(body: {
-    name: string;
-    componentType: string;
+    slug: string;
+    name?: string;
+    componentType?: string;
     vendor?: string;
-    eolSlug?: string;
     cycleRule?: string;
     notes?: string;
   }) {
     return this.http.post<ApiTechnology>('/api/v1/technologies', body);
   }
 
-  /** Products the lifecycle source publishes, to pick a slug from. */
-  searchSources(query: string) {
-    return this.http.get<ApiSourceProduct[]>(
-      `/api/v1/technologies/sources?q=${encodeURIComponent(query)}`,
-    );
-  }
+  /**
+   * The whole endoflife.date catalogue, loaded once and filtered in the browser.
+   *
+   * A few hundred rows, so a request per keystroke would be wasteful — and the
+   * list is the same for everyone, which makes it worth caching for the session.
+   */
+  readonly catalogueResource = httpResource<ApiCatalogueProduct[]>(
+    () => '/api/v1/technologies/catalogue',
+  );
+
+  readonly catalogue = computed(() => this.catalogueResource.value() ?? []);
 
   /** Every recorded change across a project, newest first. Accepts id or code. */
   activity(projectId: string) {
@@ -260,5 +279,7 @@ export class Api {
   reload(): void {
     this.projectsResource.reload();
     this.technologiesResource.reload();
+    // The catalogue's "already registered" marks go stale on every add.
+    this.catalogueResource.reload();
   }
 }

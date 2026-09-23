@@ -1,9 +1,8 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateTechnologyDto } from './dto/create-technology.dto';
@@ -25,22 +24,22 @@ export class TechnologiesController {
     return this.technologies.findAll();
   }
 
-  @Get('sources')
+  @Get('catalogue')
   @ApiOperation({
-    summary: 'Products the lifecycle source publishes, for picking a slug',
+    summary: 'Every product endoflife.date publishes — the only things addable',
     description:
-      'Engineers know the product, not the slug — Red Hat Enterprise Linux is "rhel". Searching the source means the slug is chosen, not guessed.',
+      'Returned whole so the picker can filter as you type. Each row carries its logo, a suggested component type, and the local name if it is already registered.',
   })
-  @ApiQuery({ name: 'q', required: false, example: 'redis' })
-  searchSource(@Query('q') q?: string) {
-    return this.technologies.searchSource(q ?? '');
+  @ApiOkResponse({ description: 'Products ordered by label' })
+  catalogue() {
+    return this.technologies.catalogue();
   }
 
   @Post()
   @ApiOperation({
-    summary: 'Register a technology, importing its published cycles',
+    summary: 'Register one of the published products',
     description:
-      'Given an endoflife.date slug, every cycle is imported with its real dates in the same call, so the technology can be deployed immediately.',
+      'Takes a catalogue slug. Name, component type, cycle rule and logo are read from the product, and every published cycle is imported in the same call, so it is deployable immediately.',
   })
   @ApiCreatedResponse({ description: 'The technology, with its imported cycles' })
   create(@Body() body: CreateTechnologyDto) {

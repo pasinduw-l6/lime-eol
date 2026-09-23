@@ -132,6 +132,11 @@ model Technology {
   cycleRule     CycleRule     @default(MAJOR) @map("cycle_rule")
   eolField      EolField      @default(EOL) @map("eol_field")
   referenceUrl  String?       @map("reference_url")
+  /// Simple Icons slug and brand colour, resolved once when the technology is
+  /// registered. Stored rather than derived per render so the logo stays put if
+  /// the icon set renames something, and so every screen shows the same mark.
+  iconSlug      String?       @map("icon_slug")
+  iconColour    String?       @map("icon_colour")
   notes         String?
   /// Set instead of deleting. Archived rows keep their name reserved; to reuse
   /// a name, un-archive the row rather than creating a duplicate.

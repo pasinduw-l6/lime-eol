@@ -21,16 +21,41 @@ export const COMPONENT_TYPES = [
 
 export const CYCLE_RULES = ['MAJOR', 'MAJOR_MINOR'] as const;
 
+/**
+ * Registers one of the products endoflife.date publishes.
+ *
+ * The slug is the only required field: everything else is read from the product
+ * and may be overridden. A technology cannot be invented here — one with no
+ * published lifecycle dates would be a component nobody can track.
+ */
 export class CreateTechnologyDto {
-  @ApiProperty({ example: 'Redis', description: 'How engineers refer to it' })
+  @ApiProperty({
+    example: 'redis',
+    description:
+      'endoflife.date product slug, chosen from GET /technologies/catalogue',
+  })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  slug!: string;
+
+  @ApiPropertyOptional({
+    example: 'Redis',
+    description: "Overrides the product's own label, for a local name",
+  })
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(80)
-  name!: string;
+  name?: string;
 
-  @ApiProperty({ enum: COMPONENT_TYPES, example: 'DATABASE' })
+  @ApiPropertyOptional({
+    enum: COMPONENT_TYPES,
+    description: "Overrides what is inferred from the product's category and tags",
+  })
+  @IsOptional()
   @IsIn(COMPONENT_TYPES)
-  componentType!: (typeof COMPONENT_TYPES)[number];
+  componentType?: (typeof COMPONENT_TYPES)[number];
 
   @ApiPropertyOptional({ example: 'Redis Ltd' })
   @IsOptional()
@@ -39,19 +64,9 @@ export class CreateTechnologyDto {
   vendor?: string;
 
   @ApiPropertyOptional({
-    example: 'redis',
-    description:
-      'endoflife.date slug. Given one, every published cycle is imported with its real dates, so the technology is usable immediately.',
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  eolSlug?: string;
-
-  @ApiPropertyOptional({
     enum: CYCLE_RULES,
     description:
-      'How a version maps to a cycle: MongoDB 8.0.32 belongs to cycle "8.0" (MAJOR_MINOR), Kubernetes 1.35.8 to "1.35" — while Docker 28.5.2 belongs to "28" (MAJOR).',
+      'Overrides what is read from the cycles the product publishes: MongoDB ships "8.0" (MAJOR_MINOR), Docker ships "28" (MAJOR).',
   })
   @IsOptional()
   @IsIn(CYCLE_RULES)
