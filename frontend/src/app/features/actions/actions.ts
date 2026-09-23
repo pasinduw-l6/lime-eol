@@ -1,5 +1,14 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { formatDate, formatDays, parseDate, statusFill, today } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { UpgradeAction } from '../../core/models';
@@ -156,7 +165,7 @@ function blank(): Omit<UpgradeAction, 'id'> & { id?: string } {
       <lime-modal
         [title]="form.id ? 'Edit action' : 'New upgrade action'"
         subtitle="Plan the work against a cycle that is running out of support."
-        (dismiss)="draft.set(null)"
+        (dismiss)="closeDraft()"
       >
         <form class="grid gap-4" (submit)="save($event)">
           <div class="grid gap-3 sm:grid-cols-2">
@@ -249,7 +258,7 @@ function blank(): Omit<UpgradeAction, 'id'> & { id?: string } {
           }
 
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn" (click)="draft.set(null)">Cancel</button>
+            <button type="button" class="btn" (click)="closeDraft()">Cancel</button>
             <button type="submit" class="btn btn-primary">
               {{ form.id ? 'Save changes' : 'Create action' }}
             </button>
@@ -279,6 +288,7 @@ function blank(): Omit<UpgradeAction, 'id'> & { id?: string } {
 })
 export class Actions {
   private readonly store = inject(RegistryStore);
+  private readonly router = inject(Router);
 
   /**
    * Bound from ?technology= and ?cycle=, so "Plan upgrade" on the Overview
@@ -293,10 +303,39 @@ export class Actions {
       const technology = this.technology();
       const cycle = this.cycle();
 
-      if (technology && cycle && !this.draft()) {
-        this.draft.set({ ...blank(), technology, cycle });
+      if (!technology || !cycle) {
+        return;
       }
+
+      // Read and write the draft untracked. Reading it as a dependency made
+      // this effect re-run the moment the form closed, see the query params
+      // still in the URL, and reopen it — so Cancel and the close button
+      // appeared to do nothing at all.
+      untracked(() => {
+        if (!this.draft()) {
+          this.draft.set({ ...blank(), technology, cycle });
+        }
+      });
     });
+  }
+
+  /**
+   * Closes the form and drops the query params that opened it.
+   *
+   * Without clearing them the URL would still say a form is open, and coming
+   * back to the same cycle from the Overview would not reopen it, because the
+   * inputs would not have changed.
+   */
+  protected closeDraft(): void {
+    this.draft.set(null);
+    this.error.set(null);
+
+    if (this.technology() || this.cycle()) {
+      void this.router.navigate([], {
+        queryParams: {},
+        replaceUrl: true,
+      });
+    }
   }
 
   protected readonly statuses = STATUSES;
@@ -426,8 +465,7 @@ export class Actions {
     }
 
     this.store.saveAction(form);
-    this.draft.set(null);
-    this.error.set(null);
+    this.closeDraft();
   }
 
   protected complete(action: UpgradeAction): void {
