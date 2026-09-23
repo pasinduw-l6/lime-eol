@@ -70,7 +70,7 @@ function blank(): Omit<UpgradeAction, 'id'> & { id?: string } {
         aria-label="Search actions"
         class="min-w-[240px] flex-1 rounded-full border border-rule bg-elevated px-4 py-2 text-[14px] text-ink"
       />
-      <div class="flex flex-wrap gap-1 rounded-full border border-rule bg-elevated p-1">
+      <div class="glass flex flex-wrap gap-1 rounded-full border border-rule bg-elevated p-1">
         @for (f of filters; track f) {
           <button
             type="button"
@@ -241,7 +241,7 @@ function blank(): Omit<UpgradeAction, 'id'> & { id?: string } {
               @for (d of deployments(); track d.id) {
                 <button
                   type="button"
-                  class="rounded-full border px-3 py-1.5 text-[12px]"
+                  class="glass rounded-full border px-3 py-1.5 text-[12px]"
                   [class.border-accent]="form.deploymentIds.includes(d.id)"
                   [class.bg-elevated]="form.deploymentIds.includes(d.id)"
                   [class.border-rule]="!form.deploymentIds.includes(d.id)"

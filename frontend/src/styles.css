@@ -220,7 +220,6 @@ body {
    a screen. The bevel and the sheen are pure box-shadow and gradient, so they
    cost nothing and carry most of the look. */
 .card {
-  position: relative;
   background:
     linear-gradient(
       160deg,
@@ -255,6 +254,14 @@ body {
     inset 0 0 2px rgb(13 36 48 / 16%),
     0 1px 1px rgb(13 36 48 / 5%),
     0 10px 24px -14px rgb(13 36 48 / 22%);
+}
+
+/* The sheen below needs a positioned ancestor — but only where the card is not
+   already positioned by a utility. This file is unlayered, so it outranks
+   Tailwind: a blanket `position: relative` beat `.absolute` on the project
+   dropdown, dropping it back into the layout and stretching the header. */
+.card:not(.absolute):not(.fixed):not(.sticky) {
+  position: relative;
 }
 
 /* The diagonal glare across two opposite corners, which is what reads as a
@@ -311,10 +318,50 @@ body {
   border-color: color-mix(in oklab, var(--color-rule) 65%, transparent);
 }
 
+/* For controls built from utility classes rather than .btn — the project
+   switcher, the theme toggle, the identity chip. Adding .glass gives them the
+   same material without inheriting .btn's padding and type size. */
+.glass {
+  position: relative;
+  background: color-mix(in oklab, var(--color-elevated) 72%, transparent) !important;
+  border-color: color-mix(in oklab, #ffffff 12%, transparent) !important;
+}
+
+:root[data-theme='light'] .glass {
+  background: color-mix(in oklab, var(--color-elevated) 78%, transparent) !important;
+  border-color: color-mix(in oklab, #ffffff 70%, transparent) !important;
+}
+
+.glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    45deg,
+    rgb(255 255 255 / 11%) 0%,
+    transparent 16%,
+    transparent 84%,
+    rgb(255 255 255 / 11%) 100%
+  );
+}
+
+:root[data-theme='light'] .glass::after {
+  background: linear-gradient(
+    45deg,
+    rgb(255 255 255 / 75%) 0%,
+    transparent 18%,
+    transparent 82%,
+    rgb(255 255 255 / 75%) 100%
+  );
+}
+
 /* Buttons and pills are the capsules the effect suits best, so they get the
    same bevel stack, scaled down to their size. */
 .btn,
-.pill {
+.pill,
+.glass {
   position: relative;
   box-shadow:
     inset 1.5px -1.5px 1px -1px rgb(255 255 255 / 24%),
@@ -324,12 +371,28 @@ body {
 }
 
 :root[data-theme='light'] .btn,
-:root[data-theme='light'] .pill {
+:root[data-theme='light'] .pill,
+:root[data-theme='light'] .glass {
   box-shadow:
     inset 1.5px -1.5px 1px -1px rgb(255 255 255 / 90%),
     inset -1.5px 1.5px 1px -1px rgb(255 255 255 / 90%),
     inset 0 0 2px rgb(13 36 48 / 14%),
     0 2px 5px rgb(13 36 48 / 12%);
+}
+
+/* Interactive glass lifts and brightens, matching .btn's hover. */
+button.glass:hover,
+a.glass:hover {
+  background: color-mix(in oklab, var(--color-rule) 80%, transparent) !important;
+}
+
+:root[data-theme='light'] button.glass:hover,
+:root[data-theme='light'] a.glass:hover {
+  background: color-mix(in oklab, var(--color-elevated) 100%, transparent) !important;
+}
+
+button.glass:active {
+  transform: scale(0.96);
 }
 
 /* The filled variants stay solid accent, defined further down. They are the

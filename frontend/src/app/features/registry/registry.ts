@@ -281,7 +281,7 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
               @for (c of categories(); track c) {
                 <button
                   type="button"
-                  class="rounded-full border px-3 py-1 text-[12px]"
+                  class="glass rounded-full border px-3 py-1 text-[12px]"
                   [class.border-accent]="category() === c"
                   [class.text-accent-bright]="category() === c"
                   [class.border-rule]="category() !== c"

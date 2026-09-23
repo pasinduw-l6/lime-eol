@@ -74,7 +74,7 @@ import { UpdateComponent } from './update-component';
                 type="button"
                 role="tab"
                 [attr.aria-selected]="selectedId() === env.id"
-                class="flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px]"
+                class="glass flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px]"
                 [class.border-ink]="selectedId() === env.id"
                 [class.bg-ink]="selectedId() === env.id"
                 [class.text-ground]="selectedId() === env.id"
@@ -109,7 +109,7 @@ import { UpdateComponent } from './update-component';
                   Add component
                 </button>
 
-                <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
+                <div class="glass flex gap-1 rounded-full border border-rule bg-elevated p-1">
                   @for (v of views; track v.key) {
                     <button
                       type="button"
@@ -162,7 +162,7 @@ import { UpdateComponent } from './update-component';
               @for (component of env.components; track component.technology) {
                 <button
                   type="button"
-                  class="overflow-hidden rounded-[14px] border border-rule bg-elevated text-left transition-colors hover:border-accent"
+                  class="glass overflow-hidden rounded-[14px] border border-rule bg-elevated text-left transition-colors hover:border-accent"
                   (click)="edit(env, component)"
                   [attr.aria-label]="'Update ' + component.technology + ' on ' + env.environment"
                 >
@@ -225,7 +225,7 @@ import { UpdateComponent } from './update-component';
                    is after reading the stack. -->
               <button
                 type="button"
-                class="grid min-h-[140px] place-items-center rounded-[14px] border border-dashed border-rule text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-ink"
+                class="glass grid min-h-[140px] place-items-center rounded-[14px] border border-dashed border-rule text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-ink"
                 (click)="adding.set(env)"
               >
                 <span>

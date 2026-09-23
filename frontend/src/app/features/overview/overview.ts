@@ -66,7 +66,7 @@ interface Bucket {
           </p>
         </div>
 
-        <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
+        <div class="glass flex gap-1 rounded-full border border-rule bg-elevated p-1">
           @for (h of horizons; track h) {
             <button
               type="button"
@@ -178,7 +178,7 @@ interface Bucket {
                 <a
                   [routerLink]="['/plan']"
                   [queryParams]="{ technology: alert.technology, cycle: alert.cycle }"
-                  class="rounded-full border border-accent px-3 py-1 text-[12px] text-accent-bright no-underline hover:bg-accent hover:text-white"
+                  class="glass rounded-full border border-accent px-3 py-1 text-[12px] text-accent-bright no-underline hover:bg-accent hover:text-white"
                 >
                   {{ alert.plan ? 'Open plan' : 'Plan upgrade' }}
                 </a>

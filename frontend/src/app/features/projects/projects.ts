@@ -138,7 +138,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 @for (env of allEnvironments; track env) {
                   <button
                     type="button"
-                    class="rounded-full border px-4 py-1.5 text-[13px]"
+                    class="glass rounded-full border px-4 py-1.5 text-[13px]"
                     [class.border-accent]="form.environments.includes(env)"
                     [class.bg-accent]="form.environments.includes(env)"
                     [class.border-rule]="!form.environments.includes(env)"
@@ -158,7 +158,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 @for (e of engineers(); track e.id) {
                   <button
                     type="button"
-                    class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px]"
+                    class="glass flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px]"
                     [class.border-accent]="form.engineerIds.includes(e.id)"
                     [class.bg-elevated]="form.engineerIds.includes(e.id)"
                     [class.border-rule]="!form.engineerIds.includes(e.id)"
@@ -249,7 +249,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
         aria-label="Search projects"
         class="min-w-[240px] flex-1 rounded-full border border-rule bg-elevated px-4 py-2 text-[14px] text-ink"
       />
-      <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
+      <div class="glass flex gap-1 rounded-full border border-rule bg-elevated p-1">
         @for (f of statusFilters; track f) {
           <button
             type="button"
@@ -394,7 +394,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
               @for (e of engineers(); track e.id) {
                 <button
                   type="button"
-                  class="rounded-full border px-3 py-1.5 text-[12px]"
+                  class="glass rounded-full border px-3 py-1.5 text-[12px]"
                   [class.border-accent]="editForm.engineerIds.includes(e.id)"
                   [class.bg-elevated]="editForm.engineerIds.includes(e.id)"
                   [class.border-rule]="!editForm.engineerIds.includes(e.id)"

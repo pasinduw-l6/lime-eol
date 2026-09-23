@@ -46,7 +46,7 @@ import { ShaderBackground } from './shared/shader-background';
         <div class="relative">
           <button
             type="button"
-            class="flex items-center gap-2 rounded-full border border-rule bg-elevated px-3.5 py-2 text-[13px]"
+            class="glass flex items-center gap-2 rounded-full border border-rule bg-elevated px-3.5 py-2 text-[13px]"
             [attr.aria-expanded]="open()"
             aria-haspopup="listbox"
             (click)="toggle()"
@@ -127,7 +127,7 @@ import { ShaderBackground } from './shared/shader-background';
         <!-- light / dark -->
         <button
           type="button"
-          class="grid h-9 w-9 place-items-center rounded-full border border-rule bg-elevated text-ink-soft hover:text-ink"
+          class="glass grid h-9 w-9 place-items-center rounded-full border border-rule bg-elevated text-ink-soft hover:text-ink"
           (click)="theme.toggle()"
           [attr.aria-label]="
             theme.mode() === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme'
@@ -151,7 +151,7 @@ import { ShaderBackground } from './shared/shader-background';
         <!-- who is signed in: every recorded change is attributed to them -->
         @if (session.user(); as me) {
           <span
-            class="flex items-center gap-2.5 rounded-full border border-rule bg-elevated py-1 pr-3 pl-1"
+            class="glass flex items-center gap-2.5 rounded-full border border-rule bg-elevated py-1 pr-3 pl-1"
             [title]="me.email + ' · ' + me.role.toLowerCase()"
           >
             <span

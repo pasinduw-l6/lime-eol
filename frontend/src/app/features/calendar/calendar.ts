@@ -64,7 +64,7 @@ const KIND_LABEL: Record<Kind, string> = {
           @for (k of kinds; track k.key) {
             <button
               type="button"
-              class="flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px]"
+              class="glass flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px]"
               [class.border-rule]="!enabled().includes(k.key)"
               [class.text-ink-faint]="!enabled().includes(k.key)"
               [style.border-color]="enabled().includes(k.key) ? k.colour : null"
