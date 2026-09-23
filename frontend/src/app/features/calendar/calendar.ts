@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { Api, ApiActivity } from '../../core/api';
 import { formatDays, parseDate, statusFill, today } from '../../core/lifecycle';
@@ -47,7 +48,7 @@ const KIND_LABEL: Record<Kind, string> = {
  */
 @Component({
   selector: 'lime-calendar',
-  imports: [TechIcon],
+  imports: [NgTemplateOutlet, TechIcon],
   host: { class: 'block' },
   template: `
     <header class="card mb-5 px-7 py-6">
@@ -80,8 +81,33 @@ const KIND_LABEL: Record<Kind, string> = {
       </div>
     </header>
 
+    <!-- One definition, used above a month heading, between two rows, or at the
+         end — so the line looks identical wherever now happens to fall. -->
+    <ng-template #todayLine let-trailing="trailing">
+      <div class="flex items-center gap-3 py-3">
+        <span
+          class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-[0.06em] uppercase"
+          style="background: var(--color-accent); color: var(--color-ground)"
+        >
+          Today
+        </span>
+        <span class="tabular text-[12px] text-ink-soft">{{ todayLabel }}</span>
+        <span class="h-px flex-1" style="background: var(--color-accent); opacity: 0.45"></span>
+        @if (trailing) {
+          <span class="text-[12px] text-ink-faint">nothing scheduled ahead</span>
+        }
+      </div>
+    </ng-template>
+
     <section class="card px-7 py-6">
       @for (group of groups(); track group.key) {
+        <!-- Today belongs above the heading when the month's own first entry is
+             what comes next: under it, the line reads as though today fell in
+             that month. -->
+        @if (group.entries[0].id === todayMarker()) {
+          <ng-container [ngTemplateOutlet]="todayLine" />
+        }
+
         <!-- month heading, with a rule running to the count -->
         <div class="mt-7 mb-1 flex items-baseline gap-3 first:mt-0">
           <h2 class="m-0 text-[13px] font-semibold tracking-[0.04em] uppercase">
@@ -96,19 +122,10 @@ const KIND_LABEL: Record<Kind, string> = {
 
         <ol class="m-0 list-none p-0">
           @for (entry of group.entries; track entry.id) {
-            @if (entry.id === todayMarker()) {
-              <li class="flex items-center gap-3 py-3">
-                <span
-                  class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-[0.06em] uppercase"
-                  style="background: var(--color-accent); color: var(--color-ground)"
-                >
-                  Today
-                </span>
-                <span class="tabular text-[12px] text-ink-soft">{{ todayLabel }}</span>
-                <span
-                  class="h-px flex-1"
-                  style="background: var(--color-accent); opacity: 0.45"
-                ></span>
+            <!-- $first is already handled above the heading. -->
+            @if (entry.id === todayMarker() && !$first) {
+              <li>
+                <ng-container [ngTemplateOutlet]="todayLine" />
               </li>
             }
 
@@ -150,17 +167,10 @@ const KIND_LABEL: Record<Kind, string> = {
       }
 
       @if (nothingAhead()) {
-        <div class="mt-6 flex items-center gap-3">
-          <span
-            class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-[0.06em] uppercase"
-            style="background: var(--color-accent); color: var(--color-ground)"
-          >
-            Today
-          </span>
-          <span class="tabular text-[12px] text-ink-soft">{{ todayLabel }}</span>
-          <span class="h-px flex-1" style="background: var(--color-accent); opacity: 0.45"></span>
-          <span class="text-[12px] text-ink-faint">nothing scheduled ahead</span>
-        </div>
+        <ng-container
+          [ngTemplateOutlet]="todayLine"
+          [ngTemplateOutletContext]="{ trailing: true }"
+        />
       }
     </section>
   `,
