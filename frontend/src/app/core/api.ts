@@ -103,6 +103,31 @@ export interface ApiChange {
   note: string | null;
 }
 
+/**
+ * One thing that happened on a project, from any of its environments.
+ *
+ * The backend flattens every environment's history into one stream so the
+ * calendar does not have to fan out a request per environment and interleave
+ * the results itself.
+ */
+export interface ApiActivity {
+  id: string;
+  kind: 'DONE';
+  /** The day it took effect, which is what the agenda sorts by. */
+  date: string;
+  recordedAt: string;
+  technology: string;
+  fromVersion: string | null;
+  toVersion: string | null;
+  changeType: 'INSTALL' | 'UPGRADE' | 'DOWNGRADE' | 'REMOVE';
+  reason: string;
+  ticketRef: string | null;
+  evidenceUrl: string | null;
+  note: string | null;
+  recordedBy: string | null;
+  environment: 'DEV' | 'UAT' | 'PROD';
+}
+
 export interface ApiVersionOption {
   cycle: string;
   eolDate: string | null;
@@ -152,6 +177,13 @@ export class Api {
     stack: { technology: string; version: string }[];
   }) {
     return this.http.post<ApiProject>('/api/v1/projects', body);
+  }
+
+  /** Every recorded change across a project, newest first. Accepts id or code. */
+  activity(projectId: string) {
+    return this.http.get<ApiActivity[]>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/activity`,
+    );
   }
 
   history(deploymentId: string) {

@@ -40,6 +40,17 @@ export class ProjectsController {
     return this.projects.create(body, actingUser);
   }
 
+  @Get(':id/activity')
+  @ApiOperation({
+    summary: 'Everything recorded across a project, newest first',
+    description:
+      'One stream for the whole project rather than one call per environment.',
+  })
+  @ApiParam({ name: 'id', example: 'SYP' })
+  activity(@Param('id') id: string) {
+    return this.projects.activity(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'One project, by id or code' })
   @ApiParam({ name: 'id', example: 'SYP' })

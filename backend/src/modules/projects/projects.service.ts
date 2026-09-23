@@ -165,6 +165,51 @@ export class ProjectsService {
     return this.findOne(project.id);
   }
 
+  /**
+   * Everything recorded across a project's environments, newest first.
+   *
+   * The calendar needs one stream, not one call per environment: a project
+   * with three environments would otherwise fan out three requests and stitch
+   * them together in the browser.
+   */
+  async activity(projectId: string) {
+    // The id column is a UUID, so passing a code like "SYP" to it is rejected
+    // by the driver before any row is compared — look it up by shape.
+    const project = await this.prisma.project.findFirst({
+      where: isUuid(projectId)
+        ? { id: projectId }
+        : { code: projectId.toUpperCase() },
+      include: { deployments: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`No project "${projectId}"`);
+    }
+
+    const changes = await this.prisma.componentChange.findMany({
+      where: { deploymentId: { in: project.deployments.map((d) => d.id) } },
+      orderBy: [{ effectiveAt: 'desc' }, { recordedAt: 'desc' }],
+      include: { technology: true, recordedBy: true, deployment: true },
+    });
+
+    return changes.map((change) => ({
+      id: change.id,
+      kind: 'DONE' as const,
+      date: change.effectiveAt.toISOString().slice(0, 10),
+      recordedAt: change.recordedAt.toISOString(),
+      technology: change.technology.name,
+      fromVersion: change.fromVersion,
+      toVersion: change.toVersion,
+      changeType: change.changeType,
+      reason: change.reason,
+      ticketRef: change.ticketRef,
+      evidenceUrl: change.evidenceUrl,
+      note: change.note,
+      recordedBy: change.recordedBy?.displayName ?? null,
+      environment: change.deployment.environment,
+    }));
+  }
+
   async findOne(id: string): Promise<ProjectDto> {
     const projects = await this.findAll();
     const project = projects.find((p) => p.id === id || p.code === id);
@@ -233,6 +278,12 @@ export class ProjectsService {
       eolSource: version.cycle.eolSource,
     };
   }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID.test(value);
 }
 
 function statusOf(days: number | null): string {

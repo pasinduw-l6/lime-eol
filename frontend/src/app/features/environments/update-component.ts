@@ -120,7 +120,7 @@ import { TechIcon } from '../../shared/tech-icon';
           </label>
 
           <p class="m-0 text-[11.5px] text-ink-faint">
-            Recorded as {{ actor()?.name ?? 'an unknown user' }}. Entries cannot be
+            Recorded as {{ actor().name }}. Entries cannot be
             edited or deleted afterwards — a mistake is answered with a correcting
             entry.
           </p>

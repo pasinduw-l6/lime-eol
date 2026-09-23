@@ -140,7 +140,7 @@ import { Theme } from './core/theme';
           <span class="sr-only">Acting as</span>
           <select
             class="rounded-full border border-rule bg-elevated px-3 py-1.5 text-[13px] text-ink"
-            [value]="acting.current()?.id ?? ''"
+            [value]="acting.current().id"
             (change)="chooseActor($event)"
             title="Changes you record are attributed to this person"
           >
