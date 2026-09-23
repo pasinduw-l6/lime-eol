@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ActingUser } from './core/acting-user';
 import { RegistryStore } from './core/registry.store';
+import { Theme } from './core/theme';
 
 /**
  * Application shell.
@@ -17,11 +18,9 @@ import { RegistryStore } from './core/registry.store';
   template: `
     <div class="mx-auto flex min-h-screen max-w-[1500px] flex-col px-5 py-5">
       <header class="card mb-5 flex flex-wrap items-center gap-4 px-5 py-3" role="banner">
-        <!-- The wordmark is navy, so it needs a light plate to read on the
-             dark ground. A light-wordmark version would let this go. -->
         <a
           routerLink="/overview"
-          class="flex items-center rounded-xl bg-white px-3 py-1.5 no-underline"
+          class="brand-plate flex items-center no-underline"
           aria-label="Lime Lifecycle — overview"
         >
           <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
@@ -109,6 +108,30 @@ import { RegistryStore } from './core/registry.store';
           }
         </nav>
 
+        <!-- light / dark -->
+        <button
+          type="button"
+          class="grid h-9 w-9 place-items-center rounded-full border border-rule bg-elevated text-ink-soft hover:text-ink"
+          (click)="theme.toggle()"
+          [attr.aria-label]="
+            theme.mode() === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme'
+          "
+          [title]="theme.mode() === 'dark' ? 'Light theme' : 'Dark theme'"
+        >
+          @if (theme.mode() === 'dark') {
+            <!-- sun -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round" />
+            </svg>
+          } @else {
+            <!-- moon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke-linejoin="round" />
+            </svg>
+          }
+        </button>
+
         <!-- who is acting: every recorded change is attributed to this person -->
         <label class="flex items-center gap-2">
           <span class="sr-only">Acting as</span>
@@ -134,6 +157,7 @@ import { RegistryStore } from './core/registry.store';
 export class App {
   private readonly store = inject(RegistryStore);
   protected readonly acting = inject(ActingUser);
+  protected readonly theme = inject(Theme);
 
   protected chooseActor(event: Event): void {
     this.acting.choose((event.target as HTMLSelectElement).value);

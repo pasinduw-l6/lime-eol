@@ -46,6 +46,59 @@
   color-scheme: dark;
 }
 
+/* ---------------------------------------------------------------------------
+   Light theme.
+
+   Same brand, inverted: the wordmark navy becomes the ink it was drawn as, and
+   the teal and lime are darkened enough to stay readable on white — the values
+   that glow on navy are far too pale here.
+--------------------------------------------------------------------------- */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-ground: #eef4f5;
+  --color-surface: #ffffff;
+  --color-elevated: #e4edef;
+  --color-rule: #cddde1;
+
+  --color-ink: #0d2430;
+  --color-ink-soft: #4c6976;
+  --color-ink-faint: #7b98a3;
+
+  --color-accent: #00857b;
+  --color-accent-bright: #00a396;
+  --color-accent-deep: #0a6f66;
+  --color-lime: #5f9c1f;
+  --color-lime-bright: #6fae26;
+
+  --color-overdue: #c93b28;
+  --color-soon: #a66a06;
+  --color-good: #5f9c1f;
+}
+
+/* The logo's wordmark is navy: it needs a light plate on the dark theme and
+   none at all on the light one. */
+.brand-plate {
+  background: #ffffff;
+  padding: 0.35rem 0.75rem;
+  border-radius: 12px;
+}
+
+:root[data-theme='light'] .brand-plate {
+  background: transparent;
+  padding: 0.35rem 0;
+}
+
+/* Cards lift with a shadow on light, where a border alone reads as flat. */
+:root[data-theme='light'] .card {
+  box-shadow: 0 1px 2px rgb(13 36 48 / 6%);
+}
+
+:root[data-theme='light'] .btn-primary,
+:root[data-theme='light'] .pill-active {
+  color: #ffffff;
+}
+
 html,
 body {
   height: 100%;
