@@ -3,12 +3,10 @@ import {
   Component,
   ElementRef,
   OnDestroy,
-  inject,
   input,
   viewChild,
 } from '@angular/core';
 import gsap from 'gsap';
-import { Theme } from '../../core/theme';
 
 /**
  * The frame both auth pages sit in.
@@ -21,7 +19,7 @@ import { Theme } from '../../core/theme';
   selector: 'lime-auth-layout',
   host: { class: 'block' },
   template: `
-    <div class="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+    <div class="auth-shell grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
       <!-- brand half -->
       <aside
         class="relative hidden overflow-hidden px-14 py-12 lg:flex lg:flex-col"
@@ -64,31 +62,11 @@ import { Theme } from '../../core/theme';
 
       <!-- form half -->
       <main class="flex flex-col px-5 py-8 sm:px-10">
-        <div class="flex items-center justify-between">
-          <span class="brand-plate inline-flex w-fit lg:invisible">
-            <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
-          </span>
-
-          <button
-            type="button"
-            class="grid h-9 w-9 place-items-center rounded-full border border-rule bg-elevated text-ink-soft hover:text-ink"
-            (click)="theme.toggle()"
-            [attr.aria-label]="
-              theme.mode() === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme'
-            "
-          >
-            @if (theme.mode() === 'dark') {
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round" />
-              </svg>
-            } @else {
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke-linejoin="round" />
-              </svg>
-            }
-          </button>
-        </div>
+        <!-- No theme switch here: these two pages are dark either way, and a
+             control that appears to do nothing is worse than none. -->
+        <span class="brand-plate inline-flex w-fit lg:invisible">
+          <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
+        </span>
 
         <div #panel class="m-auto w-full max-w-[26rem] py-10">
           <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">
@@ -125,8 +103,6 @@ import { Theme } from '../../core/theme';
   `,
 })
 export class AuthLayout implements AfterViewInit, OnDestroy {
-  protected readonly theme = inject(Theme);
-
   readonly heading = input.required<string>();
   readonly subheading = input.required<string>();
 

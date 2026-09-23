@@ -98,6 +98,47 @@
   padding: 0.35rem 0;
 }
 
+/* ---------------------------------------------------------------------------
+   Sign in and sign up are dark in both themes.
+
+   They are the product's front door and the only screen that is all brand: the
+   teal-to-navy gradient and the white logo plate are the mark itself, and there
+   is no washed-out version of them worth showing. Re-declaring the dark tokens
+   on this scope means every utility inside resolves to them, whatever the root
+   theme is set to.
+--------------------------------------------------------------------------- */
+.auth-shell {
+  color-scheme: dark;
+
+  --color-ground: #071a23;
+  --color-surface: #0d2430;
+  --color-elevated: #14323f;
+  --color-rule: #1f4353;
+
+  --color-ink: #e9f4f5;
+  --color-ink-soft: #9bb8c2;
+  --color-ink-faint: #648793;
+
+  --color-accent: #00b3a4;
+  --color-accent-bright: #3fd9c2;
+  --color-accent-deep: #0a6f66;
+  --color-lime: #8dc63f;
+  --color-lime-bright: #a8d957;
+
+  --color-overdue: #ff6f61;
+  --color-soon: #ffb547;
+  --color-good: #8dc63f;
+
+  background: var(--color-ground);
+  color: var(--color-ink);
+}
+
+/* The navy wordmark needs its plate back, which the light theme takes away. */
+.auth-shell .brand-plate {
+  background: #ffffff;
+  padding: 0.35rem 0.75rem;
+}
+
 /* Cards lift with a shadow on light, where a border alone reads as flat. */
 :root[data-theme='light'] .card {
   box-shadow: 0 1px 3px rgb(13 36 48 / 8%);
