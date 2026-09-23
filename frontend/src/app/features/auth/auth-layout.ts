@@ -7,6 +7,7 @@ import {
   viewChild,
 } from '@angular/core';
 import gsap from 'gsap';
+import { TechMarquee } from './tech-marquee';
 
 /**
  * The frame both auth pages sit in.
@@ -17,6 +18,7 @@ import gsap from 'gsap';
  */
 @Component({
   selector: 'lime-auth-layout',
+  imports: [TechMarquee],
   host: { class: 'block' },
   template: `
     <div class="auth-shell grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
@@ -57,6 +59,23 @@ import gsap from 'gsap';
               </div>
             }
           </dl>
+        </div>
+
+        <!-- Bled past the panel padding so the logos run edge to edge and read
+             as a passing stream rather than a boxed-in list. -->
+        <div class="relative mt-10 -mx-14">
+          <p
+            class="mb-3 px-14 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase"
+          >
+            <span aria-hidden="true">&#123;</span>
+            Lifecycles we track
+            <span aria-hidden="true">&#125;</span>
+          </p>
+
+          <lime-tech-marquee [row]="1" />
+          <div class="mt-3">
+            <lime-tech-marquee [row]="2" [reverse]="true" />
+          </div>
         </div>
       </aside>
 
