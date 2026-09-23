@@ -1,8 +1,18 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { NOTICE_DAYS, parseDate, statusFill, today } from '../../core/lifecycle';
 import { humanGap } from '../../core/relative-time';
 import { TechIcon } from '../../shared/tech-icon';
+import { Motion } from '../../core/motion';
 import { RegistryStore } from '../../core/registry.store';
 
 const BODY_H = 176;
@@ -76,7 +86,7 @@ interface Bucket {
         <div class="lg:border-r lg:border-rule lg:pr-7">
           <p class="m-0 text-[13px] text-ink-soft">Cycles at risk</p>
           <p class="m-0 mt-1 flex items-baseline gap-1 text-[46px] leading-none font-semibold tracking-[-0.02em]">
-            <span>{{ atRisk() }}</span>
+            <span #atRiskFigure>{{ atRisk() }}</span>
             <span class="text-[26px] text-ink-faint">/{{ inUse() }}</span>
           </p>
           <p class="m-0 mt-2 text-[13px]">
@@ -106,7 +116,7 @@ interface Bucket {
               <span class="flex h-[62px] items-end gap-[3px]" aria-hidden="true">
                 @for (bar of band.bars; track $index) {
                   <span
-                    class="flex-1 rounded-[2px]"
+                    class="band-bar flex-1 rounded-[2px]"
                     [style.height.%]="bar"
                     [style.background]="band.colour"
                     [style.opacity]="0.35 + (bar / 100) * 0.65"
@@ -210,7 +220,7 @@ interface Bucket {
                   >
                 }
                 <span
-                  class="w-full rounded-t-[3px]"
+                  class="month-bar w-full rounded-t-[3px]"
                   [style.height.px]="bucket.height"
                   [style.background]="bucket.colour"
                   [style.opacity]="bucket.count ? 1 : 0.18"
@@ -342,9 +352,32 @@ interface Bucket {
     </div>
   `,
 })
-export class Overview {
+export class Overview implements AfterViewInit {
   private readonly store = inject(RegistryStore);
   private readonly router = inject(Router);
+  private readonly motion = inject(Motion);
+  private readonly host = inject(ElementRef<HTMLElement>);
+
+  private readonly atRiskFigure =
+    viewChild<ElementRef<HTMLElement>>('atRiskFigure');
+
+  constructor() {
+    // Re-grow the columns whenever the horizon changes: the movement is the
+    // feedback that the chart responded.
+    effect(() => {
+      this.horizon();
+      queueMicrotask(() => this.motion.grow(this.host, '.month-bar'));
+    });
+  }
+
+  ngAfterViewInit(): void {
+    const figure = this.atRiskFigure();
+    if (figure) {
+      this.motion.countUp(figure, this.atRisk());
+    }
+    this.motion.stagger(this.host, '.band-bar', { y: 0, each: 0.02 });
+    this.motion.grow(this.host, '.month-bar');
+  }
 
   protected readonly noticeDays = NOTICE_DAYS;
   protected readonly bodyH = BODY_H;

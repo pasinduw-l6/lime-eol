@@ -1,4 +1,13 @@
-import { Component, input, output } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  OnDestroy,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
+import gsap from 'gsap';
 
 /**
  * Dialog used by every create/edit form, so they behave identically:
@@ -10,13 +19,16 @@ import { Component, input, output } from '@angular/core';
   host: { class: 'block' },
   template: `
     <div
-      class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-10"
+      #backdrop
+      class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-10"
+      style="background: rgb(0 0 0 / 45%); backdrop-filter: blur(6px)"
       (click)="dismiss.emit()"
       (keydown.escape)="dismiss.emit()"
       tabindex="-1"
     >
       <div
-        class="card w-full max-w-[min(620px,100%)] px-7 py-6 shadow-2xl"
+        #panel
+        class="card w-full max-w-[min(620px,100%)] px-7 py-6"
         role="dialog"
         aria-modal="true"
         [attr.aria-label]="title()"
@@ -44,8 +56,42 @@ import { Component, input, output } from '@angular/core';
     </div>
   `,
 })
-export class Modal {
+export class Modal implements AfterViewInit, OnDestroy {
   readonly title = input.required<string>();
   readonly subtitle = input<string>('');
   readonly dismiss = output<void>();
+
+  private readonly backdrop = viewChild<ElementRef<HTMLElement>>('backdrop');
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
+  private readonly media = gsap.matchMedia();
+
+  /**
+   * The sheet springs up rather than appearing, which is what makes a dialog
+   * feel like it came from somewhere. One movement, and only when motion is
+   * welcome.
+   */
+  ngAfterViewInit(): void {
+    const backdrop = this.backdrop()?.nativeElement;
+    const panel = this.panel()?.nativeElement;
+
+    if (!backdrop || !panel) {
+      return;
+    }
+
+    this.media.add('(prefers-reduced-motion: no-preference)', () => {
+      gsap.from(backdrop, { opacity: 0, duration: 0.18, ease: 'power1.out' });
+      gsap.from(panel, {
+        opacity: 0,
+        y: 18,
+        scale: 0.97,
+        duration: 0.42,
+        ease: 'back.out(1.4)',
+        clearProps: 'transform',
+      });
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.media.revert();
+  }
 }

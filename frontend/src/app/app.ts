@@ -17,7 +17,10 @@ import { Theme } from './core/theme';
   host: { class: 'block min-h-screen' },
   template: `
     <div class="mx-auto flex min-h-screen max-w-[1500px] flex-col px-5 py-5">
-      <header class="card mb-5 flex flex-wrap items-center gap-4 px-5 py-3" role="banner">
+      <header
+        class="card app-bar mb-5 flex flex-wrap items-center gap-4 px-5 py-3"
+        role="banner"
+      >
         <a
           routerLink="/overview"
           class="brand-plate flex items-center no-underline"
