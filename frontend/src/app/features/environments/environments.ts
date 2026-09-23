@@ -11,6 +11,7 @@ import { ChangeTimeline } from '../../shared/change-timeline';
 import { RegistryStore } from '../../core/registry.store';
 import { formatDate, formatDays, statusFill, statusLabel } from '../../core/lifecycle';
 import { TechIcon } from '../../shared/tech-icon';
+import { AddComponent } from './add-component';
 import { UpdateComponent } from './update-component';
 
 /**
@@ -23,7 +24,7 @@ import { UpdateComponent } from './update-component';
  */
 @Component({
   selector: 'lime-environments',
-  imports: [TechIcon, UpdateComponent, ChangeTimeline],
+  imports: [TechIcon, AddComponent, UpdateComponent, ChangeTimeline],
   host: { class: 'block' },
   template: `
     @if (api.isLoading()) {
@@ -103,19 +104,25 @@ import { UpdateComponent } from './update-component';
                 </p>
               </div>
 
-              <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
-                @for (v of views; track v.key) {
-                  <button
-                    type="button"
-                    class="rounded-full px-4 py-1.5 text-[13px]"
-                    [class.bg-accent]="view() === v.key"
-                    [class.text-ground]="view() === v.key"
-                    [class.text-ink-soft]="view() !== v.key"
-                    (click)="setView(v.key, env.id)"
-                  >
-                    {{ v.label }}
-                  </button>
-                }
+              <div class="flex items-center gap-2">
+                <button type="button" class="btn" (click)="adding.set(env)">
+                  Add component
+                </button>
+
+                <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
+                  @for (v of views; track v.key) {
+                    <button
+                      type="button"
+                      class="rounded-full px-4 py-1.5 text-[13px]"
+                      [class.bg-accent]="view() === v.key"
+                      [class.text-ground]="view() === v.key"
+                      [class.text-ink-soft]="view() !== v.key"
+                      (click)="setView(v.key, env.id)"
+                    >
+                      {{ v.label }}
+                    </button>
+                  }
+                </div>
               </div>
             </header>
 
@@ -213,6 +220,19 @@ import { UpdateComponent } from './update-component';
                   </dl>
                 </button>
               }
+
+              <!-- The same action as the header button, where the eye already
+                   is after reading the stack. -->
+              <button
+                type="button"
+                class="grid min-h-[140px] place-items-center rounded-[14px] border border-dashed border-rule text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-ink"
+                (click)="adding.set(env)"
+              >
+                <span>
+                  <span class="block text-[22px] leading-none">+</span>
+                  Add component
+                </span>
+              </button>
             </div>
             }
           </section>
@@ -228,6 +248,14 @@ import { UpdateComponent } from './update-component';
           [environment]="target.environment"
           [component]="target.component"
           (close)="editing.set(null)"
+          (saved)="api.reload()"
+        />
+      }
+
+      @if (adding(); as env) {
+        <lime-add-component
+          [environment]="env"
+          (close)="adding.set(null)"
           (saved)="api.reload()"
         />
       }
@@ -249,6 +277,7 @@ export class Environments {
     environment: ApiEnvironment;
     component: ApiComponent;
   } | null>(null);
+  protected readonly adding = signal<ApiEnvironment | null>(null);
 
   protected edit(environment: ApiEnvironment, component: ApiComponent): void {
     this.editing.set({ environment, component });

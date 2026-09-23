@@ -78,6 +78,15 @@ export interface ApiTechnology {
   cycles: ApiCycle[];
 }
 
+/** A product endoflife.date publishes, for picking a slug rather than typing one. */
+export interface ApiSourceProduct {
+  slug: string;
+  label: string;
+  category: string;
+  /** Already in our registry — offered for recognition, not for adding twice. */
+  registered: boolean;
+}
+
 export interface ApiVerification {
   intact: boolean;
   entries: number;
@@ -177,6 +186,28 @@ export class Api {
     stack: { technology: string; version: string }[];
   }) {
     return this.http.post<ApiProject>('/api/v1/projects', body);
+  }
+
+  /**
+   * Registers a technology. Given an eolSlug, the backend imports every
+   * published cycle in the same call, so it is immediately deployable.
+   */
+  createTechnology(body: {
+    name: string;
+    componentType: string;
+    vendor?: string;
+    eolSlug?: string;
+    cycleRule?: string;
+    notes?: string;
+  }) {
+    return this.http.post<ApiTechnology>('/api/v1/technologies', body);
+  }
+
+  /** Products the lifecycle source publishes, to pick a slug from. */
+  searchSources(query: string) {
+    return this.http.get<ApiSourceProduct[]>(
+      `/api/v1/technologies/sources?q=${encodeURIComponent(query)}`,
+    );
   }
 
   /** Every recorded change across a project, newest first. Accepts id or code. */

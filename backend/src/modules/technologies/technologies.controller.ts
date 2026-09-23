@@ -1,8 +1,13 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { PrismaService } from '../../prisma/prisma.service';
-
-const MS_PER_DAY = 86_400_000;
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
+import { CreateTechnologyDto } from './dto/create-technology.dto';
+import { TechnologiesService } from './technologies.service';
 
 /**
  * The registry: technologies and their support cycles, including cycles
@@ -11,56 +16,34 @@ const MS_PER_DAY = 86_400_000;
 @ApiTags('registry')
 @Controller('technologies')
 export class TechnologiesController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly technologies: TechnologiesService) {}
 
   @Get()
   @ApiOperation({ summary: 'Technologies with their cycles and versions' })
   @ApiOkResponse({ description: 'Technologies ordered by name' })
-  async findAll() {
-    const technologies = await this.prisma.technology.findMany({
-      where: { archivedAt: null },
-      orderBy: { name: 'asc' },
-      include: {
-        cycles: {
-          orderBy: { eolDate: 'asc' },
-          include: { versions: { orderBy: [{ major: 'desc' }, { minor: 'desc' }] } },
-        },
-      },
-    });
+  findAll() {
+    return this.technologies.findAll();
+  }
 
-    const now = new Date();
-    const todayUtc = Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-    );
+  @Get('sources')
+  @ApiOperation({
+    summary: 'Products the lifecycle source publishes, for picking a slug',
+    description:
+      'Engineers know the product, not the slug — Red Hat Enterprise Linux is "rhel". Searching the source means the slug is chosen, not guessed.',
+  })
+  @ApiQuery({ name: 'q', required: false, example: 'redis' })
+  searchSource(@Query('q') q?: string) {
+    return this.technologies.searchSource(q ?? '');
+  }
 
-    return technologies.map((technology) => ({
-      id: technology.id,
-      name: technology.name,
-      componentType: technology.componentType,
-      vendor: technology.vendor,
-      eolSlug: technology.eolSlug,
-      cycleRule: technology.cycleRule,
-      notes: technology.notes,
-      cycles: technology.cycles.map((cycle) => ({
-        id: cycle.id,
-        cycle: cycle.cycle,
-        label: cycle.label,
-        releaseDate: cycle.releaseDate?.toISOString().slice(0, 10) ?? null,
-        eolDate: cycle.eolDate?.toISOString().slice(0, 10) ?? null,
-        activeSupportEnd:
-          cycle.activeSupportEnd?.toISOString().slice(0, 10) ?? null,
-        isLts: cycle.isLts,
-        isMaintained: cycle.isMaintained,
-        latestPatch: cycle.latestPatch,
-        eolSource: cycle.eolSource,
-        notes: cycle.notes,
-        daysToEol: cycle.eolDate
-          ? Math.round((cycle.eolDate.getTime() - todayUtc) / MS_PER_DAY)
-          : null,
-        versions: cycle.versions.map((v) => v.fullVersion),
-      })),
-    }));
+  @Post()
+  @ApiOperation({
+    summary: 'Register a technology, importing its published cycles',
+    description:
+      'Given an endoflife.date slug, every cycle is imported with its real dates in the same call, so the technology can be deployed immediately.',
+  })
+  @ApiCreatedResponse({ description: 'The technology, with its imported cycles' })
+  create(@Body() body: CreateTechnologyDto) {
+    return this.technologies.create(body);
   }
 }

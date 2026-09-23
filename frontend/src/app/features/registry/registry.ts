@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Api, ApiSourceProduct } from '../../core/api';
 import { formatDate, formatDays, statusFill } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import {
@@ -244,6 +245,57 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
               <input class="input tabular" [(ngModel)]="form.eolSlug" name="slug" placeholder="redis" />
             </label>
           </div>
+
+          <!-- The slug is the one field nobody can guess: Red Hat Enterprise
+               Linux is "rhel". Search the source and pick it, and its cycles
+               arrive with real dates instead of a blank registry entry. -->
+          <div class="rounded-xl border border-rule bg-elevated px-4 py-3">
+            <label class="field">
+              Find it on endoflife.date
+              <span class="flex gap-2">
+                <input
+                  class="input"
+                  [(ngModel)]="sourceQuery"
+                  name="sourcequery"
+                  placeholder="redis, kafka, nginx…"
+                  (keydown.enter)="searchSource($event)"
+                />
+                <button type="button" class="btn" (click)="searchSource($event)">
+                  {{ searching() ? 'Searching…' : 'Search' }}
+                </button>
+              </span>
+            </label>
+
+            @if (sourceResults().length > 0) {
+              <ul class="m-0 mt-3 grid max-h-48 list-none gap-1 overflow-y-auto p-0">
+                @for (product of sourceResults(); track product.slug) {
+                  <li>
+                    <button
+                      type="button"
+                      class="flex w-full items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-[13px] hover:bg-surface"
+                      [disabled]="product.registered"
+                      (click)="useSource(product, form)"
+                    >
+                      <span class="min-w-0 truncate">
+                        {{ product.label }}
+                        <span class="tabular text-[11.5px] text-ink-faint">
+                          {{ product.slug }}
+                        </span>
+                      </span>
+                      <span class="shrink-0 text-[11.5px] text-ink-soft">
+                        {{ product.registered ? 'already added' : product.category }}
+                      </span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            } @else if (searched()) {
+              <p class="m-0 mt-2 text-[12px] text-ink-soft">
+                Nothing matched. Leave the slug blank and add the cycle by hand —
+                the sync will then never overwrite your dates.
+              </p>
+            }
+          </div>
           <label class="field">
             Cycle rule
             <select class="input" [(ngModel)]="form.cycleRule" name="rule">
@@ -255,10 +307,21 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
             Notes
             <input class="input" [(ngModel)]="form.notes" name="notes" />
           </label>
+          @if (error()) {
+            <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
+          }
+
+          @if (form.id) {
+            <p class="m-0 text-[11.5px] text-ink-faint">
+              Edits are held in this browser only — the registry has no update
+              endpoint yet. A new technology is saved to the database.
+            </p>
+          }
+
           <div class="flex justify-end gap-2">
             <button type="button" class="btn" (click)="techDraft.set(null)">Cancel</button>
-            <button type="submit" class="btn btn-primary">
-              {{ form.id ? 'Save changes' : 'Add technology' }}
+            <button type="submit" class="btn btn-primary" [disabled]="saving()">
+              {{ saving() ? 'Saving…' : form.id ? 'Save changes' : 'Add technology' }}
             </button>
           </div>
         </form>
@@ -345,6 +408,7 @@ function blankEngineer(): Omit<Engineer, 'id'> & { id?: string } {
 })
 export class Registry {
   private readonly store = inject(RegistryStore);
+  private readonly api = inject(Api);
 
   protected readonly componentTypes = COMPONENT_TYPES;
   protected readonly technologies = this.store.technologies;
@@ -402,16 +466,99 @@ export class Registry {
     this.cycleDraft.set({ ...cycle });
   }
 
+  // ---- source lookup -------------------------------------------------------
+
+  protected readonly sourceQuery = signal('');
+  protected readonly sourceResults = signal<ApiSourceProduct[]>([]);
+  protected readonly searching = signal(false);
+  protected readonly searched = signal(false);
+  protected readonly saving = signal(false);
+
+  protected searchSource(event: Event): void {
+    event.preventDefault();
+    this.searching.set(true);
+
+    this.api.searchSources(this.sourceQuery()).subscribe({
+      next: (results) => {
+        this.sourceResults.set(results);
+        this.searching.set(false);
+        this.searched.set(true);
+      },
+      error: () => {
+        this.searching.set(false);
+        this.searched.set(true);
+        this.error.set('Could not reach the lifecycle source. Enter the slug by hand.');
+      },
+    });
+  }
+
+  /** Fills the form from a picked product, so the slug always matches a real one. */
+  protected useSource(
+    product: ApiSourceProduct,
+    form: Omit<Technology, 'id'> & { id?: string },
+  ): void {
+    form.eolSlug = product.slug;
+    if (!form.name.trim()) {
+      form.name = product.label;
+    }
+    this.sourceResults.set([]);
+    this.searched.set(false);
+  }
+
+  /**
+   * Creating goes to the database; editing does not yet.
+   *
+   * A new technology must persist — an environment cannot record a component
+   * the server has never heard of — so creation is the path that was wired
+   * first. Edits stay local and the form says so rather than pretending.
+   */
   protected saveTechnology(event: Event): void {
     event.preventDefault();
     const form = this.techDraft();
+
     if (!form?.name.trim()) {
       this.error.set('A technology needs a name.');
       return;
     }
-    this.store.saveTechnology(form);
-    this.techDraft.set(null);
-    this.error.set(null);
+
+    if (form.id) {
+      this.store.saveTechnology(form);
+      this.techDraft.set(null);
+      this.error.set(null);
+      return;
+    }
+
+    this.saving.set(true);
+    this.api
+      .createTechnology({
+        name: form.name.trim(),
+        componentType: form.componentType,
+        vendor: form.vendor?.trim() || undefined,
+        eolSlug: form.eolSlug?.trim() || undefined,
+        cycleRule: form.cycleRule,
+        notes: form.notes?.trim() || undefined,
+      })
+      .subscribe({
+        next: (created) => {
+          this.saving.set(false);
+          this.techDraft.set(null);
+          this.error.set(
+            created.cycles.length === 0 && form.eolSlug
+              ? `${created.name} was added, but no cycles came back from the source. Add one by hand so its end-of-life date is known.`
+              : null,
+          );
+          this.api.reload();
+        },
+        error: (err: { error?: { message?: string | string[] } }) => {
+          this.saving.set(false);
+          const message = err.error?.message;
+          this.error.set(
+            Array.isArray(message)
+              ? message.join('. ')
+              : (message ?? 'Could not add that technology.'),
+          );
+        },
+      });
   }
 
   protected saveCycle(event: Event): void {
