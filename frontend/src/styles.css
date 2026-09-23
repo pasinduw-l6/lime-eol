@@ -56,14 +56,17 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --color-ground: #eef4f5;
-  --color-surface: #ffffff;
-  --color-elevated: #e4edef;
-  --color-rule: #cddde1;
+  /* Softened deliberately: pure white surfaces on a near-white ground glare
+     over a long session. The cards sit just off white, on a ground with
+     enough depth that they still read as raised. */
+  --color-ground: #dae5e8;
+  --color-surface: #f1f7f8;
+  --color-elevated: #e5eef0;
+  --color-rule: #c2d5da;
 
   --color-ink: #0d2430;
-  --color-ink-soft: #4c6976;
-  --color-ink-faint: #7b98a3;
+  --color-ink-soft: #476370;
+  --color-ink-faint: #74919d;
 
   --color-accent: #00857b;
   --color-accent-bright: #00a396;
@@ -91,7 +94,7 @@
 
 /* Cards lift with a shadow on light, where a border alone reads as flat. */
 :root[data-theme='light'] .card {
-  box-shadow: 0 1px 2px rgb(13 36 48 / 6%);
+  box-shadow: 0 1px 3px rgb(13 36 48 / 8%);
 }
 
 :root[data-theme='light'] .btn-primary,
