@@ -1,49 +1,69 @@
 import { Routes } from '@angular/router';
+import { Shell } from './shell';
 
 /**
- * Four sections, each answering one question. Older paths redirect, so links
- * shared before the consolidation still work.
+ * Two groups: the auth pages, which own the whole window, and everything else,
+ * which renders inside the signed-in chrome.
+ *
+ * Older paths redirect, so links shared before the consolidation still work.
  */
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'overview' },
   {
-    path: 'overview',
-    title: 'Overview · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/overview/overview').then((m) => m.Overview),
+    path: 'login',
+    title: 'Sign in · Lime Lifecycle',
+    loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },
   {
-    path: 'projects',
-    title: 'Projects · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/projects/projects').then((m) => m.Projects),
-  },
-  {
-    path: 'lifecycle',
-    title: 'Lifecycle · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/lifecycle/lifecycle-page').then((m) => m.LifecyclePage),
-  },
-  {
-    // Query params bind straight to the component's inputs, so
-    // /plan?technology=…&cycle=… opens the form already filled in.
-    path: 'plan',
-    title: 'Plan · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/actions/actions').then((m) => m.Actions),
-  },
-  {
-    path: 'calendar',
-    title: 'Calendar · Lime Lifecycle',
-    loadComponent: () =>
-      import('./features/calendar/calendar').then((m) => m.Calendar),
+    path: 'signup',
+    title: 'Create account · Lime Lifecycle',
+    loadComponent: () => import('./features/auth/sign-up').then((m) => m.SignUp),
   },
 
-  // consolidated away
-  { path: 'environments', redirectTo: 'projects' },
-  { path: 'schedule', redirectTo: 'lifecycle' },
-  { path: 'registry', redirectTo: 'lifecycle' },
-  { path: 'actions', redirectTo: 'plan' },
+  {
+    path: '',
+    component: Shell,
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'overview' },
+      {
+        path: 'overview',
+        title: 'Overview · Lime Lifecycle',
+        loadComponent: () =>
+          import('./features/overview/overview').then((m) => m.Overview),
+      },
+      {
+        path: 'projects',
+        title: 'Projects · Lime Lifecycle',
+        loadComponent: () =>
+          import('./features/projects/projects').then((m) => m.Projects),
+      },
+      {
+        path: 'lifecycle',
+        title: 'Lifecycle · Lime Lifecycle',
+        loadComponent: () =>
+          import('./features/lifecycle/lifecycle-page').then((m) => m.LifecyclePage),
+      },
+      {
+        // Query params bind straight to the component's inputs, so
+        // /plan?technology=…&cycle=… opens the form already filled in.
+        path: 'plan',
+        title: 'Plan · Lime Lifecycle',
+        loadComponent: () =>
+          import('./features/actions/actions').then((m) => m.Actions),
+      },
+      {
+        path: 'calendar',
+        title: 'Calendar · Lime Lifecycle',
+        loadComponent: () =>
+          import('./features/calendar/calendar').then((m) => m.Calendar),
+      },
 
-  { path: '**', redirectTo: 'overview' },
+      // consolidated away
+      { path: 'environments', redirectTo: 'projects' },
+      { path: 'schedule', redirectTo: 'lifecycle' },
+      { path: 'registry', redirectTo: 'lifecycle' },
+      { path: 'actions', redirectTo: 'plan' },
+
+      { path: '**', redirectTo: 'overview' },
+    ],
+  },
 ];
