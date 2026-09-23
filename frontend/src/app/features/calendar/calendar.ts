@@ -23,8 +23,6 @@ interface MonthGroup {
   key: string;
   label: string;
   entries: Entry[];
-  /** Months skipped since the previous group — rendered as an explicit gap. */
-  gapAfter: string | null;
 }
 
 const KIND_COLOUR: Record<Kind, string> = {
@@ -144,12 +142,6 @@ const KIND_LABEL: Record<Kind, string> = {
             </li>
           }
         </ol>
-
-        @if (group.gapAfter) {
-          <p class="m-0 py-5 text-center text-[12px] text-ink-faint">
-            ⋯ nothing until {{ group.gapAfter }} ⋯
-          </p>
-        }
       } @empty {
         <p class="m-0 py-10 text-center text-[14px] text-ink-soft">
           Nothing recorded or scheduled. Record a version change on an
@@ -341,7 +333,7 @@ export class Calendar {
     () => this.visible().length > 0 && this.todayMarker() === null,
   );
 
-  /** Grouped by month, with the quiet stretches named rather than left blank. */
+  /** Grouped by month. Months with nothing in them are simply not listed. */
   protected readonly groups = computed<MonthGroup[]>(() => {
     const byMonth = new Map<string, Entry[]>();
 
@@ -350,26 +342,12 @@ export class Calendar {
       byMonth.set(key, [...(byMonth.get(key) ?? []), entry]);
     }
 
-    const keys = [...byMonth.keys()].sort();
-
-    return keys.map((key, index) => {
+    return [...byMonth.keys()].sort().map((key) => {
       const [year, month] = key.split('-').map(Number);
-      const next = keys[index + 1];
-      let gapAfter: string | null = null;
-
-      if (next) {
-        const [nextYear, nextMonth] = next.split('-').map(Number);
-        const months = (nextYear - year) * 12 + (nextMonth - month);
-        if (months > 1) {
-          gapAfter = monthName(nextYear, nextMonth);
-        }
-      }
-
       return {
         key,
         label: monthName(year, month).toUpperCase(),
         entries: byMonth.get(key)!,
-        gapAfter,
       };
     });
   });
