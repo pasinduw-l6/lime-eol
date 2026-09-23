@@ -1,5 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { Api, ApiComponent, ApiEnvironment, ApiProject } from '../../core/api';
+import {
+  Api,
+  ApiChange,
+  ApiComponent,
+  ApiEnvironment,
+  ApiProject,
+  ApiVerification,
+} from '../../core/api';
+import { ChangeTimeline } from '../../shared/change-timeline';
 import { RegistryStore } from '../../core/registry.store';
 import { formatDate, formatDays, statusFill, statusLabel } from '../../core/lifecycle';
 import { TechIcon } from '../../shared/tech-icon';
@@ -15,7 +23,7 @@ import { UpdateComponent } from './update-component';
  */
 @Component({
   selector: 'lime-environments',
-  imports: [TechIcon, UpdateComponent],
+  imports: [TechIcon, UpdateComponent, ChangeTimeline],
   host: { class: 'block' },
   template: `
     @if (api.isLoading()) {
@@ -84,15 +92,63 @@ import { UpdateComponent } from './update-component';
 
         @if (selected(project); as env) {
           <section class="card px-7 py-6">
-            <header class="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-              <h2 class="m-0 text-[17px] font-semibold">
-                {{ project.name }} · {{ env.environment }}
-              </h2>
-              <p class="m-0 text-[13px] text-ink-soft">
-                {{ env.location === 'EC2' ? 'AWS' : 'Customer site' }} ·
-                {{ env.locationDetail }} · owned by {{ env.owners.join(', ') || 'nobody' }}
-              </p>
+            <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 class="m-0 text-[17px] font-semibold">
+                  {{ project.name }} · {{ env.environment }}
+                </h2>
+                <p class="m-0 text-[13px] text-ink-soft">
+                  {{ env.location === 'EC2' ? 'AWS' : 'Customer site' }} ·
+                  {{ env.locationDetail }} · owned by {{ env.owners.join(', ') || 'nobody' }}
+                </p>
+              </div>
+
+              <div class="flex gap-1 rounded-full border border-rule bg-elevated p-1">
+                @for (v of views; track v.key) {
+                  <button
+                    type="button"
+                    class="rounded-full px-4 py-1.5 text-[13px]"
+                    [class.bg-accent]="view() === v.key"
+                    [class.text-ground]="view() === v.key"
+                    [class.text-ink-soft]="view() !== v.key"
+                    (click)="setView(v.key, env.id)"
+                  >
+                    {{ v.label }}
+                  </button>
+                }
+              </div>
             </header>
+
+            @if (view() === 'history') {
+              <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <p class="m-0 text-[13px] text-ink-soft">
+                  Every recorded change to this environment, newest first.
+                </p>
+                <span class="flex items-center gap-3 text-[12px]">
+                  @if (verification(); as check) {
+                    <span
+                      [style.color]="
+                        check.intact ? 'var(--color-good)' : 'var(--color-overdue)'
+                      "
+                    >
+                      @if (check.intact) {
+                        {{ check.entries }} entries verified
+                      } @else {
+                        altered at entry {{ check.brokenAt.join(', ') }}
+                      }
+                    </span>
+                  }
+                  <a
+                    [href]="csvUrl(env.id)"
+                    download
+                    class="text-accent-bright no-underline hover:underline"
+                    >Export CSV</a
+                  >
+                </span>
+              </div>
+
+              <lime-change-timeline [changes]="history()" />
+            } @else {
 
             <!-- one card per technology -->
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -158,6 +214,7 @@ import { UpdateComponent } from './update-component';
                 </button>
               }
             </div>
+            }
           </section>
         }
       } @empty {
@@ -206,6 +263,39 @@ export class Environments {
       project.environments[0] ??
       null
     );
+  }
+
+  // ---- components / history ------------------------------------------------
+
+  protected readonly views = [
+    { key: 'components' as const, label: 'Components' },
+    { key: 'history' as const, label: 'History' },
+  ];
+
+  protected readonly view = signal<'components' | 'history'>('components');
+  protected readonly history = signal<ApiChange[]>([]);
+  protected readonly verification = signal<ApiVerification | null>(null);
+
+  /** History is fetched only when asked for — most visits never open it. */
+  protected setView(view: 'components' | 'history', deploymentId: string): void {
+    this.view.set(view);
+
+    if (view === 'history') {
+      this.loadHistory(deploymentId);
+    }
+  }
+
+  protected loadHistory(deploymentId: string): void {
+    this.api
+      .history(deploymentId)
+      .subscribe({ next: (changes) => this.history.set(changes) });
+    this.api
+      .verifyHistory(deploymentId)
+      .subscribe({ next: (result) => this.verification.set(result) });
+  }
+
+  protected csvUrl(deploymentId: string): string {
+    return this.api.historyCsvUrl(deploymentId);
   }
 
   protected riskOf(env: ApiEnvironment): number {

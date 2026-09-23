@@ -10,6 +10,7 @@ import {
 } from '../../core/api';
 import { ActingUser } from '../../core/acting-user';
 import { formatDate, formatDays } from '../../core/lifecycle';
+import { ChangeTimeline } from '../../shared/change-timeline';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
 
@@ -22,7 +23,7 @@ import { TechIcon } from '../../shared/tech-icon';
  */
 @Component({
   selector: 'lime-update-component',
-  imports: [FormsModule, Modal, TechIcon],
+  imports: [FormsModule, Modal, TechIcon, ChangeTimeline],
   host: { class: 'block' },
   template: `
     <lime-modal
@@ -136,78 +137,33 @@ import { TechIcon } from '../../shared/tech-icon';
           </div>
         </form>
 
-        <!-- audit trail -->
+        <!-- the last few, as context while recording. The full trail lives on
+             the environment, where it has room to grow. -->
         <div class="border-t border-rule pt-4">
-          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h3 class="m-0 text-[13px] font-semibold">Change history</h3>
-            <span class="flex items-center gap-3 text-[11.5px]">
-              @if (verification(); as check) {
-                <span [style.color]="check.intact ? 'var(--color-good)' : 'var(--color-overdue)'">
-                  @if (check.intact) {
-                    {{ check.entries }} entries verified
-                  } @else {
-                    altered at entry {{ check.brokenAt.join(', ') }}
-                  }
-                </span>
-              }
-              <a [href]="csvUrl()" class="text-accent-bright no-underline hover:underline" download>
-                Export CSV
-              </a>
-            </span>
+          <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="m-0 text-[13px] font-semibold">Recent changes</h3>
+            @if (verification(); as check) {
+              <span
+                class="text-[11.5px]"
+                [style.color]="check.intact ? 'var(--color-good)' : 'var(--color-overdue)'"
+              >
+                @if (check.intact) {
+                  {{ check.entries }} entries verified
+                } @else {
+                  altered at entry {{ check.brokenAt.join(', ') }}
+                }
+              </span>
+            }
           </div>
 
-          <ol class="m-0 flex list-none flex-col p-0">
-            @for (change of history(); track change.id) {
-              <li class="flex gap-3 border-b border-rule py-2.5 last:border-b-0">
-                <span
-                  class="tabular mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-elevated text-[10px] text-ink-soft"
-                  [attr.title]="'Entry ' + change.sequence"
-                  >{{ change.sequence }}</span
-                >
-                <span class="min-w-0 flex-1">
-                  <span class="flex flex-wrap items-baseline gap-x-2">
-                    <span class="tabular text-[13px]">
-                      @if (change.fromVersion) {
-                        {{ change.fromVersion }} → {{ change.toVersion }}
-                      } @else {
-                        installed {{ change.toVersion }}
-                      }
-                    </span>
-                    <span
-                      class="rounded-full border px-2 py-0.5 text-[10.5px]"
-                      [style.border-color]="reasonColour(change.reason)"
-                      [style.color]="reasonColour(change.reason)"
-                      >{{ reasonLabel(change.reason) }}</span
-                    >
-                    @if (change.ticketRef) {
-                      <span class="tabular text-[11px] text-ink-soft">{{ change.ticketRef }}</span>
-                    }
-                  </span>
-                  <span class="block text-[11.5px] text-ink-soft">
-                    {{ change.effectiveAt }} · recorded by
-                    {{ change.recordedBy ?? 'unknown' }}
-                    @if (change.evidenceUrl) {
-                      ·
-                      <a
-                        [href]="change.evidenceUrl"
-                        target="_blank"
-                        rel="noopener"
-                        class="text-accent-bright no-underline hover:underline"
-                        >evidence</a
-                      >
-                    }
-                  </span>
-                  @if (change.note) {
-                    <span class="block text-[11.5px] text-ink-soft">{{ change.note }}</span>
-                  }
-                </span>
-              </li>
-            } @empty {
-              <li class="py-2 text-[13px] text-ink-soft">
-                Nothing recorded yet for {{ component().technology }} here.
-              </li>
-            }
-          </ol>
+          <lime-change-timeline [changes]="history()" [limit]="3" />
+
+          @if (history().length > 3) {
+            <p class="m-0 mt-1 text-[12px] text-ink-soft">
+              {{ history().length - 3 }} older entries — close this and open
+              <span class="text-ink">History</span> on the environment.
+            </p>
+          }
         </div>
       </div>
     </lime-modal>
