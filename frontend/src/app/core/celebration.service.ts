@@ -2,15 +2,17 @@ import { Injectable, signal } from '@angular/core';
 import { SupportStatus } from './lifecycle';
 
 /**
- * How much of a win a recorded change actually was.
+ * Every recorded version change is celebrated.
  *
- * Tiered on purpose. If every change throws confetti it stops meaning anything
- * by the third one, and the screen starts nagging rather than rewarding.
+ * The picture does not vary — recording a change is the job, and doing the job
+ * gets the reward. What varies is the line underneath, which says what the
+ * change actually bought: clearing the last risk in an environment reads
+ * differently from a routine patch, even though both earn the same grin.
  */
-export type Tier = 'CLEARED' | 'RESCUED' | 'ROUTINE' | 'NONE';
+export type Tier = 'CLEARED' | 'RESCUED' | 'ROUTINE';
 
 export interface Celebration {
-  tier: Exclude<Tier, 'NONE'>;
+  tier: Tier;
   title: string;
   detail: string;
 }
@@ -39,13 +41,7 @@ export class Celebrations {
   }
 }
 
-/**
- * Decides what a change earned.
- *
- * Deliberately silent in two cases: an ordinary patch between supported
- * versions is just the job, and a move from one unsupported version to another
- * is not a win — congratulating it would be tone deaf.
- */
+/** Reads the change and picks the line that fits it. */
 export function celebrationFor(input: {
   technology: string;
   environment: string;
@@ -57,46 +53,40 @@ export function celebrationFor(input: {
   daysOnNewVersion: number | null;
   /** Statuses of everything else in the environment, to spot a clean sweep. */
   otherStatuses: SupportStatus[];
-}): Celebration | null {
+}): Celebration {
   const wasAtRisk =
     input.previousStatus === 'EOL' || input.previousStatus === 'NEAR';
   const nowSafe = input.daysOnNewVersion !== null && input.daysOnNewVersion > 180;
 
   const move = `${input.technology} ${input.fromVersion} → ${input.toVersion}`;
 
-  if (!wasAtRisk) {
-    return nowSafe
-      ? {
-          tier: 'ROUTINE',
-          title: 'Recorded',
-          detail: `${move} · ${input.environment}`,
-        }
-      : null;
-  }
-
-  // Still on something unsupported, or on a cycle that ends within the notice
-  // window. Recorded, but there is nothing to cheer about yet.
-  if (!nowSafe) {
-    return {
-      tier: 'ROUTINE',
-      title: 'Recorded',
-      detail: `${move} · still needs attention`,
-    };
-  }
-
   const everythingElseClear = input.otherStatuses.every(
     (status) => status !== 'EOL' && status !== 'NEAR',
   );
 
-  return everythingElseClear
-    ? {
-        tier: 'CLEARED',
-        title: `${input.environment} is fully supported`,
-        detail: `${move} was the last one at risk`,
-      }
-    : {
-        tier: 'RESCUED',
-        title: 'Off an unsupported version',
-        detail: `${move} · ${input.environment}`,
-      };
+  if (wasAtRisk && nowSafe && everythingElseClear) {
+    return {
+      tier: 'CLEARED',
+      title: `${input.environment} is fully supported`,
+      detail: `${move} was the last one at risk`,
+    };
+  }
+
+  if (wasAtRisk && nowSafe) {
+    return {
+      tier: 'RESCUED',
+      title: 'Off an unsupported version',
+      detail: `${move} · ${input.environment}`,
+    };
+  }
+
+  // Recorded and worth a grin, but the line stays honest: moving between two
+  // unsupported versions has not fixed anything yet.
+  return {
+    tier: 'ROUTINE',
+    title: 'Change recorded',
+    detail: wasAtRisk
+      ? `${move} · still needs attention`
+      : `${move} · ${input.environment}`,
+  };
 }

@@ -38,30 +38,18 @@ const CONFETTI = [
 
         <div
           #card
-          class="card relative flex w-[19rem] items-center gap-3 px-4 py-3.5"
-          [style.border-color]="
-            party.tier === 'ROUTINE' ? null : 'color-mix(in oklab, var(--color-lime) 55%, transparent)'
-          "
+          class="card relative flex w-[21rem] items-center gap-3.5 px-4 py-4"
+          style="border-color: color-mix(in oklab, var(--color-lime) 55%, transparent)"
         >
-          @if (party.tier === 'ROUTINE') {
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[18px]"
-              style="background: color-mix(in oklab, var(--color-good) 18%, transparent); color: var(--color-good)"
-              aria-hidden="true"
-            >
-              ✓
-            </span>
-          } @else {
-            <img
-              #photo
-              src="/success.jpg"
-              alt=""
-              class="h-14 w-14 shrink-0 rounded-[10px] object-cover"
-            />
-          }
+          <img
+            #photo
+            src="/success.jpg"
+            alt=""
+            class="h-[4.5rem] w-[4.5rem] shrink-0 rounded-[12px] object-cover"
+          />
 
           <span class="min-w-0">
-            <span class="block text-[14px] font-semibold">{{ party.title }}</span>
+            <span class="block text-[14.5px] font-semibold">{{ party.title }}</span>
             <span class="block text-[12px] text-ink-soft">{{ party.detail }}</span>
           </span>
         </div>
@@ -109,9 +97,7 @@ export class Celebrate {
         );
       }
 
-      if (party.tier !== 'ROUTINE') {
-        this.confetti();
-      }
+      this.confetti();
     });
   }
 

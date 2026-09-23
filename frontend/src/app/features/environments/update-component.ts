@@ -14,7 +14,7 @@ import { formatDate, formatDays, SupportStatus } from '../../core/lifecycle';
 import { ChangeTimeline } from '../../shared/change-timeline';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
-import { Working } from '../../shared/working';
+import { MIN_WORKING_MS, Working } from '../../shared/working';
 
 /**
  * Record the version an environment now runs.
@@ -238,6 +238,8 @@ export class UpdateComponent {
     }
 
     this.saving.set(true);
+    const startedAt = Date.now();
+
     this.api
       .changeComponent(this.environment().id, {
         technology: this.component().technology,
@@ -250,19 +252,38 @@ export class UpdateComponent {
       })
       .subscribe({
         next: () => {
-          this.saving.set(false);
-          this.celebrations.show(this.earned(version));
-          this.saved.emit();
-          this.close.emit();
+          // The write is already done; this only holds the modal open so the
+          // goose is on screen long enough to be seen. Against a warm cache the
+          // server answers in about 20ms, which would be a flicker.
+          this.afterWorking(startedAt, () => {
+            this.saving.set(false);
+            this.celebrations.show(this.earned(version));
+            this.saved.emit();
+            this.close.emit();
+          });
         },
         error: (err: { error?: { message?: string | string[] } }) => {
-          this.saving.set(false);
           const message = err.error?.message;
-          this.error.set(
-            Array.isArray(message) ? message.join('. ') : (message ?? 'Could not record that change.'),
-          );
+          this.afterWorking(startedAt, () => {
+            this.saving.set(false);
+            this.error.set(
+              Array.isArray(message)
+                ? message.join('. ')
+                : (message ?? 'Could not record that change.'),
+            );
+          });
         },
       });
+  }
+
+  /** Runs the callback once the goose has had its full time on screen. */
+  private afterWorking(startedAt: number, then: () => void): void {
+    const remaining = MIN_WORKING_MS - (Date.now() - startedAt);
+    if (remaining <= 0) {
+      then();
+      return;
+    }
+    setTimeout(then, remaining);
   }
 
   /**

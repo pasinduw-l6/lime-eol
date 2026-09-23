@@ -5,7 +5,7 @@ import { ActingUser } from '../../core/acting-user';
 import { Celebrations } from '../../core/celebration.service';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
-import { Working } from '../../shared/working';
+import { MIN_WORKING_MS, Working } from '../../shared/working';
 
 /**
  * Add a technology this environment was not known to run.
@@ -234,6 +234,7 @@ export class AddComponent {
 
     this.error.set(null);
     this.saving.set(true);
+    const startedAt = Date.now();
 
     this.api
       .changeComponent(this.environment().id, {
@@ -247,26 +248,39 @@ export class AddComponent {
       })
       .subscribe({
         next: () => {
-          this.saving.set(false);
-          // A first record is bookkeeping, not a rescue — acknowledged, not cheered.
-          this.celebrations.show({
-            tier: 'ROUTINE',
-            title: `${technology} recorded`,
-            detail: `${version} · ${this.environment().environment}`,
+          this.afterWorking(startedAt, () => {
+            this.saving.set(false);
+            this.celebrations.show({
+              tier: 'ROUTINE',
+              title: `${technology} recorded`,
+              detail: `${version} · ${this.environment().environment}`,
+            });
+            this.saved.emit();
+            this.close.emit();
           });
-          this.saved.emit();
-          this.close.emit();
         },
         error: (err: { error?: { message?: string | string[] } }) => {
-          this.saving.set(false);
           const message = err.error?.message;
-          this.error.set(
-            Array.isArray(message)
-              ? message.join('. ')
-              : (message ?? 'Could not record that component.'),
-          );
+          this.afterWorking(startedAt, () => {
+            this.saving.set(false);
+            this.error.set(
+              Array.isArray(message)
+                ? message.join('. ')
+                : (message ?? 'Could not record that component.'),
+            );
+          });
         },
       });
+  }
+
+  /** Runs the callback once the goose has had its full time on screen. */
+  private afterWorking(startedAt: number, then: () => void): void {
+    const remaining = MIN_WORKING_MS - (Date.now() - startedAt);
+    if (remaining <= 0) {
+      then();
+      return;
+    }
+    setTimeout(then, remaining);
   }
 
   /** Says what committing to this cycle actually buys you. */
