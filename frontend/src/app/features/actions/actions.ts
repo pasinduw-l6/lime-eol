@@ -17,13 +17,6 @@ import { TechIcon } from '../../shared/tech-icon';
 
 const STATUSES = ['NOT_STARTED', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED'];
 
-const COMMS = [
-  { key: 'NOT_REQUIRED', label: 'Not required' },
-  { key: 'PENDING', label: 'To be sent' },
-  { key: 'SENT', label: 'Sent' },
-  { key: 'ACKNOWLEDGED', label: 'Acknowledged' },
-];
-
 interface Draft {
   id?: string;
   technology: string;
@@ -33,9 +26,6 @@ interface Draft {
   plannedDate: string;
   assigneeId: string;
   jiraKey: string;
-  customerComm: string;
-  customerCommNotes: string;
-  remarks: string;
   deploymentIds: string[];
 }
 
@@ -203,27 +193,6 @@ interface Draft {
             }
           </div>
 
-          @if (action.remarks || action.customerComm !== 'NOT_REQUIRED') {
-            <dl class="m-0 mt-4 grid gap-2 border-t border-rule pt-3 text-[12.5px] sm:grid-cols-2">
-              @if (action.customerComm !== 'NOT_REQUIRED') {
-                <div>
-                  <dt class="m-0 text-ink-soft">Customer communication</dt>
-                  <dd class="m-0">
-                    {{ commLabel(action.customerComm) }}
-                    @if (action.customerCommNotes) {
-                      <span class="block text-ink-soft">{{ action.customerCommNotes }}</span>
-                    }
-                  </dd>
-                </div>
-              }
-              @if (action.remarks) {
-                <div>
-                  <dt class="m-0 text-ink-soft">Remarks</dt>
-                  <dd class="m-0">{{ action.remarks }}</dd>
-                </div>
-              }
-            </dl>
-          }
         </article>
       } @empty {
         <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
@@ -333,37 +302,6 @@ interface Draft {
             </div>
           </fieldset>
 
-          <!-- 2.5: customer communication, and remarks -->
-          <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
-              Customer communication
-              <select class="input" [(ngModel)]="form.customerComm" name="comm">
-                @for (c of comms; track c.key) {
-                  <option [value]="c.key">{{ c.label }}</option>
-                }
-              </select>
-            </label>
-            <label class="field">
-              Communication notes
-              <input
-                class="input"
-                [(ngModel)]="form.customerCommNotes"
-                name="commnotes"
-                placeholder="Window agreed with the customer"
-              />
-            </label>
-          </div>
-
-          <label class="field">
-            Remarks
-            <input
-              class="input"
-              [(ngModel)]="form.remarks"
-              name="remarks"
-              placeholder="Anything the next person needs to know"
-            />
-          </label>
-
           @if (error()) {
             <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
           }
@@ -437,7 +375,6 @@ export class Actions {
   }
 
   protected readonly statuses = STATUSES;
-  protected readonly comms = COMMS;
   protected readonly filters = ['ALL', 'OPEN', 'OVERDUE', 'COMPLETED'] as const;
 
   protected readonly query = signal('');
@@ -512,9 +449,6 @@ export class Actions {
       plannedDate: action.plannedDate ?? '',
       assigneeId: action.assignee?.id ?? '',
       jiraKey: action.jiraKey ?? '',
-      customerComm: action.customerComm,
-      customerCommNotes: action.customerCommNotes ?? '',
-      remarks: action.remarks ?? '',
       deploymentIds: action.environments.map((e) => e.deploymentId),
     });
   }
@@ -560,9 +494,6 @@ export class Actions {
       plannedDate: form.plannedDate || undefined,
       status: form.status,
       jiraKey: form.jiraKey || undefined,
-      customerComm: form.customerComm,
-      customerCommNotes: form.customerCommNotes || undefined,
-      remarks: form.remarks || undefined,
     };
 
     this.saving.set(true);
@@ -632,10 +563,6 @@ export class Actions {
     }
   }
 
-  protected commLabel(key: string): string {
-    return COMMS.find((c) => c.key === key)?.label ?? key;
-  }
-
   protected statusOf(days: number | null): SupportStatus {
     if (days === null) {
       return 'UNKNOWN';
@@ -660,9 +587,6 @@ function blank(): Draft {
     plannedDate: '',
     assigneeId: '',
     jiraKey: '',
-    customerComm: 'NOT_REQUIRED',
-    customerCommNotes: '',
-    remarks: '',
     deploymentIds: [],
   };
 }
