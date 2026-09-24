@@ -33,13 +33,16 @@ const TYPE_TINT: Record<string, string> = {
     @if (isOwnProduct()) {
       <!-- Our own product carries our own mark; Simple Icons has no entry for
            it, and a lettered "L" tile for the thing we sell reads as an
-           oversight. -->
+           oversight.
+
+           The symbol, not the full wordmark: at 2.27:1 the logo fits a square
+           slot by height, rendering under half as tall as the square brand
+           logos beside it. -->
       <img
-        src="/nav-logo.png"
+        src="/lime-mark.png"
         [attr.width]="size()"
         [attr.height]="size()"
         alt="Lime"
-        class="object-contain"
         [style.width.px]="size()"
         [style.height.px]="size()"
       />
