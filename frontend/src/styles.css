@@ -312,6 +312,32 @@ body {
     background: color-mix(in oklab, var(--color-elevated) 78%, transparent);
     border-color: color-mix(in oklab, var(--color-rule) 55%, transparent);
   }
+
+  /* Accent-tinted glass, for a call to action that should still read as the
+     same material. Setting `border-accent` on plain .glass instead replaced
+     the glass edge with a flat outline — which on the dark theme left nothing
+     but an outline, since the fill barely differs from the card behind it. */
+  .glass-accent {
+    background: color-mix(in oklab, var(--color-accent) 24%, transparent);
+    border-color: color-mix(in oklab, var(--color-accent) 65%, transparent);
+  }
+
+  :root[data-theme='light'] .glass-accent {
+    background: color-mix(in oklab, var(--color-accent) 13%, var(--color-surface));
+    border-color: color-mix(in oklab, var(--color-accent) 55%, transparent);
+  }
+
+  a.glass-accent:hover,
+  button.glass-accent:hover {
+    background: color-mix(in oklab, var(--color-accent) 48%, transparent);
+    border-color: var(--color-accent-bright);
+  }
+
+  :root[data-theme='light'] a.glass-accent:hover,
+  :root[data-theme='light'] button.glass-accent:hover {
+    background: color-mix(in oklab, var(--color-accent) 26%, var(--color-surface));
+    border-color: var(--color-accent);
+  }
 }
 
 .glass {
@@ -350,8 +376,9 @@ body {
 .glass {
   position: relative;
   box-shadow:
-    inset 1.5px -1.5px 1px -1px rgb(255 255 255 / 24%),
-    inset -1.5px 1.5px 1px -1px rgb(255 255 255 / 24%),
+    inset 1.5px -1.5px 1px -1px rgb(255 255 255 / 38%),
+    inset -1.5px 1.5px 1px -1px rgb(255 255 255 / 38%),
+    inset 0 1px 0 rgb(255 255 255 / 12%),
     inset 0 0 2px rgb(0 0 0 / 35%),
     0 2px 5px rgb(0 0 0 / 18%);
 }

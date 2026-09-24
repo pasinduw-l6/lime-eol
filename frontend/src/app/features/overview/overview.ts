@@ -178,7 +178,7 @@ interface Bucket {
                 <a
                   [routerLink]="['/plan']"
                   [queryParams]="{ technology: alert.technology, cycle: alert.cycle }"
-                  class="glass rounded-full border border-accent px-3 py-1 text-[12px] text-accent-bright no-underline hover:bg-accent hover:text-white"
+                  class="glass glass-accent rounded-full border px-3 py-1 text-[12px] text-accent-bright no-underline"
                 >
                   {{ alert.plan ? 'Open plan' : 'Plan upgrade' }}
                 </a>
