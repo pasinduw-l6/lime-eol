@@ -134,8 +134,11 @@ const PALETTE = {
     // A whiter ground than the theme's own, so the green has something to read
     // against rather than a grey that swallows it.
     ground: [0.902, 0.937, 0.941],
-    teal: [0.42, 0.76, 0.7],
-    lime: [0.55, 0.8, 0.36],
+    // Darker than the flow's dark-theme counterparts, not lighter. A pale
+    // green on a near-white ground has almost no contrast to spend; these are
+    // close to the light theme's own accent and lime tokens.
+    teal: [0.32, 0.68, 0.62],
+    lime: [0.36, 0.62, 0.16],
     strength: 1.0,
     // Much higher than the dark theme's: the light background is only visible
     // in the gutters at the rim, so the flow has to survive out there.
