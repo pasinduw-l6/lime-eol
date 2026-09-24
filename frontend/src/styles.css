@@ -241,12 +241,23 @@ body {
    so unlike cards they can afford a real backdrop blur, which is what keeps
    them feeling like the same material. */
 .popover {
-  background: color-mix(in oklab, var(--color-surface) 97%, transparent);
-  backdrop-filter: saturate(160%) blur(20px);
+  /* Fully opaque, and a step lighter than the cards behind it. At 97% the
+     three per cent still showed through on the dark theme, and because the
+     panel was the same navy as the cards there was no edge either — it read as
+     glass laid over text. An overlay has to win against whatever it covers. */
+  background: var(--color-elevated);
+  border-color: color-mix(in oklab, #ffffff 16%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 9%),
+    0 20px 55px -12px rgb(0 0 0 / 65%);
 }
 
 :root[data-theme='light'] .popover {
-  background: color-mix(in oklab, var(--color-surface) 98%, transparent);
+  background: #ffffff;
+  border-color: color-mix(in oklab, var(--color-rule) 75%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 90%),
+    0 20px 45px -14px rgb(13 36 48 / 28%);
 }
 
 /* No diagonal glare on an overlay: it lands across the content rather than an
