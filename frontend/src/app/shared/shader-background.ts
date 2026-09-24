@@ -42,6 +42,10 @@ const FRAGMENT = /* glsl */ `
   uniform vec3 uLime;
   uniform float uStrength;
 
+  /** 1 on the light theme, where the flow is brightness rather than colour. */
+  uniform float uLumaMode;
+  uniform float uLumaRange;
+
   varying vec2 vUv;
 
   // Classic 2D value noise. Cheap, and smooth enough once layered.
@@ -97,13 +101,30 @@ const FRAGMENT = /* glsl */ `
     float teal = smoothstep(0.30, 0.78, flow);
     float lime = smoothstep(0.58, 0.95, flow) * 0.55;
 
-    vec3 colour = uGround;
-    colour = mix(colour, uTeal, teal * uStrength);
-    colour = mix(colour, uLime, lime * uStrength);
+    // Dark theme: the ground tinted toward the brand colours.
+    vec3 tinted = uGround;
+    tinted = mix(tinted, uTeal, teal * uStrength);
+    tinted = mix(tinted, uLime, lime * uStrength);
 
-    // Darkened at the edges, so cards near the rim keep their contrast.
+    // Light theme: the same flow as brightness instead of hue — daylight
+    // moving behind frosted glass. A pale tint over a pale ground is a change
+    // the eye barely registers, while the same swing in luminance reads
+    // immediately, and costs nothing in text contrast because the average
+    // brightness does not move.
+    float swing = (flow - 0.5) * 2.0;
+    vec3 lifted = uGround * (1.0 + swing * uLumaRange);
+    // A whisper of teal on the bright bands, so it is not merely grey.
+    lifted = mix(lifted, uTeal, smoothstep(0.55, 1.0, flow) * 0.10);
+
+    vec3 colour = mix(tinted, lifted, uLumaMode);
+
+    // Settled toward the flat ground at the edges, so cards near the rim keep
+    // their contrast. Held back in luminance mode: the margins are exactly
+    // where the light theme's background is visible between cards, and
+    // flattening them there would hide the effect where it is needed most.
     float vignette = 1.0 - smoothstep(0.35, 1.25, length(uv - 0.5) * 1.6);
-    colour = mix(uGround, colour, 0.35 + vignette * 0.65);
+    float base = mix(0.35, 0.74, uLumaMode);
+    colour = mix(uGround, colour, base + vignette * (1.0 - base));
 
     // A little dither. Eight-bit gradients this wide band badly without it.
     float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
@@ -120,17 +141,18 @@ const PALETTE = {
     teal: [0.0, 0.50, 0.47],
     lime: [0.40, 0.64, 0.20],
     strength: 1.0,
+    lumaMode: 0,
+    lumaRange: 0,
   },
   light: {
     ground: [0.855, 0.898, 0.91],
-    // Deeper than the light theme's own tokens. Tinting a pale ground with
-    // equally pale colour produces nothing anyone can see, so these carry
-    // enough saturation to read through a translucent card.
     teal: [0.42, 0.70, 0.69],
     lime: [0.60, 0.78, 0.45],
-    // Still held back from full: the flow that reads as atmosphere on navy
-    // turns the light theme muddy and eats the contrast the text needs.
     strength: 0.85,
+    // Brightness, not hue. A 13% swing either side of the ground is clearly
+    // visible while leaving the average where the text needs it.
+    lumaMode: 1,
+    lumaRange: 0.13,
   },
 } as const;
 
@@ -166,6 +188,8 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
       program.uniforms['uTeal'].value = [...palette.teal];
       program.uniforms['uLime'].value = [...palette.lime];
       program.uniforms['uStrength'].value = palette.strength;
+      program.uniforms['uLumaMode'].value = palette.lumaMode;
+      program.uniforms['uLumaRange'].value = palette.lumaRange;
 
       if (this.still()) {
         this.draw(0);
@@ -216,6 +240,8 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
         uTeal: { value: [...palette.teal] },
         uLime: { value: [...palette.lime] },
         uStrength: { value: palette.strength },
+        uLumaMode: { value: palette.lumaMode },
+        uLumaRange: { value: palette.lumaRange },
       },
     });
 
