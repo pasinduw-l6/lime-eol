@@ -42,9 +42,8 @@ const FRAGMENT = /* glsl */ `
   uniform vec3 uLime;
   uniform float uStrength;
 
-  /** 1 on the light theme, where the flow is brightness rather than colour. */
-  uniform float uLumaMode;
-  uniform float uLumaRange;
+  /** How much of the flow survives at the edges of the screen. */
+  uniform float uEdgeFloor;
 
   varying vec2 vUv;
 
@@ -101,30 +100,18 @@ const FRAGMENT = /* glsl */ `
     float teal = smoothstep(0.30, 0.78, flow);
     float lime = smoothstep(0.58, 0.95, flow) * 0.55;
 
-    // Dark theme: the ground tinted toward the brand colours.
-    vec3 tinted = uGround;
-    tinted = mix(tinted, uTeal, teal * uStrength);
-    tinted = mix(tinted, uLime, lime * uStrength);
-
-    // Light theme: the same flow as brightness instead of hue — daylight
-    // moving behind frosted glass. A pale tint over a pale ground is a change
-    // the eye barely registers, while the same swing in luminance reads
-    // immediately, and costs nothing in text contrast because the average
-    // brightness does not move.
-    float swing = (flow - 0.5) * 2.0;
-    vec3 lifted = uGround * (1.0 + swing * uLumaRange);
-    // A whisper of teal on the bright bands, so it is not merely grey.
-    lifted = mix(lifted, uTeal, smoothstep(0.55, 1.0, flow) * 0.10);
-
-    vec3 colour = mix(tinted, lifted, uLumaMode);
+    // The ground tinted toward the brand colours — teal through the middle of
+    // the range, lime at the peaks.
+    vec3 colour = uGround;
+    colour = mix(colour, uTeal, teal * uStrength);
+    colour = mix(colour, uLime, lime * uStrength);
 
     // Settled toward the flat ground at the edges, so cards near the rim keep
-    // their contrast. Held back in luminance mode: the margins are exactly
-    // where the light theme's background is visible between cards, and
-    // flattening them there would hide the effect where it is needed most.
+    // their contrast. The light theme keeps far more of it: the margins are
+    // exactly where its background shows between cards, and flattening them
+    // there hides the effect where it is most needed.
     float vignette = 1.0 - smoothstep(0.35, 1.25, length(uv - 0.5) * 1.6);
-    float base = mix(0.35, 0.74, uLumaMode);
-    colour = mix(uGround, colour, base + vignette * (1.0 - base));
+    colour = mix(uGround, colour, uEdgeFloor + vignette * (1.0 - uEdgeFloor));
 
     // A little dither. Eight-bit gradients this wide band badly without it.
     float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
@@ -141,18 +128,18 @@ const PALETTE = {
     teal: [0.0, 0.50, 0.47],
     lime: [0.40, 0.64, 0.20],
     strength: 1.0,
-    lumaMode: 0,
-    lumaRange: 0,
+    edgeFloor: 0.35,
   },
   light: {
-    ground: [0.855, 0.898, 0.91],
-    teal: [0.42, 0.70, 0.69],
-    lime: [0.60, 0.78, 0.45],
-    strength: 0.85,
-    // Brightness, not hue. A 13% swing either side of the ground is clearly
-    // visible while leaving the average where the text needs it.
-    lumaMode: 1,
-    lumaRange: 0.13,
+    // A whiter ground than the theme's own, so the green has something to read
+    // against rather than a grey that swallows it.
+    ground: [0.902, 0.937, 0.941],
+    teal: [0.42, 0.76, 0.7],
+    lime: [0.55, 0.8, 0.36],
+    strength: 1.0,
+    // Much higher than the dark theme's: the light background is only visible
+    // in the gutters at the rim, so the flow has to survive out there.
+    edgeFloor: 0.58,
   },
 } as const;
 
@@ -188,8 +175,7 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
       program.uniforms['uTeal'].value = [...palette.teal];
       program.uniforms['uLime'].value = [...palette.lime];
       program.uniforms['uStrength'].value = palette.strength;
-      program.uniforms['uLumaMode'].value = palette.lumaMode;
-      program.uniforms['uLumaRange'].value = palette.lumaRange;
+      program.uniforms['uEdgeFloor'].value = palette.edgeFloor;
 
       if (this.still()) {
         this.draw(0);
@@ -240,8 +226,7 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
         uTeal: { value: [...palette.teal] },
         uLime: { value: [...palette.lime] },
         uStrength: { value: palette.strength },
-        uLumaMode: { value: palette.lumaMode },
-        uLumaRange: { value: palette.lumaRange },
+        uEdgeFloor: { value: palette.edgeFloor },
       },
     });
 
