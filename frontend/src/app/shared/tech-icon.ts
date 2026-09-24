@@ -30,7 +30,20 @@ const TYPE_TINT: Record<string, string> = {
   selector: 'lime-tech-icon',
   host: { class: 'inline-flex shrink-0' },
   template: `
-    @if (mark(); as brand) {
+    @if (isOwnProduct()) {
+      <!-- Our own product carries our own mark; Simple Icons has no entry for
+           it, and a lettered "L" tile for the thing we sell reads as an
+           oversight. -->
+      <img
+        src="/nav-logo.png"
+        [attr.width]="size()"
+        [attr.height]="size()"
+        alt="Lime"
+        class="object-contain"
+        [style.width.px]="size()"
+        [style.height.px]="size()"
+      />
+    } @else if (mark(); as brand) {
       <img
         [src]="'https://cdn.simpleicons.org/' + brand.slug + '/' + brand.colour"
         [attr.width]="size()"
@@ -69,6 +82,10 @@ export class TechIcon {
   readonly componentType = input<string | null>(null);
 
   protected readonly failed = signal(false);
+
+  protected readonly isOwnProduct = computed(
+    () => this.technology().trim().toLowerCase() === 'lime',
+  );
 
   private readonly registered = computed(() =>
     this.api.technologies().find((t) => t.name === this.technology()),

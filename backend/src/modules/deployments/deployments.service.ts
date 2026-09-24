@@ -57,11 +57,17 @@ export class DeploymentsService {
     );
     const cycle =
       technology.cycles.find((c) => c.cycle === cycleName) ??
-      (await this.importCycle(technology.id, technology.eolSlug, cycleName));
+      (await this.importCycle(technology.id, technology.eolSlug, cycleName)) ??
+      // Our own software has no upstream to import from, so its cycles are
+      // created as versions are recorded. Nobody should have to register a
+      // Lime release before deploying it.
+      (technology.eolSlug === null
+        ? await this.createInternalCycle(technology.id, cycleName)
+        : null);
 
-    // A cycle is only ever created from published data. Inventing one would
-    // put a component into the estate with no end-of-life date — the exact
-    // blind spot this tool exists to remove.
+    // For anything tracked upstream a cycle is only ever created from published
+    // data. Inventing one would put a component into the estate with no
+    // end-of-life date — the exact blind spot this tool exists to remove.
     if (!cycle) {
       throw new BadRequestException(
         `${technology.name} ${toVersion} belongs to cycle ${cycleName}, which is not in the registry and not published by the lifecycle source. Add that cycle by hand so its end-of-life date is known.`,
@@ -199,6 +205,28 @@ export class DeploymentsService {
       .sort((a, b) => b.length - a.length)[0];
 
     return match ?? deriveCycle(version, rule);
+  }
+
+  /**
+   * A dateless cycle for a technology nobody publishes dates for.
+   *
+   * Deliberately no eolDate: it resolves to UNKNOWN throughout, which reads as
+   * "no published date" rather than pretending the version is supported
+   * forever.
+   */
+  private async createInternalCycle(technologyId: string, cycleName: string) {
+    return this.prisma.technologyCycle.create({
+      data: {
+        technologyId,
+        cycle: cycleName,
+        label: cycleName,
+        isLts: false,
+        isMaintained: true,
+        eolSource: 'MANUAL',
+        notes: 'Internal release — recorded to track what is deployed.',
+      },
+      include: { versions: true },
+    });
   }
 
   /**

@@ -61,6 +61,16 @@ export class TechnologiesService {
    * call.
    */
   async create(input: CreateTechnologyDto) {
+    if (input.internal) {
+      return this.createInternal(input);
+    }
+
+    if (!input.slug) {
+      throw new BadRequestException(
+        'Pick a product from the catalogue, or pass internal: true with a name.',
+      );
+    }
+
     const product = await this.eol.getProduct(input.slug).catch(() => null);
 
     if (!product) {
@@ -119,6 +129,46 @@ export class TechnologiesService {
     });
 
     return this.toDto(created);
+  }
+
+  /**
+   * Our own software, and anything else nobody publishes dates for.
+   *
+   * No slug, so nothing to sync and no cycles to import: its versions exist to
+   * record what is running where, not to warn about support ending. Cycles are
+   * created as versions are recorded, so nobody has to register a Lime release
+   * before deploying it.
+   */
+  private async createInternal(input: CreateTechnologyDto) {
+    const name = input.name?.trim();
+
+    if (!name) {
+      throw new BadRequestException('An internal technology needs a name.');
+    }
+
+    const existing = await this.prisma.technology.findUnique({ where: { name } });
+    if (existing) {
+      throw new ConflictException(`"${name}" is already in the registry.`);
+    }
+
+    const technology = await this.prisma.technology.create({
+      data: {
+        name,
+        componentType: input.componentType ?? 'OTHER',
+        vendor: input.vendor ?? null,
+        eolSlug: null,
+        cycleRule: input.cycleRule ?? 'MAJOR_MINOR',
+        notes: input.notes ?? 'Internal — no published end-of-life dates.',
+      },
+      include: {
+        cycles: {
+          orderBy: { eolDate: 'asc' },
+          include: { versions: { orderBy: [{ major: 'desc' }, { minor: 'desc' }] } },
+        },
+      },
+    });
+
+    return this.toDto(technology);
   }
 
   /**

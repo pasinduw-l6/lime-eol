@@ -16,6 +16,9 @@ import {
 const MS_PER_DAY = 86_400_000;
 const NOTICE_DAYS = 180;
 
+/** Our own product, tracked as a component of every environment. */
+const LIME_TECHNOLOGY = 'Lime';
+
 /**
  * Reads projects with everything the UI needs in one call: environments, the
  * components each runs, and the lifecycle state of those components.
@@ -146,8 +149,25 @@ export class ProjectsService {
 
     const effectiveAt = input.startedAt ?? new Date().toISOString().slice(0, 10);
 
+    // Lime itself is a component of every environment. It is what we sell, so
+    // which release a customer is on matters at least as much as the versions
+    // underneath it — and tracking it here means it gets the same per
+    // environment history as everything else, rather than one field on the
+    // project that cannot say DEV is ahead of PROD.
+    const stack = [...input.stack];
+    if (
+      input.limeVersion &&
+      !stack.some((entry) => entry.technology === LIME_TECHNOLOGY)
+    ) {
+      await this.ensureLimeTechnology();
+      stack.unshift({
+        technology: LIME_TECHNOLOGY,
+        version: input.limeVersion,
+      });
+    }
+
     for (const deployment of project.deployments) {
-      for (const entry of input.stack) {
+      for (const entry of stack) {
         await this.deployments.changeComponent(
           deployment.id,
           {
@@ -208,6 +228,28 @@ export class ProjectsService {
       recordedBy: change.recordedBy?.displayName ?? null,
       environment: change.deployment.environment,
     }));
+  }
+
+  /**
+   * Registers Lime itself, once, so a new project never fails for want of it.
+   *
+   * No endoflife.date slug: nobody publishes support dates for our own
+   * product, so its cycles carry none and read as "no published date" rather
+   * than pretending a release is supported forever.
+   */
+  private async ensureLimeTechnology(): Promise<void> {
+    await this.prisma.technology.upsert({
+      where: { name: LIME_TECHNOLOGY },
+      update: {},
+      create: {
+        name: LIME_TECHNOLOGY,
+        componentType: 'FRAMEWORK',
+        vendor: 'LinearSix',
+        eolSlug: null,
+        cycleRule: 'MAJOR_MINOR',
+        notes: 'Our own product. Versions are tracked to know what each customer runs.',
+      },
+    });
   }
 
   /**

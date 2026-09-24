@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -29,25 +30,35 @@ export const CYCLE_RULES = ['MAJOR', 'MAJOR_MINOR'] as const;
  * published lifecycle dates would be a component nobody can track.
  */
 export class CreateTechnologyDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'redis',
     description:
-      'endoflife.date product slug, chosen from GET /technologies/catalogue',
+      'endoflife.date product slug, chosen from GET /technologies/catalogue. Omit it, and pass `internal: true` with a name, for something nobody publishes lifecycle dates for.',
   })
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
-  slug!: string;
+  slug?: string;
 
   @ApiPropertyOptional({
-    example: 'Redis',
-    description: "Overrides the product's own label, for a local name",
+    example: 'Lime',
+    description:
+      "Overrides the product's own label. Required for an internal technology.",
   })
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(80)
   name?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Our own software, or anything no external source tracks. It carries no end-of-life dates, and its versions are recorded purely so the estate knows what is running where.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  internal?: boolean;
 
   @ApiPropertyOptional({
     enum: COMPONENT_TYPES,
