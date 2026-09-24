@@ -1,12 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Api, ApiNotificationLog } from '../core/api';
 import { NotificationPreview } from '../features/notifications/notification-preview';
-import { SAMPLE_LOG, SampleSend } from '../features/notifications/sample-log';
 import { TechIcon } from './tech-icon';
 
 const SEEN_KEY = 'lime.notifications.seen';
 
-interface Row extends SampleSend {
-  id: string;
+interface Row extends ApiNotificationLog {
   unread: boolean;
   when: string;
 }
@@ -14,14 +13,15 @@ interface Row extends SampleSend {
 /**
  * The bell, and what it drops down.
  *
- * A log of what this tool announced, not a page about notifications. Follows
- * the pattern every web tool has settled on — newest first, unread in bold,
- * relative times for recent entries and absolute ones for older, a count that
- * means "new since you last looked", and one place to clear it.
+ * A log of what this tool actually announced — read from the API, not from a
+ * fixture. Follows the pattern every web tool has settled on: newest first,
+ * unread in bold, relative times for recent entries and absolute ones for
+ * older, a count meaning "new since you last looked", and one place to clear
+ * it.
  *
- * The channel status stays in the header of the panel rather than a settings
- * screen: a drawer should not be the only place something important is said,
- * and "not connected" is important.
+ * The channel status stays pinned in the panel rather than a settings screen:
+ * a drawer should not be the only place something important is said, and
+ * "not connected" is important.
  */
 @Component({
   selector: 'lime-notification-menu',
@@ -56,7 +56,6 @@ interface Row extends SampleSend {
     </button>
 
     @if (open()) {
-      <!-- click anywhere else to dismiss -->
       <div class="fixed inset-0 z-30" (click)="open.set(false)" aria-hidden="true"></div>
 
       <div
@@ -68,29 +67,23 @@ interface Row extends SampleSend {
         <header class="flex items-center justify-between gap-3 border-b border-rule px-4 py-3">
           <h2 class="m-0 text-[14px] font-semibold">Notifications</h2>
           @if (unreadCount() > 0) {
-            <button
-              type="button"
-              class="text-[12px] text-accent-bright"
-              (click)="markAllRead()"
-            >
+            <button type="button" class="text-[12px] text-accent-bright" (click)="markAllRead()">
               Mark all read
             </button>
           }
         </header>
 
-        <!-- what the next run holds, and whether it can even send -->
+        <!-- real state, from /notifications/status -->
         <div class="border-b border-rule px-4 py-2.5 text-[12px]">
-          <p class="m-0 flex items-center gap-2 text-ink-soft">
+          <p class="m-0 flex items-center gap-2" [style.color]="health().colour">
             <span
               class="h-2 w-2 shrink-0 rounded-full"
-              style="background: var(--color-soon)"
+              [style.background]="health().colour"
               aria-hidden="true"
             ></span>
-            Teams not connected — nothing is being sent
+            {{ health().label }}
           </p>
-          <p class="m-0 mt-0.5 text-ink-faint">
-            {{ preview.pending().length }} would go out on the next run, 08:00 daily
-          </p>
+          <p class="m-0 mt-0.5 text-ink-faint">{{ health().detail }}</p>
         </div>
 
         <ol class="scroll-hidden m-0 max-h-[46vh] list-none overflow-y-auto p-0">
@@ -114,15 +107,12 @@ interface Row extends SampleSend {
               </span>
 
               <span class="min-w-0 flex-1">
-                <span
-                  class="block truncate text-[13px]"
-                  [class.font-semibold]="row.unread"
-                >
+                <span class="block truncate text-[13px]" [class.font-semibold]="row.unread">
                   {{ row.technology }} {{ row.cycle }}
                 </span>
                 <span class="block text-[12px] text-ink-soft">
                   {{ row.threshold === 0 ? 'End of life' : row.threshold + '-day notice' }}
-                  · {{ row.note }}
+                  · {{ row.recipient }}
                 </span>
                 @if (!row.success) {
                   <span class="mt-0.5 block text-[11.5px]" style="color: var(--color-overdue)">
@@ -137,19 +127,16 @@ interface Row extends SampleSend {
             </li>
           } @empty {
             <li class="px-4 py-8 text-center text-[13px] text-ink-soft">
-              Nothing has been sent yet.
+              Nothing has been announced yet.
             </li>
           }
         </ol>
-
-        <footer class="border-t border-rule px-4 py-2 text-[11px] text-ink-faint">
-          Sample history — delivery is not wired up yet.
-        </footer>
       </div>
     }
   `,
 })
 export class NotificationMenu {
+  private readonly api = inject(Api);
   protected readonly preview = inject(NotificationPreview);
 
   protected readonly open = signal(false);
@@ -158,11 +145,10 @@ export class NotificationMenu {
   protected readonly rows = computed<Row[]>(() =>
     // Newest first, which is what everyone expects and what makes the count
     // mean anything.
-    [...SAMPLE_LOG]
+    [...this.api.notificationLog()]
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
       .map((entry) => ({
         ...entry,
-        id: entry.at + entry.technology,
         unread: Date.parse(entry.at) > this.seenAt(),
         when: relative(entry.at),
       })),
@@ -177,8 +163,71 @@ export class NotificationMenu {
     this.rows().some((r) => r.unread && !r.success),
   );
 
+  /**
+   * Whether anything can actually get out, in the order that matters.
+   *
+   * A failed send is reported ahead of configuration, because a channel that
+   * was working and stopped is more urgent than one never set up.
+   */
+  protected readonly health = computed(() => {
+    const status = this.api.notificationStatus();
+    const pending = this.preview.pending().length;
+    const schedule = `${pending} due · runs 08:00 daily`;
+
+    if (!status) {
+      return {
+        colour: 'var(--color-ink-soft)',
+        label: 'Checking the channel…',
+        detail: schedule,
+      };
+    }
+
+    if (this.rows().some((r) => !r.success)) {
+      return {
+        colour: 'var(--color-overdue)',
+        label: 'Last send failed',
+        detail: 'The channel is configured but rejected it — see below.',
+      };
+    }
+
+    if (!status.configured) {
+      return {
+        colour: 'var(--color-soon)',
+        label: 'Teams not connected — nothing is being sent',
+        detail: schedule,
+      };
+    }
+
+    if (status.dryRun) {
+      return {
+        colour: 'var(--color-soon)',
+        label: 'Dry run — rendered but not sent',
+        detail: schedule,
+      };
+    }
+
+    if (!status.enabled) {
+      return {
+        colour: 'var(--color-soon)',
+        label: 'Scheduled sending is off',
+        detail: `Connected to ${status.channel}, but the daily run is disabled.`,
+      };
+    }
+
+    return {
+      colour: 'var(--color-good)',
+      label: `Connected · ${status.channel}`,
+      detail: schedule,
+    };
+  });
+
   protected toggle(): void {
     this.open.update((v) => !v);
+    // Reopened after a run, the panel should show it.
+    if (this.open()) {
+      this.api.notificationLogResource.reload();
+      this.api.notificationStatusResource.reload();
+    }
   }
 
   protected markAllRead(): void {

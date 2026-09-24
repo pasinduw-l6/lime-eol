@@ -113,6 +113,28 @@ export interface ApiUser {
   lastLoginAt: string | null;
 }
 
+/** Whether anything could actually be delivered. Never carries the webhook URL. */
+export interface ApiNotificationStatus {
+  enabled: boolean;
+  dryRun: boolean;
+  configured: boolean;
+  channel: string;
+  cron: string;
+}
+
+/** One send attempt, successful or not. */
+export interface ApiNotificationLog {
+  id: string;
+  at: string;
+  technology: string;
+  cycle: string;
+  threshold: number;
+  recipient: string;
+  channel: 'TEAMS' | 'EMAIL';
+  success: boolean;
+  error: string | null;
+}
+
 export interface ApiVerification {
   intact: boolean;
   entries: number;
@@ -283,6 +305,16 @@ export class Api {
 
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
   readonly usersResource = httpResource<ApiUser[]>(() => '/api/v1/users');
+
+  readonly notificationStatusResource = httpResource<ApiNotificationStatus>(
+    () => '/api/v1/notifications/status',
+  );
+  readonly notificationLogResource = httpResource<ApiNotificationLog[]>(
+    () => '/api/v1/notifications/log?limit=50',
+  );
+
+  readonly notificationStatus = computed(() => this.notificationStatusResource.value());
+  readonly notificationLog = computed(() => this.notificationLogResource.value() ?? []);
   readonly users = computed(() => this.usersResource.value() ?? []);
   readonly technologiesResource = httpResource<ApiTechnology[]>(
     () => '/api/v1/technologies',
