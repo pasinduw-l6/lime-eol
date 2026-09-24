@@ -135,6 +135,45 @@ export interface ApiNotificationLog {
   error: string | null;
 }
 
+/** One environment an action covers, with whether the estate agrees it moved. */
+export interface ApiActionEnvironment {
+  deploymentId: string;
+  project: string;
+  projectId: string | null;
+  environment: 'DEV' | 'UAT' | 'PROD';
+  completedAt: string | null;
+  /** A recorded change confirms this environment is on the new version. */
+  verified: boolean;
+}
+
+export interface ApiUpgradeAction {
+  id: string;
+  technology: string;
+  technologyCycleId: string;
+  cycle: string;
+  eolDate: string | null;
+  daysToEol: number | null;
+  targetVersion: string | null;
+  status: string;
+  /** Computed from progress and dates — OVERDUE and IN_PROGRESS are facts. */
+  derivedStatus: string;
+  plannedDate: string | null;
+  completedDate: string | null;
+  assignee: { id: string; name: string } | null;
+  team: { id: string; name: string } | null;
+  jiraKey: string | null;
+  customerComm: 'NOT_REQUIRED' | 'PENDING' | 'SENT' | 'ACKNOWLEDGED';
+  customerCommNotes: string | null;
+  remarks: string | null;
+  environments: ApiActionEnvironment[];
+  progress: { done: number; total: number };
+  /** Marked complete with no recorded change behind it. */
+  unverifiedCompletion: boolean;
+  /** The plan finishes after support ends. */
+  planTooLate: boolean;
+  createdAt: string;
+}
+
 export interface ApiVerification {
   intact: boolean;
   entries: number;
@@ -305,6 +344,34 @@ export class Api {
 
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
   readonly usersResource = httpResource<ApiUser[]>(() => '/api/v1/users');
+
+  // ---- upgrade actions ------------------------------------------------------
+
+  readonly actionsResource = httpResource<ApiUpgradeAction[]>(
+    () => '/api/v1/upgrade-actions',
+  );
+
+  readonly actions = computed(() => this.actionsResource.value() ?? []);
+
+  createAction(body: Record<string, unknown>) {
+    return this.http.post<ApiUpgradeAction>('/api/v1/upgrade-actions', body);
+  }
+
+  updateAction(id: string, body: Record<string, unknown>) {
+    return this.http.patch<ApiUpgradeAction>(`/api/v1/upgrade-actions/${id}`, body);
+  }
+
+  /** Marks one environment done; the action completes once all of them are. */
+  completeActionEnvironment(id: string, deploymentId: string) {
+    return this.http.post<ApiUpgradeAction>(
+      `/api/v1/upgrade-actions/${id}/environments/complete`,
+      { deploymentId },
+    );
+  }
+
+  deleteAction(id: string) {
+    return this.http.delete<void>(`/api/v1/upgrade-actions/${id}`);
+  }
 
   readonly notificationStatusResource = httpResource<ApiNotificationStatus>(
     () => '/api/v1/notifications/status',

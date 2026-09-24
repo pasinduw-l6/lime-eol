@@ -152,9 +152,35 @@ export class RegistryStore {
     })),
   );
 
+  /**
+   * Upgrade actions, from the API.
+   *
+   * The Plan screen owns the writes; this is the read every other screen uses
+   * — the Overview inbox to say whether a deadline has a plan, the Calendar to
+   * place it on the timeline.
+   */
+  private readonly _actions = linkedSignal<UpgradeAction[]>(() =>
+    this.api.actions().map((a) => ({
+      id: a.id,
+      technology: a.technology,
+      cycle: a.cycle,
+      targetVersion: a.targetVersion,
+      // The derived one: OVERDUE and IN_PROGRESS are facts about progress,
+      // not something anybody typed.
+      status: (a.derivedStatus === 'OVERDUE'
+        ? 'IN_PROGRESS'
+        : a.derivedStatus) as UpgradeAction['status'],
+      plannedDate: a.plannedDate,
+      completedDate: a.completedDate,
+      assignee: a.assignee?.name ?? null,
+      team: a.team?.name ?? null,
+      jiraKey: a.jiraKey,
+      deploymentIds: a.environments.map((e) => e.deploymentId),
+    })),
+  );
+
   // ---- client-only state (no API yet) --------------------------------------
 
-  private readonly _actions = signal<UpgradeAction[]>([]);
   private readonly _revisions = signal<Revision[]>([]);
   private readonly _topologies = signal<EnvTopology[]>([]);
 
