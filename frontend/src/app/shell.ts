@@ -5,6 +5,7 @@ import { RegistryStore } from './core/registry.store';
 import { SessionStore } from './core/session';
 import { Theme } from './core/theme';
 import { Celebrate } from './shared/celebrate';
+import { NotificationMenu } from './shared/notification-menu';
 import { ShaderBackground } from './shared/shader-background';
 
 /**
@@ -19,7 +20,7 @@ import { ShaderBackground } from './shared/shader-background';
  */
 @Component({
   selector: 'lime-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Celebrate, ShaderBackground],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Celebrate, ShaderBackground, NotificationMenu],
   host: { class: 'block min-h-screen' },
   template: `
     <!-- Deferred until the browser is idle: this is decoration, and OGL should
@@ -123,6 +124,8 @@ import { ShaderBackground } from './shared/shader-background';
             </a>
           }
         </nav>
+
+        <lime-notification-menu />
 
         <!-- light / dark -->
         <button
