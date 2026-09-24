@@ -532,6 +532,9 @@ model UpgradeAction {
 model UpgradeActionDeployment {
   upgradeActionId String @map("upgrade_action_id") @db.Uuid
   deploymentId    String @map("deployment_id") @db.Uuid
+  /// Set when this environment is done. A rollout runs DEV, then UAT, then
+  /// PROD over weeks, and one status across all three hides which is left.
+  completedAt     DateTime? @map("completed_at") @db.Date
 
   upgradeAction UpgradeAction @relation(fields: [upgradeActionId], references: [id], onDelete: Cascade)
   deployment    Deployment    @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
