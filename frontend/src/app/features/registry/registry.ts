@@ -298,7 +298,7 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
                 Loading the catalogue…
               </p>
             } @else {
-              <ul class="m-0 grid max-h-[46vh] list-none gap-1 overflow-y-auto p-0">
+              <ul class="scroll-hidden m-0 grid max-h-[46vh] list-none gap-1 overflow-y-auto p-0">
                 @for (product of matches(); track product.slug) {
                   <li>
                     <button

@@ -27,7 +27,7 @@ import gsap from 'gsap';
     >
       <div
         #panel
-        class="card relative w-full max-w-[min(620px,100%)] px-7 py-6"
+        class="card popover relative w-full max-w-[min(620px,100%)] px-7 py-6"
         role="dialog"
         aria-modal="true"
         [attr.aria-label]="title()"

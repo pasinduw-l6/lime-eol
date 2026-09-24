@@ -60,7 +60,7 @@ interface Row extends SampleSend {
       <div class="fixed inset-0 z-30" (click)="open.set(false)" aria-hidden="true"></div>
 
       <div
-        class="card absolute top-[46px] right-0 z-40 w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden p-0 shadow-2xl"
+        class="card popover absolute top-[46px] right-0 z-40 w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden p-0 shadow-2xl"
         role="region"
         aria-label="Notifications"
         (keydown.escape)="open.set(false)"
@@ -93,7 +93,7 @@ interface Row extends SampleSend {
           </p>
         </div>
 
-        <ol class="m-0 max-h-[46vh] list-none overflow-y-auto p-0">
+        <ol class="scroll-hidden m-0 max-h-[46vh] list-none overflow-y-auto p-0">
           @for (row of rows(); track row.id) {
             <li
               class="flex gap-3 border-b border-rule px-4 py-3 last:border-b-0"

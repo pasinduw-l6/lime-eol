@@ -59,7 +59,7 @@ import { ShaderBackground } from './shared/shader-background';
 
           @if (open()) {
             <div
-              class="card absolute top-[46px] left-0 z-20 w-[320px] p-3 shadow-2xl"
+              class="card popover absolute top-[46px] left-0 z-20 w-[320px] p-3 shadow-2xl"
               role="listbox"
               (keydown.escape)="open.set(false)"
             >
@@ -70,7 +70,7 @@ import { ShaderBackground } from './shared/shader-background';
                 aria-label="Find a project"
                 class="mb-2 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[13px] text-ink"
               />
-              <div class="max-h-[320px] overflow-y-auto">
+              <div class="scroll-hidden max-h-[320px] overflow-y-auto">
                 <button
                   type="button"
                   role="option"

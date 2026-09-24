@@ -237,7 +237,7 @@ function blank(): Omit<UpgradeAction, 'id'> & { id?: string } {
 
           <fieldset class="m-0 border-0 p-0">
             <legend class="mb-2 p-0 text-[12px] text-ink-soft">Environments affected</legend>
-            <div class="flex max-h-[150px] flex-wrap gap-2 overflow-y-auto">
+            <div class="scroll-hidden flex max-h-[150px] flex-wrap gap-2 overflow-y-auto">
               @for (d of deployments(); track d.id) {
                 <button
                   type="button"

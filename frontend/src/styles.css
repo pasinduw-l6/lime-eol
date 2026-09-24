@@ -233,6 +233,41 @@ body {
     0 10px 24px -14px rgb(13 36 48 / 22%);
 }
 
+/* Overlay panels are opaque, not glass.
+
+   Translucency works over the shader, which is a soft gradient with nothing to
+   read. Over live content it is just unreadable — the text behind shows
+   through the text in front. There are only ever one or two of these on screen,
+   so unlike cards they can afford a real backdrop blur, which is what keeps
+   them feeling like the same material. */
+.popover {
+  background: color-mix(in oklab, var(--color-surface) 97%, transparent);
+  backdrop-filter: saturate(160%) blur(20px);
+}
+
+:root[data-theme='light'] .popover {
+  background: color-mix(in oklab, var(--color-surface) 98%, transparent);
+}
+
+/* No diagonal glare on an overlay: it lands across the content rather than an
+   empty pane, which is exactly what made the small buttons wash out. */
+.popover::after {
+  content: none;
+}
+
+/* Scrolls, without the bar. The content is obviously a list and the panel is
+   obviously cut off, so the bar only adds a rail through the layout. */
+.scroll-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scroll-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 /* The sheen below needs a positioned ancestor — but only where the card is not
    already positioned by a utility. This file is unlayered, so it outranks
    Tailwind: a blanket `position: relative` beat `.absolute` on the project
