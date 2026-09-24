@@ -319,8 +319,14 @@ body {
 }
 
 /* A card sitting inside another must not stack two translucent layers into
-   something opaque — it gets the faintest fill and leans on its border. */
-.card .card {
+   something opaque — it gets the faintest fill and leans on its border.
+
+   Overlays are excluded. The notification dropdown and the project switcher
+   are cards rendered inside the header, which is itself a card, so this rule
+   matched them and forced them to 34% — the exact opposite of what a panel
+   laid over live content needs. It also outranked .popover, which is why
+   raising that rule's opacity changed nothing. */
+.card .card:not(.popover) {
   background: color-mix(in oklab, var(--color-elevated) 34%, transparent);
 }
 
