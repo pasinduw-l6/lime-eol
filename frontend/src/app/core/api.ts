@@ -402,6 +402,7 @@ export class Api {
     this.projectsResource.reload();
     this.technologiesResource.reload();
     this.usersResource.reload();
+    this.actionsResource.reload();
     // The catalogue's "already registered" marks go stale on every add.
     this.catalogueResource.reload();
   }
