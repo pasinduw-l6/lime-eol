@@ -120,13 +120,11 @@ export class NotificationPreview {
           },
           {
             title: 'Plan',
-            value: action
-              ? `${action.jiraKey ?? 'no ticket'} · ${action.assignee ?? 'unassigned'}`
-              : 'None',
+            value: action?.assignee ?? 'None',
           },
         ],
         mention: this.mentionFor(project, action?.assignee ?? null),
-        actions: this.actionsFor(entry.cycle.technology, entry.cycle.cycle, action?.jiraKey),
+        actions: this.actionsFor(entry.cycle.technology, entry.cycle.cycle),
       });
     }
 
@@ -194,23 +192,14 @@ export class NotificationPreview {
     return [...versions].join(', ') || '—';
   }
 
-  private actionsFor(technology: string, cycle: string, jiraKey?: string | null) {
-    const actions = [
+  private actionsFor(technology: string, cycle: string) {
+    // One action. Ticket links arrive when Jira does.
+    return [
       {
-        title: jiraKey ? 'Update the plan' : 'Plan the upgrade',
+        title: 'Plan the upgrade',
         url: `${location.origin}/plan?technology=${encodeURIComponent(technology)}&cycle=${encodeURIComponent(cycle)}`,
       },
     ];
-
-    if (jiraKey) {
-      // Needs JIRA_BASE_URL once it exists; shown here so the card is complete.
-      actions.unshift({
-        title: `Open ${jiraKey}`,
-        url: `https://jira.example.com/browse/${jiraKey}`,
-      });
-    }
-
-    return actions;
   }
 
   /** The exact Adaptive Card body a run would POST. */

@@ -4,6 +4,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { EolSyncModule } from './modules/eol-sync/eol-sync.module';
 import { HealthModule } from './modules/health/health.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TechnologiesModule } from './modules/technologies/technologies.module';
 import { UsersModule } from './modules/users/users.module';
@@ -24,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
     TechnologiesModule,
     DeploymentsModule,
     UsersModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

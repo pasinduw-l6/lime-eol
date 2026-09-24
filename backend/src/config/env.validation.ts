@@ -39,12 +39,20 @@ export const envSchema = z
     // ---- Notifications ----
     NOTIFY_CRON: z.string().default('0 8 * * *'),
     NOTIFY_ENABLED: booleanish.default(false),
+    /// Renders and records what would be sent, without making the request.
+    NOTIFY_DRY_RUN: booleanish.default(true),
+    /// Power Automate trigger URL. Carries a sig= credential.
+    TEAMS_WEBHOOK_URL: z.string().url().optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().optional(),
     SMTP_USER: z.string().optional(),
     SMTP_PASS: z.string().optional(),
     MAIL_FROM: z.string().optional(),
   })
+  .refine(
+    (env) => !env.NOTIFY_ENABLED || env.NOTIFY_DRY_RUN || !!env.TEAMS_WEBHOOK_URL,
+    'TEAMS_WEBHOOK_URL is required when NOTIFY_ENABLED=true and NOTIFY_DRY_RUN=false',
+  )
   // The app must refuse to start with AUTH_MODE=dev in production (PLAN section 5).
   .refine(
     (env) => !(env.NODE_ENV === 'production' && env.AUTH_MODE === 'dev'),
