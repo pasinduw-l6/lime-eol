@@ -24,7 +24,13 @@ import {
 } from './dto/upgrade-action.dto';
 import { UpgradeActionsService } from './upgrade-actions.service';
 import { ActionStepsService } from './action-steps.service';
-import { CreateStepDto, ReorderStepsDto, UpdateStepDto } from './dto/step.dto';
+import {
+  BlockStepDto,
+  CreateStepDto,
+  LogTimeDto,
+  ReorderStepsDto,
+  UpdateStepDto,
+} from './dto/step.dto';
 
 @ApiTags('upgrade-actions')
 @Controller('upgrade-actions')
@@ -115,12 +121,42 @@ export class UpgradeActionsController {
 
   @Post(':id/steps/:stepId/start')
   @ApiOperation({
-    summary: 'Start the clock on a step',
+    summary: 'Start the clock on a stretch of work',
     description:
-      'Only one step runs at a time — a list worked through one by one cannot have two things in progress, and allowing it would make every recorded duration meaningless.',
+      'Effort accumulates across stretches, because an upgrade is picked up and put down over weeks. Several steps may run at once — refusing that would only teach people to leave the clock off.',
   })
   startStep(@Param('id') id: string, @Param('stepId') stepId: string) {
     return this.steps.start(id, stepId);
+  }
+
+  @Post(':id/steps/:stepId/pause')
+  @ApiOperation({ summary: 'Stop the clock and bank what that stretch took' })
+  pauseStep(@Param('id') id: string, @Param('stepId') stepId: string) {
+    return this.steps.pause(id, stepId);
+  }
+
+  @Post(':id/steps/:stepId/time')
+  @ApiOperation({ summary: 'Log effort that happened away from the clock' })
+  logStepTime(
+    @Param('id') id: string,
+    @Param('stepId') stepId: string,
+    @Body() body: LogTimeDto,
+  ) {
+    return this.steps.logTime(id, stepId, body);
+  }
+
+  @Post(':id/steps/:stepId/block')
+  @ApiOperation({
+    summary: 'Mark a step as waiting on something outside the team',
+    description:
+      'Distinct from not started: work nobody can proceed with is a different problem from work nobody has picked up.',
+  })
+  blockStep(
+    @Param('id') id: string,
+    @Param('stepId') stepId: string,
+    @Body() body: BlockStepDto,
+  ) {
+    return this.steps.block(id, stepId, body.reason);
   }
 
   @Post(':id/steps/:stepId/complete')

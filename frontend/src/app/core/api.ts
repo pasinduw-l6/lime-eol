@@ -178,17 +178,24 @@ export interface ApiUpgradeAction {
 export interface ApiActionStep {
   id: string;
   title: string;
+  description: string | null;
   position: number;
-  /** What it was expected to take, in minutes. */
+  status: 'TODO' | 'IN_PROGRESS' | 'BLOCKED' | 'DONE';
+  /** Expected effort in minutes, entered in whatever unit suited. */
   estimateMinutes: number | null;
+  /** Effort accumulated across every stretch of work, not calendar time. */
+  spentMinutes: number;
+  overEstimate: boolean;
   startedAt: string | null;
+  /** The clock is running on this step right now. */
+  running: boolean;
+  dueDate: string | null;
+  overdue: boolean;
+  assignee: { id: string; name: string } | null;
+  blockedReason: string | null;
   completedAt: string | null;
   completedBy: string | null;
-  note: string | null;
-  /** Measured from start to completion — never typed in. */
-  actualMinutes: number | null;
-  inProgress: boolean;
-  /** The one to pick up next. */
+  /** The first thing not yet done — where someone picks up. */
   isNext: boolean;
 }
 
@@ -397,10 +404,41 @@ export class Api {
     return this.http.get<ApiActionStep[]>(`/api/v1/upgrade-actions/${id}/steps`);
   }
 
-  addActionStep(id: string, body: { title: string; estimateMinutes?: number }) {
+  addActionStep(
+    id: string,
+    body: {
+      title: string;
+      description?: string;
+      estimateMinutes?: number;
+      dueDate?: string;
+      assigneeId?: string;
+    },
+  ) {
     return this.http.post<ApiActionStep[]>(
       `/api/v1/upgrade-actions/${id}/steps`,
       body,
+    );
+  }
+
+  pauseActionStep(id: string, stepId: string) {
+    return this.http.post<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}/pause`,
+      {},
+    );
+  }
+
+  /** Effort done away from the clock — a day of work logged after the fact. */
+  logActionStepTime(id: string, stepId: string, minutes: number) {
+    return this.http.post<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}/time`,
+      { minutes },
+    );
+  }
+
+  blockActionStep(id: string, stepId: string, reason: string) {
+    return this.http.post<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}/block`,
+      { reason },
     );
   }
 

@@ -75,6 +75,16 @@ enum ActionStatus {
   DEFERRED
 }
 
+/// Where a to-do item stands. Blocked is deliberately separate from not
+/// started: work nobody can proceed with is a different problem from work
+/// nobody has picked up, and only one of them needs chasing.
+enum StepStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+}
+
 enum CommStatus {
   NOT_REQUIRED
   PENDING
@@ -476,7 +486,8 @@ model AppUser {
   teams           TeamMember[]
   projects        ProjectEngineer[]
   assignedActions UpgradeAction[]
-  completedSteps  UpgradeActionStep[]
+  completedSteps  UpgradeActionStep[] @relation("StepCompletedBy")
+  assignedSteps   UpgradeActionStep[] @relation("StepAssignee")
   recordedChanges ComponentChange[]
   auditLogs       AuditLog[]
 
@@ -537,24 +548,37 @@ model UpgradeAction {
 /// typed: startedAt and completedAt give the real duration, which is the only
 /// honest basis for estimating the next upgrade of the same thing.
 model UpgradeActionStep {
-  id              String    @id @default(uuid(7)) @db.Uuid
-  upgradeActionId String    @map("upgrade_action_id") @db.Uuid
+  id              String     @id @default(uuid(7)) @db.Uuid
+  upgradeActionId String     @map("upgrade_action_id") @db.Uuid
   title           String
+  description     String?
   /// Position in the list. Gaps are fine; only the order matters.
   position        Int
-  /// What it was expected to take, in minutes. Null when nobody estimated.
-  estimateMinutes Int?      @map("estimate_minutes")
-  startedAt       DateTime? @map("started_at") @db.Timestamptz(3)
-  completedAt     DateTime? @map("completed_at") @db.Timestamptz(3)
-  completedById   String?   @map("completed_by_id") @db.Uuid
-  note            String?
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  status          StepStatus @default(TODO)
+  /// Expected effort, normalised to minutes. The interface offers minutes,
+  /// hours, days and weeks, because a platform upgrade is measured in weeks
+  /// and storing two units invites them to disagree.
+  estimateMinutes Int?       @map("estimate_minutes")
+  /// Effort accumulated across every stretch of work. Long jobs are picked up
+  /// and put down over weeks, so a single start-to-finish span would measure
+  /// the calendar rather than the work.
+  spentMinutes    Int        @default(0) @map("spent_minutes")
+  /// When the current stretch began. Null whenever the clock is not running.
+  startedAt       DateTime?  @map("started_at") @db.Timestamptz(3)
+  dueDate         DateTime?  @map("due_date") @db.Date
+  assigneeId      String?    @map("assignee_id") @db.Uuid
+  blockedReason   String?    @map("blocked_reason")
+  completedAt     DateTime?  @map("completed_at") @db.Timestamptz(3)
+  completedById   String?    @map("completed_by_id") @db.Uuid
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   upgradeAction UpgradeAction @relation(fields: [upgradeActionId], references: [id], onDelete: Cascade)
-  completedBy   AppUser?      @relation(fields: [completedById], references: [id], onDelete: SetNull)
+  completedBy   AppUser?      @relation("StepCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  assignee      AppUser?      @relation("StepAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
   @@index([upgradeActionId, position])
+  @@index([assigneeId])
   @@map("upgrade_action_step")
 }
 
