@@ -13,6 +13,7 @@ import { Api, ApiUpgradeAction } from '../../core/api';
 import { formatDate, formatDays, statusFill, SupportStatus } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
+import { ActionChecklist } from '../../shared/action-checklist';
 import { TechIcon } from '../../shared/tech-icon';
 
 const STATUSES = ['NOT_STARTED', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED'];
@@ -39,7 +40,7 @@ interface Draft {
  */
 @Component({
   selector: 'lime-actions',
-  imports: [FormsModule, Modal, TechIcon],
+  imports: [FormsModule, Modal, TechIcon, ActionChecklist],
   host: { class: 'block' },
   template: `
     <section class="card mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
@@ -193,6 +194,7 @@ interface Draft {
             }
           </div>
 
+          <lime-action-checklist [actionId]="action.id" />
         </article>
       } @empty {
         <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">

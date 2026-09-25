@@ -174,6 +174,24 @@ export interface ApiUpgradeAction {
   createdAt: string;
 }
 
+/** One item on an upgrade's to-do list. */
+export interface ApiActionStep {
+  id: string;
+  title: string;
+  position: number;
+  /** What it was expected to take, in minutes. */
+  estimateMinutes: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  note: string | null;
+  /** Measured from start to completion — never typed in. */
+  actualMinutes: number | null;
+  inProgress: boolean;
+  /** The one to pick up next. */
+  isNext: boolean;
+}
+
 export interface ApiVerification {
   intact: boolean;
   entries: number;
@@ -371,6 +389,46 @@ export class Api {
 
   deleteAction(id: string) {
     return this.http.delete<void>(`/api/v1/upgrade-actions/${id}`);
+  }
+
+  // Every step call returns the whole list back, so the caller never has to
+  // merge one changed row into what it already had.
+  actionSteps(id: string) {
+    return this.http.get<ApiActionStep[]>(`/api/v1/upgrade-actions/${id}/steps`);
+  }
+
+  addActionStep(id: string, body: { title: string; estimateMinutes?: number }) {
+    return this.http.post<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps`,
+      body,
+    );
+  }
+
+  startActionStep(id: string, stepId: string) {
+    return this.http.post<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}/start`,
+      {},
+    );
+  }
+
+  completeActionStep(id: string, stepId: string) {
+    return this.http.post<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}/complete`,
+      {},
+    );
+  }
+
+  reopenActionStep(id: string, stepId: string) {
+    return this.http.post<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}/reopen`,
+      {},
+    );
+  }
+
+  removeActionStep(id: string, stepId: string) {
+    return this.http.delete<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}`,
+    );
   }
 
   readonly notificationStatusResource = httpResource<ApiNotificationStatus>(
