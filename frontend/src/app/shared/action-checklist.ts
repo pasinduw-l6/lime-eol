@@ -3,14 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { Api, ApiActionStep } from '../core/api';
 import { RegistryStore } from '../core/registry.store';
 
-/** Units for logging effort. Stored as minutes, entered in whatever suits. */
-const UNITS = [
-  { key: 'm', label: 'minutes', minutes: 1 },
-  { key: 'h', label: 'hours', minutes: 60 },
-  { key: 'd', label: 'days', minutes: 60 * 8 },
-  { key: 'w', label: 'weeks', minutes: 60 * 8 * 5 },
-];
-
 /**
  * The to-do list on an upgrade, as a timeline.
  *
@@ -35,9 +27,6 @@ const UNITS = [
             {{ doneCount() }}/{{ steps().length }} done
             @if (spent() > 0) {
               · {{ effort(spent()) }} spent
-            }
-            @if (blockedCount() > 0) {
-              · <span class="text-overdue">{{ blockedCount() }} blocked</span>
             }
           </span>
         }
@@ -114,12 +103,6 @@ const UNITS = [
                 }
               </span>
 
-              @if (step.status === 'BLOCKED' && step.blockedReason) {
-                <span class="mt-0.5 block text-[11.5px]" style="color: var(--color-overdue)">
-                  Blocked — {{ step.blockedReason }}
-                </span>
-              }
-
               @if (step.description) {
                 <span class="mt-0.5 block text-[11.5px] text-ink-faint">
                   {{ step.description }}
@@ -127,29 +110,19 @@ const UNITS = [
               }
             </span>
 
-            <span class="flex shrink-0 flex-wrap justify-end gap-2 pt-0.5 text-[11.5px]">
+            <span class="flex shrink-0 items-center gap-2 pt-0.5 text-[11.5px]">
               @if (step.status === 'DONE') {
                 <button type="button" class="text-ink-faint hover:text-ink" (click)="reopen(step)">
                   Reopen
                 </button>
               } @else {
-                @if (step.running) {
-                  <button type="button" class="text-ink-soft hover:text-ink" (click)="pause(step)">
-                    Pause
-                  </button>
-                } @else {
+                @if (!step.running) {
                   <button type="button" class="text-accent-bright" (click)="start(step)">
-                    Start
+                    In progress
                   </button>
                 }
                 <button type="button" class="text-accent-bright" (click)="complete(step)">
                   Done
-                </button>
-                <button type="button" class="text-ink-faint hover:text-ink" (click)="openBlock(step)">
-                  {{ step.status === 'BLOCKED' ? 'Unblock' : 'Block' }}
-                </button>
-                <button type="button" class="text-ink-faint hover:text-ink" (click)="openLog(step)">
-                  Log
                 </button>
                 <button type="button" class="text-ink-faint hover:text-overdue" (click)="remove(step)">
                   ✕
@@ -159,40 +132,6 @@ const UNITS = [
           </li>
         }
       </ol>
-
-      <!-- blocking, and logging effort done away from the clock -->
-      @if (blocking(); as step) {
-        <form class="mt-2 flex flex-wrap gap-2" (submit)="saveBlock($event, step)">
-          <input
-            class="input mt-0 min-w-[220px] flex-1"
-            [(ngModel)]="blockReason"
-            name="blockreason"
-            placeholder="What is it waiting on?"
-          />
-          <button type="submit" class="btn">Block</button>
-          <button type="button" class="btn" (click)="blocking.set(null)">Cancel</button>
-        </form>
-      }
-
-      @if (logging(); as step) {
-        <form class="mt-2 flex flex-wrap items-center gap-2" (submit)="saveLog($event, step)">
-          <span class="text-[12px] text-ink-soft">Add effort to “{{ step.title }}”</span>
-          <input
-            class="input tabular mt-0 w-[90px]"
-            type="number"
-            [(ngModel)]="logAmount"
-            name="logamount"
-            placeholder="0"
-          />
-          <select class="input mt-0 w-[120px]" [(ngModel)]="logUnit" name="logunit">
-            @for (u of units; track u.key) {
-              <option [value]="u.key">{{ u.label }}</option>
-            }
-          </select>
-          <button type="submit" class="btn">Log</button>
-          <button type="button" class="btn" (click)="logging.set(null)">Cancel</button>
-        </form>
-      }
 
       @if (error()) {
         <p class="m-0 mt-2 text-[12px] text-overdue" role="alert">{{ error() }}</p>
@@ -252,7 +191,6 @@ export class ActionChecklist {
   readonly actionId = input.required<string>();
 
   protected readonly threadX = 67;
-  protected readonly units = UNITS;
   protected readonly engineers = this.store.engineers;
 
   protected readonly steps = signal<ApiActionStep[]>([]);
@@ -263,18 +201,9 @@ export class ActionChecklist {
   protected readonly dueDate = signal('');
   protected readonly assigneeId = signal('');
 
-  protected readonly blocking = signal<ApiActionStep | null>(null);
-  protected readonly blockReason = signal('');
-  protected readonly logging = signal<ApiActionStep | null>(null);
-  protected readonly logAmount = signal<number | null>(null);
-  protected readonly logUnit = signal('h');
 
   protected readonly doneCount = computed(
     () => this.steps().filter((s) => s.status === 'DONE').length,
-  );
-
-  protected readonly blockedCount = computed(
-    () => this.steps().filter((s) => s.status === 'BLOCKED').length,
   );
 
   /** Effort recorded so far, across every stretch of work. */
@@ -292,9 +221,6 @@ export class ActionChecklist {
     });
   }
 
-  private toMinutes(amount: number, unit: string): number {
-    return Math.max(1, Math.round(amount * (UNITS.find((u) => u.key === unit)?.minutes ?? 1)));
-  }
 
   protected add(event: Event): void {
     event.preventDefault();
@@ -331,11 +257,6 @@ export class ActionChecklist {
     });
   }
 
-  protected pause(step: ApiActionStep): void {
-    this.api.pauseActionStep(this.actionId(), step.id).subscribe({
-      next: (steps) => this.steps.set(steps),
-    });
-  }
 
   protected complete(step: ApiActionStep): void {
     this.api.completeActionStep(this.actionId(), step.id).subscribe({
@@ -355,63 +276,14 @@ export class ActionChecklist {
     });
   }
 
-  protected openBlock(step: ApiActionStep): void {
-    // Already blocked, the button clears it rather than asking again.
-    if (step.status === 'BLOCKED') {
-      this.api.pauseActionStep(this.actionId(), step.id).subscribe({
-        next: (steps) => this.steps.set(steps),
-      });
-      return;
-    }
-    this.blockReason.set('');
-    this.logging.set(null);
-    this.blocking.set(step);
-  }
 
-  protected saveBlock(event: Event, step: ApiActionStep): void {
-    event.preventDefault();
-    const reason = this.blockReason().trim();
-    if (!reason) {
-      return;
-    }
 
-    this.api.blockActionStep(this.actionId(), step.id, reason).subscribe({
-      next: (steps) => {
-        this.steps.set(steps);
-        this.blocking.set(null);
-      },
-    });
-  }
 
-  protected openLog(step: ApiActionStep): void {
-    this.logAmount.set(null);
-    this.blocking.set(null);
-    this.logging.set(step);
-  }
-
-  protected saveLog(event: Event, step: ApiActionStep): void {
-    event.preventDefault();
-    const amount = this.logAmount();
-    if (!amount) {
-      return;
-    }
-
-    this.api
-      .logActionStepTime(this.actionId(), step.id, this.toMinutes(amount, this.logUnit()))
-      .subscribe({
-        next: (steps) => {
-          this.steps.set(steps);
-          this.logging.set(null);
-        },
-      });
-  }
 
   protected dotColour(step: ApiActionStep): string {
     switch (step.status) {
       case 'DONE':
         return 'var(--color-good)';
-      case 'BLOCKED':
-        return 'var(--color-overdue)';
       case 'IN_PROGRESS':
         return 'var(--color-accent-bright)';
       default:
