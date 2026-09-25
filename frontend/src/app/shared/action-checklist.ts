@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Api, ApiActionStep } from '../core/api';
 import { RegistryStore } from '../core/registry.store';
 
-/** Entry units. Stored as minutes; a platform upgrade is measured in days. */
+/** Units for logging effort. Stored as minutes, entered in whatever suits. */
 const UNITS = [
   { key: 'm', label: 'minutes', minutes: 1 },
   { key: 'h', label: 'hours', minutes: 60 },
@@ -18,8 +18,9 @@ const UNITS = [
  * line, with state carried by the dot before any text is read.
  *
  * Sized for real upgrade work rather than an afternoon's tasks — effort
- * accumulates across many stretches, estimates are entered in days or weeks,
- * and a step waiting on someone else is distinct from one nobody has picked up.
+ * accumulates across many stretches rather than one span, a finish date is
+ * picked off a calendar rather than added up from a duration, and a step
+ * waiting on someone else is distinct from one nobody has picked up.
  */
 @Component({
   selector: 'lime-action-checklist',
@@ -34,9 +35,6 @@ const UNITS = [
             {{ doneCount() }}/{{ steps().length }} done
             @if (spent() > 0) {
               · {{ effort(spent()) }} spent
-            }
-            @if (estimatedLeft() > 0) {
-              · {{ effort(estimatedLeft()) }} left
             }
             @if (blockedCount() > 0) {
               · <span class="text-overdue">{{ blockedCount() }} blocked</span>
@@ -60,14 +58,10 @@ const UNITS = [
             class="step-item relative flex items-start gap-3 py-2.5"
             [style.animation-delay.ms]="$index * 40"
           >
-            <!-- effort: what it has taken, or what it should -->
+            <!-- effort recorded against this step -->
             <span class="tabular w-[62px] shrink-0 pt-0.5 text-right text-[12px]">
               @if (step.spentMinutes > 0) {
-                <span [style.color]="step.overEstimate ? 'var(--color-soon)' : 'var(--color-ink)'">
-                  {{ effort(step.spentMinutes) }}
-                </span>
-              } @else if (step.estimateMinutes) {
-                <span class="text-ink-soft">~{{ effort(step.estimateMinutes) }}</span>
+                {{ effort(step.spentMinutes) }}
               } @else {
                 <span class="text-ink-faint">—</span>
               }
@@ -101,9 +95,6 @@ const UNITS = [
                   {{ when(step.completedAt!) }}
                   @if (step.completedBy) {
                     · by {{ step.completedBy }}
-                  }
-                  @if (step.estimateMinutes) {
-                    · estimated {{ effort(step.estimateMinutes) }}
                   }
                 } @else {
                   @if (step.assignee) {
@@ -207,58 +198,33 @@ const UNITS = [
         <p class="m-0 mt-2 text-[12px] text-overdue" role="alert">{{ error() }}</p>
       }
 
-      <!-- add a step -->
-      <form class="mt-3 grid gap-2" (submit)="add($event)">
-        <div class="flex flex-wrap gap-2">
-          <input
-            class="input mt-0 min-w-[200px] flex-1"
-            [(ngModel)]="title"
-            name="steptitle"
-            placeholder="Add a step"
-          />
-          <input
-            class="input tabular mt-0 w-[80px]"
-            type="number"
-            min="1"
-            [(ngModel)]="estimate"
-            name="stepestimate"
-            placeholder="0"
-            aria-label="Estimate"
-          />
-          <select class="input mt-0 w-[110px]" [(ngModel)]="estimateUnit" name="stepunit">
-            @for (u of units; track u.key) {
-              <option [value]="u.key">{{ u.label }}</option>
-            }
-          </select>
-          <button type="button" class="btn" (click)="detailed.set(!detailed())">
-            {{ detailed() ? 'Less' : 'More' }}
-          </button>
-          <button type="submit" class="btn btn-primary" [disabled]="busy()">Add</button>
-        </div>
-
-        @if (detailed()) {
-          <div class="flex flex-wrap gap-2">
-            <select class="input mt-0 w-[190px]" [(ngModel)]="assigneeId" name="stepassignee">
-              <option value="">Unassigned</option>
-              @for (e of engineers(); track e.id) {
-                <option [value]="e.id">{{ e.name }}</option>
-              }
-            </select>
-            <input
-              class="input mt-0 w-[170px]"
-              type="date"
-              [(ngModel)]="dueDate"
-              name="stepdue"
-              aria-label="Due date"
-            />
-            <input
-              class="input mt-0 min-w-[200px] flex-1"
-              [(ngModel)]="description"
-              name="stepdesc"
-              placeholder="Notes for whoever picks it up"
-            />
-          </div>
-        }
+      <!-- add a step: one row, columns sized to what each part needs -->
+      <form
+        class="mt-3 grid items-center gap-2"
+        style="grid-template-columns: minmax(0, 1fr) 150px 150px auto"
+        (submit)="add($event)"
+      >
+        <input
+          class="input mt-0"
+          [(ngModel)]="title"
+          name="steptitle"
+          placeholder="Add a step"
+        />
+        <select class="input mt-0" [(ngModel)]="assigneeId" name="stepassignee">
+          <option value="">Unassigned</option>
+          @for (e of engineers(); track e.id) {
+            <option [value]="e.id">{{ e.name }}</option>
+          }
+        </select>
+        <input
+          class="input mt-0"
+          type="date"
+          [(ngModel)]="dueDate"
+          name="stepdue"
+          aria-label="Finish by"
+          title="Finish by"
+        />
+        <button type="submit" class="btn btn-primary" [disabled]="busy()">Add</button>
       </form>
     </div>
   `,
@@ -294,12 +260,8 @@ export class ActionChecklist {
   protected readonly busy = signal(false);
 
   protected readonly title = signal('');
-  protected readonly description = signal('');
-  protected readonly estimate = signal<number | null>(null);
-  protected readonly estimateUnit = signal('h');
   protected readonly dueDate = signal('');
   protected readonly assigneeId = signal('');
-  protected readonly detailed = signal(false);
 
   protected readonly blocking = signal<ApiActionStep | null>(null);
   protected readonly blockReason = signal('');
@@ -318,12 +280,6 @@ export class ActionChecklist {
   /** Effort recorded so far, across every stretch of work. */
   protected readonly spent = computed(() =>
     this.steps().reduce((total, s) => total + s.spentMinutes, 0),
-  );
-
-  protected readonly estimatedLeft = computed(() =>
-    this.steps()
-      .filter((s) => s.status !== 'DONE')
-      .reduce((total, s) => total + (s.estimateMinutes ?? 0), 0),
   );
 
   constructor() {
@@ -347,14 +303,10 @@ export class ActionChecklist {
       return;
     }
 
-    const amount = this.estimate();
-
     this.busy.set(true);
     this.api
       .addActionStep(this.actionId(), {
         title,
-        description: this.description().trim() || undefined,
-        estimateMinutes: amount ? this.toMinutes(amount, this.estimateUnit()) : undefined,
         dueDate: this.dueDate() || undefined,
         assigneeId: this.assigneeId() || undefined,
       })
@@ -362,8 +314,6 @@ export class ActionChecklist {
         next: (steps) => {
           this.steps.set(steps);
           this.title.set('');
-          this.description.set('');
-          this.estimate.set(null);
           this.dueDate.set('');
           this.assigneeId.set('');
           this.busy.set(false);
