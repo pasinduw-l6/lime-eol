@@ -34,11 +34,19 @@ export const envSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
     // ---- Auth ----
-    AUTH_MODE: z.enum(['dev', 'entra']).default('dev'),
+    /// dev  = email and password issued by this API (local work only)
+    /// entra = Microsoft, with the URLs derived from the tenant id
+    /// oidc  = any other provider, e.g. Keycloak, via explicit URLs
+    AUTH_MODE: z.enum(['dev', 'entra', 'oidc']).default('dev'),
     DEV_JWT_SECRET: z.string().optional(),
-    ENTRA_TENANT_ID: z.string().optional(),
-    ENTRA_API_CLIENT_ID: z.string().optional(),
-    ENTRA_AUDIENCE: z.string().optional(),
+    ENTRA_TENANT_ID: blankable(z.string().optional()),
+    ENTRA_API_CLIENT_ID: blankable(z.string().optional()),
+    ENTRA_AUDIENCE: blankable(z.string().optional()),
+    /// Used when AUTH_MODE=oidc. The issuer as the provider states it,
+    /// its key set, and the audience it stamps on tokens for this API.
+    OIDC_ISSUER: blankable(z.string().url().optional()),
+    OIDC_JWKS_URI: blankable(z.string().url().optional()),
+    OIDC_AUDIENCE: blankable(z.string().optional()),
 
     // ---- EOL sync ----
     EOL_API_BASE: z.string().url().default('https://endoflife.date/api/v1'),
@@ -127,6 +135,12 @@ export const envSchema = z
       env.AUTH_MODE !== 'entra' ||
       (!!env.ENTRA_TENANT_ID && !!env.ENTRA_AUDIENCE),
     'ENTRA_TENANT_ID and ENTRA_AUDIENCE are required when AUTH_MODE=entra',
+  )
+  .refine(
+    (env) =>
+      env.AUTH_MODE !== 'oidc' ||
+      (!!env.OIDC_ISSUER && !!env.OIDC_JWKS_URI && !!env.OIDC_AUDIENCE),
+    'OIDC_ISSUER, OIDC_JWKS_URI and OIDC_AUDIENCE are required when AUTH_MODE=oidc',
   );
 
 export type AppEnv = z.infer<typeof envSchema>;

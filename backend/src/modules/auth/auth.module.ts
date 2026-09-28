@@ -6,6 +6,8 @@ import { authConfig } from '../../config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { OidcStrategy } from './strategies/oidc.strategy';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Module({
   imports: [
@@ -22,7 +24,28 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    /**
+     * Exactly one strategy, chosen by AUTH_MODE, both registered under the
+     * passport name 'jwt'.
+     *
+     * Registering both would have them fight over the name. Choosing here
+     * means the guards, and every controller, never learn where a token
+     * came from: they read request.user.role and that is all.
+     */
+    {
+      provide: 'AUTH_STRATEGY',
+      inject: [authConfig.KEY, PrismaService],
+      useFactory: (
+        config: ConfigType<typeof authConfig>,
+        prisma: PrismaService,
+      ) =>
+        config.mode === 'dev'
+          ? new JwtStrategy(config)
+          : new OidcStrategy(config, prisma),
+    },
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}
