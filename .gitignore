@@ -40,3 +40,6 @@ logs/
 
 # Angular build cache, created by a local ng build
 .angular/
+
+# Database dumps: contain password hashes and customer data
+backups/
