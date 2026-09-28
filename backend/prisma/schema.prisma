@@ -78,12 +78,6 @@ enum ActionStatus {
 /// Where a to-do item stands. Blocked is deliberately separate from not
 /// started: work nobody can proceed with is a different problem from work
 /// nobody has picked up, and only one of them needs chasing.
-enum StepStatus {
-  TODO
-  IN_PROGRESS
-  BLOCKED
-  DONE
-}
 
 enum CommStatus {
   NOT_REQUIRED
@@ -486,8 +480,6 @@ model AppUser {
   teams           TeamMember[]
   projects        ProjectEngineer[]
   assignedActions UpgradeAction[]
-  completedSteps  UpgradeActionStep[] @relation("StepCompletedBy")
-  assignedSteps   UpgradeActionStep[] @relation("StepAssignee")
   recordedChanges ComponentChange[]
   auditLogs       AuditLog[]
 
@@ -522,7 +514,25 @@ model UpgradeAction {
   plannedDate       DateTime?    @map("planned_date") @db.Date
   completedDate     DateTime?    @map("completed_date") @db.Date
   status            ActionStatus @default(NOT_STARTED)
+  /// The issue key as a person types it, e.g. OPS-1042. Kept even when the
+  /// mirror below is stale or Jira is unreachable.
   jiraKey           String?      @map("jira_key")
+  /// Jira's own immutable id. The key changes if an issue moves project; this
+  /// does not, so the link survives.
+  jiraIssueId       String?      @map("jira_issue_id")
+  jiraUrl           String?      @map("jira_url")
+  /// Mirrored from Jira, never edited here. A cache: if it disagrees with Jira,
+  /// Jira wins and the next sync corrects it.
+  jiraStatus        String?      @map("jira_status")
+  /// to-do, indeterminate or done. Jira's own grouping, which survives a
+  /// workflow being renamed.
+  jiraStatusCategory String?     @map("jira_status_category")
+  jiraAssignee      String?      @map("jira_assignee")
+  jiraSubtaskDone   Int?         @map("jira_subtask_done")
+  jiraSubtaskTotal  Int?         @map("jira_subtask_total")
+  jiraSyncedAt      DateTime?    @map("jira_synced_at") @db.Timestamptz(3)
+  /// Why the last sync failed, shown in the UI. Never holds a credential.
+  jiraSyncError     String?      @map("jira_sync_error")
   customerComm      CommStatus   @default(NOT_REQUIRED) @map("customer_comm")
   customerCommNotes String?      @map("customer_comm_notes")
   remarks           String?
@@ -533,7 +543,7 @@ model UpgradeAction {
   team          Team?                     @relation(fields: [teamId], references: [id], onDelete: Restrict)
   assignee      AppUser?                  @relation(fields: [assigneeId], references: [id], onDelete: Restrict)
   deployments   UpgradeActionDeployment[]
-  steps         UpgradeActionStep[]
+  jiraSubtasks  JiraSubtask[]
   notifications NotificationLog[]
 
   @@index([status, plannedDate])
@@ -547,40 +557,6 @@ model UpgradeAction {
 /// Ordered and worked through in sequence. Timings are recorded rather than
 /// typed: startedAt and completedAt give the real duration, which is the only
 /// honest basis for estimating the next upgrade of the same thing.
-model UpgradeActionStep {
-  id              String     @id @default(uuid(7)) @db.Uuid
-  upgradeActionId String     @map("upgrade_action_id") @db.Uuid
-  title           String
-  description     String?
-  /// Position in the list. Gaps are fine; only the order matters.
-  position        Int
-  status          StepStatus @default(TODO)
-  /// Expected effort, normalised to minutes. The interface offers minutes,
-  /// hours, days and weeks, because a platform upgrade is measured in weeks
-  /// and storing two units invites them to disagree.
-  estimateMinutes Int?       @map("estimate_minutes")
-  /// Effort accumulated across every stretch of work. Long jobs are picked up
-  /// and put down over weeks, so a single start-to-finish span would measure
-  /// the calendar rather than the work.
-  spentMinutes    Int        @default(0) @map("spent_minutes")
-  /// When the current stretch began. Null whenever the clock is not running.
-  startedAt       DateTime?  @map("started_at") @db.Timestamptz(3)
-  dueDate         DateTime?  @map("due_date") @db.Date
-  assigneeId      String?    @map("assignee_id") @db.Uuid
-  blockedReason   String?    @map("blocked_reason")
-  completedAt     DateTime?  @map("completed_at") @db.Timestamptz(3)
-  completedById   String?    @map("completed_by_id") @db.Uuid
-  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  upgradeAction UpgradeAction @relation(fields: [upgradeActionId], references: [id], onDelete: Cascade)
-  completedBy   AppUser?      @relation("StepCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
-  assignee      AppUser?      @relation("StepAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-
-  @@index([upgradeActionId, position])
-  @@index([assigneeId])
-  @@map("upgrade_action_step")
-}
 
 model UpgradeActionDeployment {
   upgradeActionId String @map("upgrade_action_id") @db.Uuid
@@ -677,4 +653,33 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+/// A sub-task of a linked Jira issue, mirrored so the board renders without a
+/// request to Jira on every page load.
+///
+/// Read-only by construction: nothing in this application writes to it except
+/// the sync, and the UI offers no way to edit a row. The work is managed in
+/// Jira; this table only remembers what Jira last said.
+model JiraSubtask {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  upgradeActionId String   @map("upgrade_action_id") @db.Uuid
+  /// e.g. OPS-1043
+  issueKey        String   @map("issue_key")
+  issueId         String   @map("issue_id")
+  summary         String
+  status          String
+  /// to-do, indeterminate or done
+  statusCategory  String   @map("status_category")
+  assignee        String?
+  url             String
+  /// Jira's order within the parent, so the mirror lists them as Jira does.
+  position        Int
+  syncedAt        DateTime @default(now()) @map("synced_at") @db.Timestamptz(3)
+
+  upgradeAction UpgradeAction @relation(fields: [upgradeActionId], references: [id], onDelete: Cascade)
+
+  @@unique([upgradeActionId, issueId])
+  @@index([upgradeActionId, position])
+  @@map("jira_subtask")
 }

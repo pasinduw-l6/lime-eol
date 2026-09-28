@@ -4,6 +4,22 @@ const booleanish = z
   .enum(['true', 'false', '1', '0'])
   .transform((value) => value === 'true' || value === '1');
 
+/**
+ * Treats a blank value as absent.
+ *
+ * A key left empty in an .env template arrives as '', not undefined, so
+ * `.optional()` alone does not cover it and the underlying check runs against
+ * the empty string — which is how `JIRA_BASE_URL=` became "Invalid URL" rather
+ * than "not configured". Anything a person is expected to leave blank until
+ * they have a value for it goes through here.
+ */
+function blankable<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    schema,
+  );
+}
+
 export const envSchema = z
   .object({
     // ---- General ----
@@ -42,13 +58,41 @@ export const envSchema = z
     /// Renders and records what would be sent, without making the request.
     NOTIFY_DRY_RUN: booleanish.default(true),
     /// Power Automate trigger URL. Carries a sig= credential.
-    TEAMS_WEBHOOK_URL: z.string().url().optional(),
-    SMTP_HOST: z.string().optional(),
-    SMTP_PORT: z.coerce.number().int().positive().optional(),
-    SMTP_USER: z.string().optional(),
-    SMTP_PASS: z.string().optional(),
-    MAIL_FROM: z.string().optional(),
+    TEAMS_WEBHOOK_URL: blankable(z.string().url().optional()),
+    SMTP_HOST: blankable(z.string().optional()),
+    SMTP_PORT: blankable(z.coerce.number().int().positive().optional()),
+    SMTP_USER: blankable(z.string().optional()),
+    SMTP_PASS: blankable(z.string().optional()),
+    MAIL_FROM: blankable(z.string().optional()),
+
+    // ---- Jira ----
+    // All four are optional: with none of them set the app runs against a null
+    // adapter, reports "not connected" and stays fully usable. The registry
+    // must never depend on Jira being reachable.
+    /// e.g. https://linearsix.atlassian.net — no trailing path.
+    JIRA_BASE_URL: blankable(z.string().url().optional()),
+    /// The account the API token belongs to. Cloud Basic auth is email:token.
+    JIRA_EMAIL: blankable(z.string().email().optional()),
+    /// Carries full access as that user. Treated like TEAMS_WEBHOOK_URL: env
+    /// only, never committed, never logged, never returned by an endpoint.
+    JIRA_API_TOKEN: blankable(z.string().optional()),
+    /// Where upgrade epics are created, e.g. OPS.
+    JIRA_PROJECT_KEY: blankable(z.string().optional()),
+    /// How often the worker reconciles linked issues. Jira is a cache here.
+    JIRA_SYNC_CRON: z.string().default('*/15 * * * *'),
+    JIRA_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
   })
+  // Partial credentials are worse than none: the app would look connected and
+  // fail on every call. Either all four, or none.
+  .refine((env) => {
+    const parts = [
+      env.JIRA_BASE_URL,
+      env.JIRA_EMAIL,
+      env.JIRA_API_TOKEN,
+      env.JIRA_PROJECT_KEY,
+    ].filter(Boolean).length;
+    return parts === 0 || parts === 4;
+  }, 'JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN and JIRA_PROJECT_KEY must be set together, or all left unset')
   .refine(
     (env) => !env.NOTIFY_ENABLED || env.NOTIFY_DRY_RUN || !!env.TEAMS_WEBHOOK_URL,
     'TEAMS_WEBHOOK_URL is required when NOTIFY_ENABLED=true and NOTIFY_DRY_RUN=false',

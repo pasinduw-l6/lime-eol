@@ -174,29 +174,49 @@ export interface ApiUpgradeAction {
   createdAt: string;
 }
 
-/** One item on an upgrade's to-do list. */
-export interface ApiActionStep {
-  id: string;
-  title: string;
-  description: string | null;
-  position: number;
-  status: 'TODO' | 'IN_PROGRESS' | 'BLOCKED' | 'DONE';
-  /** Expected effort in minutes, entered in whatever unit suited. */
-  estimateMinutes: number | null;
-  /** Effort accumulated across every stretch of work, not calendar time. */
-  spentMinutes: number;
-  overEstimate: boolean;
-  startedAt: string | null;
-  /** The clock is running on this step right now. */
-  running: boolean;
-  dueDate: string | null;
-  overdue: boolean;
-  assignee: { id: string; name: string } | null;
-  blockedReason: string | null;
-  completedAt: string | null;
-  completedBy: string | null;
-  /** The first thing not yet done — where someone picks up. */
-  isNext: boolean;
+/** Jira's own status grouping. Survives a workflow being renamed. */
+export type JiraStatusCategory = 'to-do' | 'in-progress' | 'done' | 'unknown';
+
+/** One sub-task, as Jira last reported it. Read-only here by design. */
+export interface ApiJiraSubtask {
+  key: string;
+  summary: string;
+  status: string;
+  statusCategory: JiraStatusCategory;
+  assignee: string | null;
+  url: string;
+}
+
+/**
+ * The mirrored issue behind a plan.
+ *
+ * Everything here is a cache of Jira, refreshed by the worker. It is served
+ * from our own database, so the panel still renders when Jira is unreachable —
+ * `syncError` is how it says so.
+ */
+export interface ApiJiraLink {
+  linked: boolean;
+  key: string | null;
+  url: string | null;
+  status: string | null;
+  statusCategory: JiraStatusCategory | null;
+  assignee: string | null;
+  done: number;
+  total: number;
+  syncedAt: string | null;
+  syncError: string | null;
+  subtasks: ApiJiraSubtask[];
+}
+
+/** Whether Jira could be reached. Never carries the token. */
+export interface ApiJiraStatus {
+  tracker: string;
+  configured: boolean;
+  reachable: boolean;
+  detail: string;
+  projectKey: string | null;
+  baseUrl: string | null;
+  cron: string;
 }
 
 export interface ApiVerification {
@@ -398,93 +418,37 @@ export class Api {
     return this.http.delete<void>(`/api/v1/upgrade-actions/${id}`);
   }
 
-  // Every step call returns the whole list back, so the caller never has to
-  // merge one changed row into what it already had.
-  actionSteps(id: string) {
-    return this.http.get<ApiActionStep[]>(`/api/v1/upgrade-actions/${id}/steps`);
+  /** The mirrored Jira issue for a plan. Reads our cache, never Jira. */
+  jiraLink(actionId: string) {
+    return this.http.get<ApiJiraLink>(`/api/v1/upgrade-actions/${actionId}/jira`);
   }
 
-  addActionStep(
-    id: string,
-    body: {
-      title: string;
-      description?: string;
-      estimateMinutes?: number;
-      dueDate?: string;
-      assigneeId?: string;
-    },
-  ) {
-    return this.http.post<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps`,
-      body,
+  /** Points a plan at an issue that already exists. Fails if Jira cannot read it. */
+  linkJiraIssue(actionId: string, issueKey: string) {
+    return this.http.post<ApiJiraLink>(
+      `/api/v1/upgrade-actions/${actionId}/jira/link`,
+      { issueKey },
     );
   }
 
-  /** Edits a step. Omit a field to leave it; pass null to clear it. */
-  updateActionStep(
-    id: string,
-    stepId: string,
-    body: {
-      title?: string;
-      description?: string | null;
-      dueDate?: string | null;
-      assigneeId?: string | null;
-    },
-  ) {
-    return this.http.patch<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}`,
-      body,
-    );
-  }
-
-  pauseActionStep(id: string, stepId: string) {
-    return this.http.post<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}/pause`,
+  /** Pulls this plan's issue and sub-tasks from Jira now. */
+  syncJiraIssue(actionId: string) {
+    return this.http.post<ApiJiraLink>(
+      `/api/v1/upgrade-actions/${actionId}/jira/sync`,
       {},
     );
   }
 
-  /** Effort done away from the clock — a day of work logged after the fact. */
-  logActionStepTime(id: string, stepId: string, minutes: number) {
-    return this.http.post<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}/time`,
-      { minutes },
+  /** Forgets the link. The Jira issue itself is left alone. */
+  unlinkJiraIssue(actionId: string) {
+    return this.http.delete<ApiJiraLink>(
+      `/api/v1/upgrade-actions/${actionId}/jira/link`,
     );
   }
 
-  blockActionStep(id: string, stepId: string, reason: string) {
-    return this.http.post<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}/block`,
-      { reason },
-    );
-  }
-
-  startActionStep(id: string, stepId: string) {
-    return this.http.post<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}/start`,
-      {},
-    );
-  }
-
-  completeActionStep(id: string, stepId: string) {
-    return this.http.post<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}/complete`,
-      {},
-    );
-  }
-
-  reopenActionStep(id: string, stepId: string) {
-    return this.http.post<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}/reopen`,
-      {},
-    );
-  }
-
-  removeActionStep(id: string, stepId: string) {
-    return this.http.delete<ApiActionStep[]>(
-      `/api/v1/upgrade-actions/${id}/steps/${stepId}`,
-    );
-  }
+  readonly jiraStatusResource = httpResource<ApiJiraStatus>(
+    () => '/api/v1/integrations/jira/status',
+  );
 
   readonly notificationStatusResource = httpResource<ApiNotificationStatus>(
     () => '/api/v1/notifications/status',
