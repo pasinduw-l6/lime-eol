@@ -1,7 +1,7 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, ApiEnvironment, ApiVersionOption } from '../../core/api';
-import { ActingUser } from '../../core/acting-user';
+import { SessionStore } from '../../core/session';
 import { Celebrations } from '../../core/celebration.service';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
@@ -132,7 +132,7 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
           </label>
 
           <p class="m-0 text-[11.5px] text-ink-faint">
-            Recorded as {{ actor().name }} — the first entry in this component's
+            Recorded as {{ actor() }} — the first entry in this component's
             trail on {{ environment().environment }}.
           </p>
         }
@@ -153,7 +153,7 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
 })
 export class AddComponent {
   private readonly api = inject(Api);
-  private readonly acting = inject(ActingUser);
+  private readonly session = inject(SessionStore);
   private readonly celebrations = inject(Celebrations);
 
   readonly environment = input.required<ApiEnvironment>();
@@ -168,7 +168,10 @@ export class AddComponent {
     { key: 'SECURITY_PATCH', label: 'Security patch' },
   ];
 
-  protected readonly actor = this.acting.current;
+  /** Who the entry will be attributed to: the signed-in account. */
+  protected readonly actor = computed(
+    () => this.session.user()?.displayName ?? 'you',
+  );
   protected readonly technology = signal('');
   protected readonly version = signal('');
   protected readonly reason = signal('INITIAL_RECORD');

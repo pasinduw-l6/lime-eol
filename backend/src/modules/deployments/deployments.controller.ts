@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Header, Headers, Param, Patch, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Param,
+  Patch,
+  Query,
+} from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -8,6 +16,10 @@ import {
 } from '@nestjs/swagger';
 import { DeploymentsService } from './deployments.service';
 import { ChangeComponentDto, ComponentChangeDto } from './dto/change-component.dto';
+import {
+  AuthenticatedUser,
+  CurrentUser,
+} from '../auth/current-user.decorator';
 
 @ApiTags('environments')
 @Controller('deployments')
@@ -25,11 +37,11 @@ export class DeploymentsController {
   change(
     @Param('id') id: string,
     @Body() body: ChangeComponentDto,
-    // Stands in for the signed-in user until Entra lands; the service only
-    // ever sees an id, so swapping the header for a token changes nothing here.
-    @Headers('x-acting-user') actingUser?: string,
+    // From the verified token, never from the request body or a header: this
+    // id is written into the tamper-evident history as who did it.
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ComponentChangeDto> {
-    return this.deployments.changeComponent(id, body, actingUser);
+    return this.deployments.changeComponent(id, body, user.id);
   }
 
   @Get(':id/history')

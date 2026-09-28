@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   Param,
   Patch,
   Post,
@@ -18,6 +17,10 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { SetEngineersDto } from './dto/set-engineers.dto';
 import { ProjectDto } from './dto/project-response.dto';
 import { ProjectsService } from './projects.service';
+import {
+  AuthenticatedUser,
+  CurrentUser,
+} from '../auth/current-user.decorator';
 
 @ApiTags('projects')
 @Controller('projects')
@@ -44,9 +47,11 @@ export class ProjectsController {
   @ApiCreatedResponse({ type: ProjectDto })
   create(
     @Body() body: CreateProjectDto,
-    @Headers('x-acting-user') actingUser?: string,
+    // Every component becomes an INSTALL in the history, attributed to whoever
+    // is signed in rather than to whoever the client claimed to be.
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ProjectDto> {
-    return this.projects.create(body, actingUser);
+    return this.projects.create(body, user.id);
   }
 
   @Patch(':id/engineers')

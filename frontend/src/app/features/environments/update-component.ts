@@ -8,7 +8,7 @@ import {
   ApiVerification,
   ApiVersionOption,
 } from '../../core/api';
-import { ActingUser } from '../../core/acting-user';
+import { SessionStore } from '../../core/session';
 import { Celebrations, celebrationFor } from '../../core/celebration.service';
 import { formatDate, formatDays, SupportStatus } from '../../core/lifecycle';
 import { ChangeTimeline } from '../../shared/change-timeline';
@@ -124,7 +124,7 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
           </label>
 
           <p class="m-0 text-[11.5px] text-ink-faint">
-            Recorded as {{ actor().name }}. Entries cannot be
+            Recorded as {{ actor() }}. Entries cannot be
             edited or deleted afterwards — a mistake is answered with a correcting
             entry.
           </p>
@@ -181,7 +181,7 @@ export class UpdateComponent {
   readonly close = output<void>();
   readonly saved = output<void>();
 
-  private readonly acting = inject(ActingUser);
+  private readonly session = inject(SessionStore);
   private readonly celebrations = inject(Celebrations);
 
   protected readonly reasons = [
@@ -192,7 +192,10 @@ export class UpdateComponent {
     { key: 'DECOMMISSION', label: 'Decommission' },
   ];
 
-  protected readonly actor = this.acting.current;
+  /** Who the entry will be attributed to: the signed-in account. */
+  protected readonly actor = computed(
+    () => this.session.user()?.displayName ?? 'you',
+  );
   protected readonly reason = signal('PLANNED_UPGRADE');
   protected readonly ticketRef = signal('');
   protected readonly evidenceUrl = signal('');

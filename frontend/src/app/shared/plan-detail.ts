@@ -1,6 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 import { ApiUpgradeAction } from '../core/api';
-import { formatDate, formatDays, statusFill, SupportStatus } from '../core/lifecycle';
+import { formatDate, formatDays, statusFill, statusOf } from '../core/lifecycle';
 import { JiraPanel } from './jira-panel';
 import { Modal } from './modal';
 
@@ -146,13 +146,7 @@ export class PlanDetail {
     return names.length > 0 ? names.join(', ') : 'no environments in scope';
   });
 
-  private readonly support = computed<SupportStatus>(() => {
-    const days = this.action().daysToEol;
-    if (days === null) {
-      return 'UNKNOWN';
-    }
-    return days <= 0 ? 'EOL' : days <= 180 ? 'NEAR' : 'SUPPORTED';
-  });
+  private readonly support = computed(() => statusOf(this.action().daysToEol));
 
   protected readonly urgencyColour = computed(() => statusFill(this.support()));
 

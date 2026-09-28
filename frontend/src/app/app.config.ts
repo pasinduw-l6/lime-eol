@@ -8,7 +8,6 @@ import {
   withFetch,
   withInterceptors,
 } from '@angular/common/http';
-import { actingUserInterceptor } from './core/acting-user';
 import { authInterceptor } from './core/session';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { routes } from './app.routes';
@@ -25,7 +24,7 @@ export const appConfig: ApplicationConfig = {
     // Auth first: the token goes on before anything else touches the request.
     provideHttpClient(
       withFetch(),
-      withInterceptors([authInterceptor, actingUserInterceptor]),
+      withInterceptors([authInterceptor]),
     ),
     provideRouter(routes, withComponentInputBinding()),
   ],

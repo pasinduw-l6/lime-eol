@@ -1,6 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 import { ApiActionEnvironment, ApiUpgradeAction } from '../core/api';
-import { formatDays, statusFill, SupportStatus } from '../core/lifecycle';
+import { formatDays, statusFill, statusOf } from '../core/lifecycle';
 import { PlanTimeline } from './plan-timeline';
 import { TechIcon } from './tech-icon';
 
@@ -243,7 +243,7 @@ export class PlanBoard {
   }
 
   protected urgencyColour(action: ApiUpgradeAction): string {
-    return statusFill(supportOf(action.daysToEol));
+    return statusFill(statusOf(action.daysToEol));
   }
 
   protected deadline(action: ApiUpgradeAction): string {
@@ -276,9 +276,3 @@ function envState(env: ApiActionEnvironment): string {
   return env.verified ? 'recorded' : 'marked done, nothing recorded';
 }
 
-function supportOf(days: number | null): SupportStatus {
-  if (days === null) {
-    return 'UNKNOWN';
-  }
-  return days <= 0 ? 'EOL' : days <= 180 ? 'NEAR' : 'SUPPORTED';
-}

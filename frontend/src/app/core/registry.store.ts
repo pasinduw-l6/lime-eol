@@ -358,13 +358,6 @@ export class RegistryStore {
     return null;
   }
 
-  saveEngineer(input: Omit<Engineer, 'id'> & { id?: string }): Engineer {
-    const engineer: Engineer = { ...input, id: input.id ?? newId('e') };
-    this._engineers.update((all) =>
-      input.id ? all.map((e) => (e.id === input.id ? engineer : e)) : [...all, engineer],
-    );
-    return engineer;
-  }
 
   deleteEngineer(id: string): string | null {
     const staffed = this._projects().filter((p) => p.engineerIds.includes(id));
@@ -375,37 +368,6 @@ export class RegistryStore {
     return null;
   }
 
-  addProject(input: NewProject): Project {
-    const project: Project = {
-      id: newId('p'),
-      name: input.name,
-      customer: input.customer,
-      code: input.code.toUpperCase(),
-      limeVersion: input.limeVersion,
-      status: input.status,
-      engineerIds: input.engineerIds,
-      startedAt: new Date().toISOString().slice(0, 10),
-    };
-
-    const deployments: Deployment[] = input.environments.map((environment) => ({
-      id: `${project.id}-${environment.toLowerCase()}`,
-      projectId: project.id,
-      customer: project.customer,
-      customerCode: project.code,
-      name: `${project.name} ${environment}`,
-      environment,
-      location: input.location,
-      locationDetail: input.locationDetail,
-      limeVersion: project.limeVersion,
-      owners: ['DevOps'],
-      components: [],
-    }));
-
-    this._projects.update((all) => [...all, project]);
-    this._deployments.update((all) => [...all, ...deployments]);
-    this.scope.set(project.id);
-    return project;
-  }
 
   updateProject(id: string, patch: Partial<Project>): void {
     this._projects.update((all) =>
@@ -465,21 +427,7 @@ export class RegistryStore {
     );
   }
 
-  saveAction(input: Omit<UpgradeAction, 'id'> & { id?: string }): UpgradeAction {
-    const action: UpgradeAction = { ...input, id: input.id ?? newId('act') };
-    this._actions.update((all) =>
-      input.id ? all.map((a) => (a.id === input.id ? action : a)) : [...all, action],
-    );
-    return action;
-  }
 
-  completeAction(id: string, completedDate: string): void {
-    this._actions.update((all) =>
-      all.map((a) =>
-        a.id === id ? { ...a, status: 'COMPLETED' as const, completedDate } : a,
-      ),
-    );
-  }
 
   deleteAction(id: string): void {
     this._actions.update((all) => all.filter((a) => a.id !== id));
