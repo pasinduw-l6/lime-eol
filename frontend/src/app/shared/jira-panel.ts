@@ -7,25 +7,12 @@ import {
   JiraStatusCategory,
 } from '../core/api';
 
-/**
- * The work behind a plan, as Jira holds it.
- *
- * Deliberately read-only. Jira owns task breakdown — sub-tasks, worklogs,
- * permissions, an audit trail — and a second place to edit the same work would
- * only split the team's attention and go stale. Every row here opens Jira.
- *
- * What it shows is a mirror served from our own database, refreshed by the
- * worker. That is why it still renders when Jira is unreachable: the panel says
- * when it last synced and what went wrong, rather than showing nothing.
- */
 @Component({
   selector: 'lime-jira-panel',
   imports: [FormsModule],
   host: { class: 'block' },
   template: `
     <div class="mt-4 border-t border-rule pt-4">
-      <!-- Invented issues always announce themselves. Nobody looking at this
-           screen, or a screenshot of it, should have to wonder. -->
       @if (demo()) {
         <p
           class="m-0 mb-2.5 flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[11.5px]"
@@ -38,7 +25,6 @@ import {
 
       @if (link(); as jira) {
         @if (jira.linked) {
-          <!-- the issue -->
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
             <a
               class="tabular text-[13px] font-semibold text-accent-bright hover:underline"
@@ -104,7 +90,6 @@ import {
             </p>
           }
 
-          <!-- the breakdown, exactly as Jira has it -->
           @if (jira.subtasks.length > 0) {
             <ul class="m-0 mt-3 list-none space-y-px p-0">
               @for (task of jira.subtasks; track task.key) {
@@ -142,7 +127,6 @@ import {
             </p>
           }
 
-          <!-- Add a step. Creates it in Jira; everything after that is Jira's. -->
           @if (!jira.syncError) {
             <form
               class="mt-2 grid items-center gap-2"
@@ -183,7 +167,6 @@ import {
             </form>
           }
         } @else {
-          <!-- not linked -->
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-[12.5px] text-ink-soft">
               The work for this upgrade is tracked in Jira.
@@ -216,7 +199,6 @@ import {
             </p>
           }
 
-          <!-- So that setting Jira up later is a checklist, not guesswork. -->
           @if (missing().length > 0 && !demo()) {
             <p class="m-0 mt-2 text-[11.5px] text-ink-faint">
               Still to set in <span class="tabular">.env</span>:
@@ -248,7 +230,6 @@ export class JiraPanel {
   protected readonly newAssignee = signal('');
   protected readonly newDue = signal('');
 
-  /** Whether linking is even possible, from the integration status endpoint. */
   protected readonly connected = computed(
     () => this.api.jiraStatusResource.value()?.configured ?? false,
   );
@@ -257,7 +238,6 @@ export class JiraPanel {
     () => this.api.jiraStatusResource.value()?.detail ?? 'checking…',
   );
 
-  /** Drives the badge. Issues must never be invented without the panel saying so. */
   protected readonly demo = computed(
     () => this.api.jiraStatusResource.value()?.demo ?? false,
   );
@@ -289,7 +269,6 @@ export class JiraPanel {
     });
   }
 
-  /** Jira's account list. Ours cannot be used — different identity system. */
   private loadAssignees(): void {
     this.api.jiraAssignees(this.actionId()).subscribe({
       next: (people) => this.assignees.set(people),
@@ -356,8 +335,6 @@ export class JiraPanel {
       next: (link) => {
         this.link.set(link);
         this.busy.set(false);
-        // Assignable users are per issue, so a freshly linked issue needs its
-        // own list rather than whatever the last one had.
         if (link.linked) {
           this.loadAssignees();
         } else {
@@ -372,7 +349,6 @@ export class JiraPanel {
     });
   }
 
-  /** Coloured by Jira's category, not its status name, which varies per project. */
   protected categoryColour(category: JiraStatusCategory | null): string {
     switch (category) {
       case 'done':
@@ -390,7 +366,6 @@ export class JiraPanel {
     return `color-mix(in oklab, ${this.categoryColour(category)} 16%, transparent)`;
   }
 
-  /** "synced 4 min ago" — how stale the mirror is, which the panel must admit. */
   protected syncedLabel(): string {
     const at = this.link()?.syncedAt;
     if (!at) {

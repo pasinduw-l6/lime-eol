@@ -22,13 +22,6 @@ export const COMPONENT_TYPES = [
 
 export const CYCLE_RULES = ['MAJOR', 'MAJOR_MINOR'] as const;
 
-/**
- * Registers one of the products endoflife.date publishes.
- *
- * The slug is the only required field: everything else is read from the product
- * and may be overridden. A technology cannot be invented here — one with no
- * published lifecycle dates would be a component nobody can track.
- */
 export class CreateTechnologyDto {
   @ApiPropertyOptional({
     example: 'redis',

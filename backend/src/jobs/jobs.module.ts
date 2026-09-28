@@ -5,9 +5,6 @@ import { JiraSyncJob } from './jira-sync.job';
 import { NotificationsJob } from './notifications.job';
 import { WorkerHeartbeatService } from './worker-heartbeat.service';
 
-/**
- * Scheduled work. Imported by WorkerModule only — the API must never run jobs.
- */
 @Module({
   imports: [NotificationsModule, IssueTrackerModule],
   providers: [WorkerHeartbeatService, NotificationsJob, JiraSyncJob],

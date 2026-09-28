@@ -9,25 +9,16 @@ import {
 import gsap from 'gsap';
 import { TechMarquee } from './tech-marquee';
 
-/**
- * The frame both auth pages sit in.
- *
- * Two halves: what the tool is for on the left, the form on the right. The left
- * half is decoration on a phone and is dropped there rather than stacked, so the
- * form is the first thing on screen at every width.
- */
 @Component({
   selector: 'lime-auth-layout',
   imports: [TechMarquee],
   host: { class: 'block' },
   template: `
     <div class="auth-shell grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
-      <!-- brand half -->
       <aside
         class="relative hidden overflow-hidden px-14 py-12 lg:flex lg:flex-col"
         style="background: linear-gradient(150deg, var(--color-accent-deep), var(--color-ground) 58%)"
       >
-        <!-- the lime in the mark, bled into the corner -->
         <span
           class="pointer-events-none absolute -top-24 -right-24 h-[420px] w-[420px] rounded-full"
           style="background: radial-gradient(circle, color-mix(in oklab, var(--color-lime) 38%, transparent), transparent 68%)"
@@ -61,8 +52,6 @@ import { TechMarquee } from './tech-marquee';
           </dl>
         </div>
 
-        <!-- Bled past the panel padding so the logos run edge to edge and read
-             as a passing stream rather than a boxed-in list. -->
         <div class="relative mt-10 -mx-14">
           <p
             class="mb-3 px-14 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase"
@@ -79,10 +68,7 @@ import { TechMarquee } from './tech-marquee';
         </div>
       </aside>
 
-      <!-- form half -->
       <main class="flex flex-col px-5 py-8 sm:px-10">
-        <!-- No theme switch here: these two pages are dark either way, and a
-             control that appears to do nothing is worse than none. -->
         <span class="brand-plate inline-flex w-fit lg:invisible">
           <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
         </span>
@@ -145,17 +131,9 @@ export class AuthLayout implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // kill(), not revert(): reverting a .from() would leave the panel invisible.
     this.tween?.kill();
   }
 
-  /**
-   * Deliberately fixed, not live figures.
-   *
-   * This page is shown to someone who is not signed in; reading real counts out
-   * of the estate here would leak how many customers there are and what is
-   * failing, to anyone who loads the URL.
-   */
   protected readonly facts = [
     { label: 'Tracked', value: '477' },
     { label: 'Environments', value: '3' },

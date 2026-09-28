@@ -11,13 +11,6 @@ import { compareVersions, deriveCycle, parseVersion } from '../../lifecycle/vers
 import { ChangeComponentDto, ComponentChangeDto } from './dto/change-component.dto';
 import { ChainEntry, hashEntry, verifyChain, VerificationResult } from './history.util';
 
-/**
- * Changing what an environment runs, and remembering that it changed.
- *
- * The write and the history entry happen in one transaction: an environment
- * whose recorded state moved without a matching history row would be worse
- * than no history at all.
- */
 @Injectable()
 export class DeploymentsService {
   constructor(
@@ -58,23 +51,16 @@ export class DeploymentsService {
     const cycle =
       technology.cycles.find((c) => c.cycle === cycleName) ??
       (await this.importCycle(technology.id, technology.eolSlug, cycleName)) ??
-      // Our own software has no upstream to import from, so its cycles are
-      // created as versions are recorded. Nobody should have to register a
-      // Lime release before deploying it.
       (technology.eolSlug === null
         ? await this.createInternalCycle(technology.id, cycleName)
         : null);
 
-    // For anything tracked upstream a cycle is only ever created from published
-    // data. Inventing one would put a component into the estate with no
-    // end-of-life date — the exact blind spot this tool exists to remove.
     if (!cycle) {
       throw new BadRequestException(
         `${technology.name} ${toVersion} belongs to cycle ${cycleName}, which is not in the registry and not published by the lifecycle source. Add that cycle by hand so its end-of-life date is known.`,
       );
     }
 
-    // Reuse the version row if we already know it; otherwise record it.
     const parsed = parseVersion(toVersion);
     const target =
       cycle.versions.find((v) => v.fullVersion === toVersion) ??
@@ -113,9 +99,6 @@ export class DeploymentsService {
     );
 
     const change = await this.prisma.$transaction(async (tx) => {
-      // Sequence and hash are computed inside the transaction so two
-      // simultaneous recordings cannot claim the same position; the unique
-      // index on (deployment_id, sequence) is the backstop.
       const previous = await tx.componentChange.findFirst({
         where: { deploymentId },
         orderBy: { sequence: 'desc' },
@@ -175,14 +158,6 @@ export class DeploymentsService {
     return toDto(change);
   }
 
-  /**
-   * Which published cycle a version belongs to.
-   *
-   * Derivation from `cycleRule` is only a hint: Docker ships 18.09 under a
-   * major.minor scheme and 27, 28 under a major one, so no single rule maps
-   * both. The published cycle always wins — the longest known cycle that the
-   * version sits under — and derivation is the fallback when nothing matches.
-   */
   private async resolveCycleName(
     version: string,
     rule: 'MAJOR' | 'MAJOR_MINOR',
@@ -196,7 +171,6 @@ export class DeploymentsService {
         const product = await this.eol.getProduct(slug);
         product.releases.forEach((r) => candidates.add(r.cycle));
       } catch {
-        // Registered cycles alone are still a reasonable basis.
       }
     }
 
@@ -207,13 +181,6 @@ export class DeploymentsService {
     return match ?? deriveCycle(version, rule);
   }
 
-  /**
-   * A dateless cycle for a technology nobody publishes dates for.
-   *
-   * Deliberately no eolDate: it resolves to UNKNOWN throughout, which reads as
-   * "no published date" rather than pretending the version is supported
-   * forever.
-   */
   private async createInternalCycle(technologyId: string, cycleName: string) {
     return this.prisma.technologyCycle.create({
       data: {
@@ -229,10 +196,6 @@ export class DeploymentsService {
     });
   }
 
-  /**
-   * Registers a cycle the source publishes but we have never deployed, with
-   * the source's own dates. Returns null when the source does not know it.
-   */
   private async importCycle(
     technologyId: string,
     slug: string | null,
@@ -291,7 +254,6 @@ export class DeploymentsService {
     return changes.map(toDto);
   }
 
-  /** Recomputes the chain and reports whether anything was altered. */
   async verify(deploymentId: string): Promise<VerificationResult> {
     const entries = await this.prisma.componentChange.findMany({
       where: { deploymentId },
@@ -315,7 +277,6 @@ export class DeploymentsService {
     );
   }
 
-  /** The change log as CSV, which is how auditors want to receive it. */
   async historyCsv(deploymentId: string): Promise<string> {
     const changes = await this.history(deploymentId);
     const header = [
@@ -353,15 +314,6 @@ export class DeploymentsService {
     return [header.join(','), ...rows.map((r) => r.join(','))].join('\n');
   }
 
-  /**
-   * Upgrade targets: every version newer than the one running now.
-   *
-   * Merges what the registry already knows with what the lifecycle source
-   * publishes, so a cycle we have never deployed still appears — with its real
-   * end-of-life date rather than a blank. Older versions are left out: this
-   * picker exists to move forward, and a downgrade is rare enough to type by
-   * hand.
-   */
   async versionsFor(technologyName: string, currentVersion?: string) {
     const technology = await this.prisma.technology.findUnique({
       where: { name: technologyName },
@@ -405,7 +357,6 @@ export class DeploymentsService {
       }
     }
 
-    // Cycles the source publishes but we have never deployed.
     if (technology.eolSlug) {
       try {
         const product = await this.eol.getProduct(technology.eolSlug);
@@ -416,8 +367,6 @@ export class DeploymentsService {
           }
         }
       } catch {
-        // The registry alone is still a usable answer; never fail the picker
-        // because an external source is unreachable.
       }
     }
 
@@ -446,7 +395,6 @@ function toDate(value: string | null): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
-/** Quotes a CSV cell only when it needs it. */
 function csvCell(value: string | number): string {
   const text = String(value);
   const needsQuoting = text.includes(',') || text.includes('"') || text.includes('\n');

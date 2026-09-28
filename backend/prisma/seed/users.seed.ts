@@ -1,17 +1,6 @@
 import { PrismaClient, Role } from '@prisma/client';
 import { hashPassword } from '../../src/modules/auth/password.util';
 
-/**
- * The people who may sign in.
- *
- * Accounts are issued here rather than through self-service registration: this
- * tool records who changed a customer's production estate, and an account that
- * anyone could create for themselves would make that record worthless.
- *
- * Passwords are the agreed starting ones and are meant to be changed. They are
- * hashed on the way in, so the database never holds the plain text even though
- * the starting values are written down elsewhere.
- */
 const ENGINEERS: { email: string; displayName: string }[] = [
   { email: 'dinith@lime-automation.com', displayName: 'Dinith' },
   { email: 'kushantha@linearsix.com', displayName: 'Kushantha' },
@@ -23,7 +12,6 @@ const ENGINEERS: { email: string; displayName: string }[] = [
 
 const ENGINEER_PASSWORD = 'yl123';
 
-/** A read-only account, for anyone who needs to look without recording. */
 const VIEWER = {
   email: 'lime@linearsix.com',
   displayName: 'Lime Viewer',
@@ -34,9 +22,6 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
   const engineerHash = await hashPassword(ENGINEER_PASSWORD);
 
   for (const engineer of ENGINEERS) {
-    // Upserted on email so a rerun re-issues the password without creating a
-    // second account, and without disturbing the changes already attributed to
-    // this person.
     await prisma.appUser.upsert({
       where: { email: engineer.email },
       update: {

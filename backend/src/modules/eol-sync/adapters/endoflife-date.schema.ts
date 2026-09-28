@@ -1,15 +1,6 @@
 import { z } from 'zod';
 
-/**
- * Wire format of endoflife.date API v1 (schema_version 1.2.x).
- *
- * The API is Beta, so every response is validated before use: an unexpected
- * shape must fail loudly during sync rather than silently write nulls over
- * good EOL dates. Unknown properties are ignored, so additive changes upstream
- * do not break us.
- */
 
-/** ISO date, date-only: "2028-04-30". */
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
 const nullableDate = isoDate.nullable().default(null);
@@ -59,7 +50,6 @@ export const productSchema = productSummarySchema.extend({
   releases: z.array(releaseSchema).default([]),
 });
 
-/** Every v1 response wraps its payload in this envelope. */
 export function envelopeSchema<T extends z.ZodTypeAny>(result: T) {
   return z.object({
     schema_version: z.string(),
@@ -70,7 +60,6 @@ export function envelopeSchema<T extends z.ZodTypeAny>(result: T) {
   });
 }
 
-/** Categories, tags and identifiers are all listed as { name, uri }. */
 export const namedResourceSchema = z.object({
   name: z.string(),
   uri: z.string().optional(),

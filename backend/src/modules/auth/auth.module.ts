@@ -12,9 +12,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 @Module({
   imports: [
     PassportModule,
-    // The signing key comes from the validated config namespace rather than
-    // process.env, so a missing DEV_JWT_SECRET fails at startup, not at the
-    // first sign-in attempt.
     JwtModule.registerAsync({
       imports: [ConfigModule.forFeature(authConfig)],
       inject: [authConfig.KEY],
@@ -26,14 +23,6 @@ import { PrismaService } from '../../prisma/prisma.service';
   controllers: [AuthController],
   providers: [
     AuthService,
-    /**
-     * Exactly one strategy, chosen by AUTH_MODE, both registered under the
-     * passport name 'jwt'.
-     *
-     * Registering both would have them fight over the name. Choosing here
-     * means the guards, and every controller, never learn where a token
-     * came from: they read request.user.role and that is all.
-     */
     {
       provide: 'AUTH_STRATEGY',
       inject: [authConfig.KEY, PrismaService],

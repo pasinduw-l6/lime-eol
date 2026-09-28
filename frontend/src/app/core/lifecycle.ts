@@ -1,8 +1,3 @@
-/**
- * Lifecycle rules, kept in one place exactly as they are on the backend
- * (src/lifecycle). The notice horizon is policy, not data: it comes from
- * STATUS_APPROACHING_DAYS and is applied here, never frozen into a query.
- */
 
 export const NOTICE_DAYS = 180;
 
@@ -42,7 +37,6 @@ export function statusOf(days: number | null): SupportStatus {
   return days <= NOTICE_DAYS ? 'NEAR' : 'SUPPORTED';
 }
 
-/** Signed, with a true minus sign: −681 d. Never bare "681". */
 export function formatDays(days: number | null): string {
   if (days === null) {
     return '—';
@@ -63,7 +57,6 @@ export function statusLabel(status: SupportStatus): string {
   }
 }
 
-/** Text colour per status. Supported deliberately has no colour of its own. */
 export function statusTextClass(status: SupportStatus): string {
   switch (status) {
     case 'EOL':

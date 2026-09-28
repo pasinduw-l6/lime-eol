@@ -16,16 +16,8 @@ import {
 const MS_PER_DAY = 86_400_000;
 const NOTICE_DAYS = 180;
 
-/** Our own product, tracked as a component of every environment. */
 const LIME_TECHNOLOGY = 'Lime';
 
-/**
- * Reads projects with everything the UI needs in one call: environments, the
- * components each runs, and the lifecycle state of those components.
- *
- * Deliberately one query per screen rather than one per row — the client
- * should not have to fan out to render a list.
- */
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -84,13 +76,6 @@ export class ProjectsService {
     });
   }
 
-  /**
-   * Creates a project, its environments, and what each of them runs.
-   *
-   * Components are installed through the same path a later upgrade takes, so
-   * every environment begins with a complete change history rather than
-   * appearing fully formed with no record of how it got that way.
-   */
   async create(input: CreateProjectDto, actorId?: string): Promise<ProjectDto> {
     const existing = await this.prisma.project.findUnique({
       where: { code: input.code.toUpperCase() },
@@ -99,8 +84,6 @@ export class ProjectsService {
       throw new ConflictException(`A project with code ${input.code} already exists.`);
     }
 
-    // Technologies must exist first: a stack entry naming something unknown
-    // would create an environment with a component nobody tracks.
     for (const entry of input.stack) {
       const known = await this.prisma.technology.findUnique({
         where: { name: entry.technology },
@@ -149,11 +132,6 @@ export class ProjectsService {
 
     const effectiveAt = input.startedAt ?? new Date().toISOString().slice(0, 10);
 
-    // Lime itself is a component of every environment. It is what we sell, so
-    // which release a customer is on matters at least as much as the versions
-    // underneath it — and tracking it here means it gets the same per
-    // environment history as everything else, rather than one field on the
-    // project that cannot say DEV is ahead of PROD.
     const stack = [...input.stack];
     if (
       input.limeVersion &&
@@ -185,16 +163,7 @@ export class ProjectsService {
     return this.findOne(project.id);
   }
 
-  /**
-   * Everything recorded across a project's environments, newest first.
-   *
-   * The calendar needs one stream, not one call per environment: a project
-   * with three environments would otherwise fan out three requests and stitch
-   * them together in the browser.
-   */
   async activity(projectId: string) {
-    // The id column is a UUID, so passing a code like "SYP" to it is rejected
-    // by the driver before any row is compared — look it up by shape.
     const project = await this.prisma.project.findFirst({
       where: isUuid(projectId)
         ? { id: projectId }
@@ -230,13 +199,6 @@ export class ProjectsService {
     }));
   }
 
-  /**
-   * Registers Lime itself, once, so a new project never fails for want of it.
-   *
-   * No endoflife.date slug: nobody publishes support dates for our own
-   * product, so its cycles carry none and read as "no published date" rather
-   * than pretending a release is supported forever.
-   */
   private async ensureLimeTechnology(): Promise<void> {
     await this.prisma.technology.upsert({
       where: { name: LIME_TECHNOLOGY },
@@ -252,13 +214,6 @@ export class ProjectsService {
     });
   }
 
-  /**
-   * Replaces who is staffed on a project.
-   *
-   * Sent whole rather than as add/remove calls: the picker already knows the
-   * final list, and two people editing staffing at once should not be able to
-   * interleave into a set neither of them chose.
-   */
   async setEngineers(
     projectId: string,
     engineerIds: string[],
@@ -287,8 +242,6 @@ export class ProjectsService {
       );
     }
 
-    // The first named is the lead unless one is chosen, so a project is never
-    // left with nobody answerable for it.
     const lead = leadId && ids.includes(leadId) ? leadId : ids[0];
 
     await this.prisma.$transaction([
@@ -408,7 +361,6 @@ function isoDate(date: Date | null): string | null {
   return date ? date.toISOString().slice(0, 10) : null;
 }
 
-/** Counts each technology+version once, however many environments run it. */
 function riskOf(environments: EnvironmentDto[]): { eol: number; near: number } {
   const seen = new Set<string>();
   let eol = 0;

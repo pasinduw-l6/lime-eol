@@ -3,17 +3,6 @@ import { Cron } from '@nestjs/schedule';
 import { jiraConfig, JiraConfig } from '../config';
 import { IssueTrackerService } from '../modules/issue-tracker/issue-tracker.service';
 
-/**
- * Keeps the Jira mirror current.
- *
- * Polling rather than webhooks: Atlassian would have to reach this application
- * to deliver one, and it runs on an internal network. If that changes, a
- * webhook endpoint can replace this and the rest of the design is unaffected —
- * which is the point of the mirror being a cache.
- *
- * Lives in the worker, never the API, for the same reason the notification
- * pass does: a page load must not trigger outbound traffic.
- */
 @Injectable()
 export class JiraSyncJob {
   private readonly logger = new Logger(JiraSyncJob.name);
@@ -29,8 +18,6 @@ export class JiraSyncJob {
   })
   async run(): Promise<void> {
     if (!this.config.configured) {
-      // Logged rather than silent, so "the board never updates" is never a
-      // mystery.
       this.logger.debug('Skipped — no Jira credentials are configured.');
       return;
     }

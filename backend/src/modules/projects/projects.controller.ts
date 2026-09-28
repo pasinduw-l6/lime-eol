@@ -47,8 +47,6 @@ export class ProjectsController {
   @ApiCreatedResponse({ type: ProjectDto })
   create(
     @Body() body: CreateProjectDto,
-    // Every component becomes an INSTALL in the history, attributed to whoever
-    // is signed in rather than to whoever the client claimed to be.
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ProjectDto> {
     return this.projects.create(body, user.id);

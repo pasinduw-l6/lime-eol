@@ -3,9 +3,6 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 export const SWAGGER_PATH = 'api/docs';
 
-/**
- * Keeps documentation wiring out of main.ts (single responsibility).
- */
 export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle('Lime Technology Lifecycle & EOL Registry')

@@ -1,18 +1,10 @@
 import { parseDate, today } from './lifecycle';
 
-/**
- * Human phrasing for lifecycle dates.
- *
- * "Ends in 1 week and 6 days" tells an engineer whether to act this sprint;
- * "2026-10-01" makes them do the arithmetic. Both are shown — the phrase to
- * judge by, the date to plan by.
- */
 
 export type Tone = 'past' | 'soon' | 'future' | 'unknown';
 
 const DAY = 86_400_000;
 
-/** Two-unit duration, as people actually say it. */
 export function humanGap(days: number): string {
   const abs = Math.abs(days);
 
@@ -44,7 +36,6 @@ export interface Phrase {
   days: number | null;
 }
 
-/** "Ends in 1 year", "Ended 1 year and 5 months ago", or "—". */
 export function phraseFor(
   value: string | null,
   verb: 'end' | 'release' = 'end',
@@ -77,7 +68,6 @@ export function phraseFor(
   };
 }
 
-/** Cell tint per tone, matching the status palette used everywhere else. */
 export function toneBackground(tone: Tone): string {
   switch (tone) {
     case 'past':

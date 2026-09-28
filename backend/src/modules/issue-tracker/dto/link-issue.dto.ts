@@ -18,12 +18,6 @@ export class LinkIssueDto {
   issueKey!: string;
 }
 
-/**
- * A step to add under the linked issue.
- *
- * Note what is absent: no status, no time, no comments. Those are Jira's to
- * own, and offering them here would rebuild the very thing this replaced.
- */
 export class CreateSubtaskDto {
   @ApiProperty({ example: 'Upgrade DEV and smoke test' })
   @IsString()

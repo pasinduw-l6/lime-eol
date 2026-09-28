@@ -16,13 +16,6 @@ import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
 import { MIN_WORKING_MS, Working } from '../../shared/working';
 
-/**
- * Record the version an environment now runs.
- *
- * Two fields do the real work: the version, and the date it actually happened.
- * Engineers record upgrades days after the window, and a history dated by when
- * the paperwork caught up is worthless for reporting.
- */
 @Component({
   selector: 'lime-update-component',
   imports: [FormsModule, Modal, TechIcon, ChangeTimeline, Working],
@@ -141,8 +134,6 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
           </div>
         </form>
 
-        <!-- the last few, as context while recording. The full trail lives on
-             the environment, where it has room to grow. -->
         <div class="border-t border-rule pt-4">
           <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
             <h3 class="m-0 text-[13px] font-semibold">Recent changes</h3>
@@ -192,7 +183,6 @@ export class UpdateComponent {
     { key: 'DECOMMISSION', label: 'Decommission' },
   ];
 
-  /** Who the entry will be attributed to: the signed-in account. */
   protected readonly actor = computed(
     () => this.session.user()?.displayName ?? 'you',
   );
@@ -210,7 +200,6 @@ export class UpdateComponent {
 
   protected readonly options = computed(() => this.allOptions());
 
-  /** Only this technology's changes, newest first. */
   protected readonly history = computed(() =>
     this.allChanges().filter((c) => c.technology === this.component().technology),
   );
@@ -255,9 +244,6 @@ export class UpdateComponent {
       })
       .subscribe({
         next: () => {
-          // The write is already done; this only holds the modal open so the
-          // goose is on screen long enough to be seen. Against a warm cache the
-          // server answers in about 20ms, which would be a flicker.
           this.afterWorking(startedAt, () => {
             this.saving.set(false);
             this.celebrations.show(this.earned(version));
@@ -279,7 +265,6 @@ export class UpdateComponent {
       });
   }
 
-  /** Runs the callback once the goose has had its full time on screen. */
   private afterWorking(startedAt: number, then: () => void): void {
     const remaining = MIN_WORKING_MS - (Date.now() - startedAt);
     if (remaining <= 0) {
@@ -289,13 +274,6 @@ export class UpdateComponent {
     setTimeout(then, remaining);
   }
 
-  /**
-   * What this change earned, worked out before the reload lands.
-   *
-   * Everything needed is already on screen: where the component stood, which
-   * cycle the new version belongs to, and how the rest of the environment is
-   * doing — so there is no second request just to decide whether to cheer.
-   */
   private earned(version: string) {
     const group = this.options().find((option) =>
       option.versions.includes(version),
@@ -331,7 +309,6 @@ export class UpdateComponent {
     );
   }
 
-  /** Security patches and rollbacks should stand out in a long list. */
   protected reasonColour(reason: string): string {
     switch (reason) {
       case 'SECURITY_PATCH':
@@ -346,7 +323,6 @@ export class UpdateComponent {
     }
   }
 
-  /** Says what moving to this cycle actually buys you. */
   protected cycleLabel(group: ApiVersionOption): string {
     if (!group.eolDate) {
       return `Cycle ${group.cycle} — no published end of life`;

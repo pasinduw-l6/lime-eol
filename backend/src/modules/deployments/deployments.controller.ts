@@ -37,8 +37,6 @@ export class DeploymentsController {
   change(
     @Param('id') id: string,
     @Body() body: ChangeComponentDto,
-    // From the verified token, never from the request body or a header: this
-    // id is written into the tamper-evident history as who did it.
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ComponentChangeDto> {
     return this.deployments.changeComponent(id, body, user.id);

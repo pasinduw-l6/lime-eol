@@ -8,7 +8,6 @@ import {
 import gsap from 'gsap';
 import { Celebrations } from '../core/celebration.service';
 
-/** Brand colours only, so a burst still looks like the product. */
 const CONFETTI = [
   'var(--color-lime)',
   'var(--color-lime-bright)',
@@ -17,13 +16,6 @@ const CONFETTI = [
   'var(--color-soon)',
 ];
 
-/**
- * The reward for recording a change.
- *
- * Mounted once in the shell and driven by a signal, so any screen can set one
- * off without owning the animation. Never blocks: pointer events pass straight
- * through, and it leaves on its own, so there is nothing to dismiss.
- */
 @Component({
   selector: 'lime-celebrate',
   host: { class: 'block' },
@@ -77,8 +69,6 @@ export class Celebrate {
         return;
       }
 
-      // Springs up rather than fading in: this is the one moment in the tool
-      // that is allowed to be pleased with itself.
       gsap.from(card, {
         opacity: 0,
         y: 22,
@@ -101,12 +91,6 @@ export class Celebrate {
     });
   }
 
-  /**
-   * A burst of brand-coloured squares, built and torn down in place.
-   *
-   * Hand-rolled rather than pulled from a library: it is forty divs and one
-   * tween, and a dependency for that would outweigh it.
-   */
   private confetti(): void {
     const host = this.burst()?.nativeElement;
     if (!host) {
@@ -134,8 +118,6 @@ export class Celebrate {
       opacity: 0,
       duration: () => gsap.utils.random(0.9, 1.5),
       ease: 'power2.out',
-      // Removed on completion; leaving forty absolutely positioned nodes behind
-      // on every upgrade would accumulate for the life of the session.
       onComplete: () => pieces.forEach((piece) => piece.remove()),
     });
   }

@@ -7,19 +7,10 @@ import { Modal } from '../../shared/modal';
 import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
 import { Environments } from '../environments/environments';
 
-/** Lime releases offered when creating or editing a project. */
 const LIME_VERSIONS = ['2026.2', '2026.1', '2025.4'];
 
 const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
-/**
- * Projects.
- *
- * One row per customer installation, with the Lime release it runs, who is
- * staffed on it and how much of its stack is out of support. Built as a
- * searchable, filterable list rather than a card wall, because the number of
- * projects grows with sales.
- */
 @Component({
   selector: 'lime-projects',
   imports: [FormsModule, Modal, Environments],
@@ -39,7 +30,6 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
         </button>
       </div>
 
-      <!-- add project -->
       @if (showForm()) {
         <form
           class="mt-6 grid gap-5 border-t border-rule pt-6 lg:grid-cols-2"
@@ -174,7 +164,6 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
               </div>
             </fieldset>
 
-            <!-- what every environment starts with -->
             <fieldset class="m-0 border-0 p-0">
               <legend class="mb-2 p-0 text-[12px] text-ink-soft">
                 Technology stack
@@ -240,7 +229,6 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
       }
     </section>
 
-    <!-- filters -->
     <section class="card mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
       <input
         type="search"
@@ -266,7 +254,6 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
       <span class="tabular text-[13px] text-ink-soft">{{ filtered().length }} shown</span>
     </section>
 
-    <!-- list -->
     <section class="card overflow-hidden">
       <table class="w-full border-collapse text-[14px]">
         <caption class="sr-only">Projects with Lime version, staffing and risk</caption>
@@ -353,10 +340,8 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
       </table>
     </section>
 
-    <!-- the selected project's environments and their technologies -->
     <lime-environments class="mt-5 block" />
 
-    <!-- manage: edit, environments, delete -->
     @if (managed(); as project) {
       <lime-modal
         [title]="project.name"
@@ -519,7 +504,6 @@ export class Projects {
 
   protected readonly technologies = this.store.technologies;
 
-  /** Versions already known for a technology, offered as suggestions. */
   protected versionsFor(technology: string): string[] {
     return this.store
       .cycles()
@@ -568,7 +552,6 @@ export class Projects {
     () => this.rows().filter((r) => r.risk.eol > 0 || r.risk.near > 0).length,
   );
 
-  // ---- manage an existing project -----------------------------------------
 
   protected readonly managed = signal<Project | null>(null);
   protected readonly confirmDelete = signal<Project | null>(null);
@@ -620,14 +603,6 @@ export class Projects {
     this.store.deleteDeployment(id);
   }
 
-  /**
-   * Staffing is saved to the database; the rest is still local.
-   *
-   * Name, Lime version and status have no update endpoint yet, so they are held
-   * in the browser as before. Who is assigned does persist — it decides whose
-   * name appears against a customer's environments, which is not something to
-   * lose on refresh.
-   */
   protected saveProject(id: string): void {
     const { engineerIds } = this.editForm;
     this.store.updateProject(id, { ...this.editForm });
@@ -712,7 +687,6 @@ export class Projects {
             locationDetail: '',
             stack: [{ technology: '', version: '' }],
           };
-          // Pull the server's copy and focus the new project.
           this.api.reload();
           this.store.scope.set(created.id);
         },
@@ -728,7 +702,6 @@ export class Projects {
       });
   }
 
-  /** Selecting a project scopes the whole app to it. */
   protected open(project: Project): void {
     this.store.scope.set(project.id);
     void this.router.navigate(['/overview']);

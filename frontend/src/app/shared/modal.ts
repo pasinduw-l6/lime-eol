@@ -9,11 +9,6 @@ import {
 } from '@angular/core';
 import gsap from 'gsap';
 
-/**
- * Dialog used by every create/edit form, so they behave identically:
- * Escape closes, the backdrop closes, the panel does not, and the heading is
- * announced.
- */
 @Component({
   selector: 'lime-modal',
   host: { class: 'block' },
@@ -59,7 +54,6 @@ import gsap from 'gsap';
 export class Modal implements AfterViewInit, OnDestroy {
   readonly title = input.required<string>();
 
-  /** Wider than the default for content that needs two columns. */
   readonly maxWidth = input(620);
   readonly subtitle = input<string>('');
   readonly dismiss = output<void>();
@@ -67,15 +61,6 @@ export class Modal implements AfterViewInit, OnDestroy {
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
   private tween?: gsap.core.Tween;
 
-  /**
-   * The sheet springs up rather than appearing, which is what makes a dialog
-   * feel like it came from somewhere.
-   *
-   * Only the panel moves. Animating the blurred backdrop as well meant
-   * compositing a full-screen blur on every frame, and an interrupted tween
-   * could leave it stuck at opacity 0 — an invisible layer still swallowing
-   * clicks, which is exactly how a close button appears to "not work".
-   */
   ngAfterViewInit(): void {
     const panel = this.panel()?.nativeElement;
 
@@ -94,8 +79,6 @@ export class Modal implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    // kill(), not revert(): reverting a .from() would restore its start state,
-    // leaving the panel invisible on the way out.
     this.tween?.kill();
   }
 }

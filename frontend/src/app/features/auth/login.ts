@@ -4,13 +4,6 @@ import { Router, RouterLink } from '@angular/router';
 import { SessionStore } from '../../core/session';
 import { AuthLayout } from './auth-layout';
 
-/**
- * Sign in.
- *
- * The form and its validation only; there is no auth API yet, so submitting a
- * valid form goes straight to the overview. Everything the server will need is
- * already gathered here, so wiring it up later is one call in `submit`.
- */
 @Component({
   selector: 'lime-login',
   imports: [FormsModule, RouterLink, AuthLayout],
@@ -100,7 +93,6 @@ export class Login {
   private readonly router = inject(Router);
   private readonly session = inject(SessionStore);
 
-  /** Where to go after signing in, set by the guard that sent them here. */
   readonly next = input<string>('');
 
   protected readonly busy = signal(false);
@@ -122,8 +114,6 @@ export class Login {
       : 'That does not look like an email address.';
   });
 
-  // Errors appear once the field has been left or the form pushed, never while
-  // the first character is still being typed.
   protected readonly showEmailError = computed(
     () => !!this.emailError() && (this.touched() || this.submitted()),
   );

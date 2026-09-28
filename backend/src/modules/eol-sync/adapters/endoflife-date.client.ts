@@ -19,10 +19,8 @@ import {
   releaseResponseSchema,
 } from './endoflife-date.schema';
 
-/** Responses change at most daily upstream, so an hour of caching is safe. */
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
-/** Upstream failures worth retrying — transient, not "you asked for nothing". */
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export class EolDataSourceError extends Error {
@@ -44,12 +42,6 @@ export class EolProductNotFoundError extends EolDataSourceError {
   }
 }
 
-/**
- * endoflife.date API v1 adapter.
- *
- * Owns transport concerns only — URLs, timeouts, retries, caching and response
- * validation — and hands back domain types. No business rules live here.
- */
 @Injectable()
 export class EndOfLifeDateClient implements EolDataSource {
   private readonly logger = new Logger(EndOfLifeDateClient.name);
@@ -139,7 +131,6 @@ export class EndOfLifeDateClient implements EolDataSource {
 
       return this.toRelease(body.result);
     } catch (error) {
-      // A 404 here means "no such cycle", which is an answer, not a failure.
       if (error instanceof EolProductNotFoundError) {
         return null;
       }
@@ -147,7 +138,6 @@ export class EndOfLifeDateClient implements EolDataSource {
     }
   }
 
-  /** Drops cached responses so the next call hits the network. */
   clearCache(): void {
     this.cache.clear();
   }
@@ -214,7 +204,6 @@ export class EndOfLifeDateClient implements EolDataSource {
         const status =
           error instanceof EolDataSourceError ? error.status : undefined;
 
-        // A non-retryable status (e.g. 400) will fail identically next time.
         if (status !== undefined && !RETRYABLE_STATUS.has(status)) {
           throw error;
         }

@@ -15,10 +15,6 @@ import { UpgradeActionsModule } from './modules/upgrade-actions/upgrade-actions.
 import { UsersModule } from './modules/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 
-/**
- * API entry module. Feature modules are added here as phases land.
- * Scheduled jobs deliberately live in WorkerModule only.
- */
 @Module({
   imports: [
     AppConfigModule,
@@ -34,14 +30,6 @@ import { PrismaModule } from './prisma/prisma.module';
     UpgradeActionsModule,
     IssueTrackerModule,
   ],
-  /**
-   * Authentication then authorisation, in that order: EditorGuard reads
-   * request.user, which JwtAuthGuard is what puts there.
-   *
-   * Registered globally so the API is closed by default. Opening a route
-   * takes an explicit @Public(), which is visible in review; forgetting a
-   * decorator now fails safe instead of exposing an endpoint.
-   */
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: EditorGuard },

@@ -1,7 +1,3 @@
-/**
- * Mirrors the backend DTOs so the mock layer can be swapped for generated
- * types from /api/docs-json without reshaping any component.
- */
 
 export type ComponentType =
   | 'DATABASE'
@@ -20,22 +16,18 @@ export type EolSource = 'API' | 'MANUAL';
 
 export type CycleRule = 'MAJOR' | 'MAJOR_MINOR';
 
-/** A technology in the registry. Cycles hang off it. */
 export interface Technology {
   id: string;
   name: string;
   componentType: ComponentType;
   vendor: string | null;
-  /** endoflife.date slug; null for things it does not track. */
   eolSlug: string | null;
   cycleRule: CycleRule;
-  /** Simple Icons slug and brand colour, resolved when it was registered. */
   iconSlug: string | null;
   iconColour: string | null;
   notes: string | null;
 }
 
-/** One support cycle — where all lifecycle dates live (see db-design-notes). */
 export interface Cycle {
   id: string;
   technology: string;
@@ -58,31 +50,22 @@ export interface DeploymentComponent {
   source: 'LIME_DEFAULT' | 'OVERRIDE';
 }
 
-/** A DevOps engineer. Projects are staffed, and staffing drives the inbox. */
 export interface Engineer {
   id: string;
   name: string;
   initials: string;
   email: string;
-  /** False for viewers, who can be shown but not staffed on work. */
   canEdit: boolean;
   role: 'Engineer' | 'Viewer';
 }
 
 export type ProjectStatus = 'ACTIVE' | 'ONBOARDING' | 'PAUSED';
 
-/**
- * One customer's Lime installation — the unit engineers actually work in.
- *
- * A customer may run more than one (a second brand, a separate region), so
- * this is deliberately not the same record as the customer.
- */
 export interface Project {
   id: string;
   name: string;
   customer: string;
   code: string;
-  /** Which Lime release this customer is on — differs per project. */
   limeVersion: string;
   status: ProjectStatus;
   engineerIds: string[];
@@ -104,13 +87,11 @@ export interface Deployment {
   components: DeploymentComponent[];
 }
 
-/** One machine or service in an environment. */
 export interface EnvNode {
   id: string;
   name: string;
   role: 'gateway' | 'application' | 'database' | 'messaging' | 'platform';
   host?: string;
-  /** Position on the canvas, kept in the JSON so an arrangement survives. */
   x: number;
   y: number;
   stack: { technology: string; version: string }[];
@@ -122,23 +103,12 @@ export interface EnvLink {
   label?: string;
 }
 
-/**
- * The editable unit: one customer environment as data.
- * This is what a DevOps engineer edits, either as JSON or on the canvas.
- */
 export interface EnvTopology {
   deploymentId: string;
   nodes: EnvNode[];
   links: EnvLink[];
 }
 
-/**
- * One saved state of an environment — a commit.
- *
- * History is kept as full snapshots rather than deltas: a snapshot always
- * renders, can be diffed against any other revision, and answers "what was
- * running on this date?" without replaying anything.
- */
 export interface Revision {
   id: string;
   deploymentId: string;

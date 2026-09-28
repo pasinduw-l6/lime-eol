@@ -11,10 +11,8 @@ import { buildDigest, buildDeadlineCard, Due } from './notifications.renderer';
 
 const MS_PER_DAY = 86_400_000;
 
-/** Above this, one summary goes out instead of a card each. */
 const DIGEST_ABOVE = 5;
 
-/** How often something already unsupported is repeated. */
 const PAST_EOL_REPEAT_DAYS = 7;
 
 export interface RunResult {
@@ -27,14 +25,6 @@ export interface RunResult {
   cards: NotificationCard[];
 }
 
-/**
- * Deciding what to announce, and remembering that it was announced.
- *
- * The dedup key is enforced by a unique index rather than by this code, so two
- * runs overlapping cannot double-post. It includes the end-of-life date, which
- * is what makes a moved deadline re-arm every threshold instead of being
- * silently suppressed.
- */
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -45,12 +35,6 @@ export class NotificationsService {
     @Inject(notificationConfig.KEY) private readonly config: NotificationConfig,
   ) {}
 
-  /**
-   * Everything inside a notice period that has not been announced yet.
-   *
-   * Read straight from the estate: cycles that something is actually running,
-   * with the environments running them and whoever is answerable.
-   */
   async due(): Promise<Due[]> {
     const rules = await this.prisma.notificationRule.findMany({
       where: { isActive: true, teamsEnabled: true },
@@ -71,8 +55,6 @@ export class NotificationsService {
       },
     });
 
-    // One entry per cycle, carrying every environment that runs it — a card
-    // per environment would say the same thing three times.
     const byCycle = new Map<string, Due>();
 
     for (const component of components) {
@@ -119,13 +101,6 @@ export class NotificationsService {
     return dues.sort((a, b) => a.days - b.days);
   }
 
-  /**
-   * Whoever should answer for each one.
-   *
-   * There is no upgrade-action API yet, so nothing is ever "assigned" — every
-   * card falls to the project lead. When actions are persisted this is where
-   * the assignee takes over.
-   */
   private async attachMentions(dues: Due[]): Promise<void> {
     const projectIds = [...new Set(dues.map((d) => d.projectId))];
 
@@ -143,7 +118,6 @@ export class NotificationsService {
 
       const name = lead.user.displayName ?? lead.user.email;
       due.mention = {
-        // The sign-in address; a display name alone cannot be mentioned.
         upn: lead.user.email,
         name,
         why: 'project lead — nobody is assigned',
@@ -151,7 +125,6 @@ export class NotificationsService {
     }
   }
 
-  /** What has already gone out, so the same thing is not announced twice. */
   private async alreadySent(dues: Due[]): Promise<Set<string>> {
     const sent = await this.prisma.notificationLog.findMany({
       where: {
@@ -172,8 +145,6 @@ export class NotificationsService {
     for (const row of sent) {
       const key = `${row.technologyCycleId}|${iso(row.referenceDate)}|${row.thresholdDays}`;
 
-      // Something already unsupported is repeated weekly; every other
-      // threshold is announced once and then stays quiet.
       if (row.thresholdDays === 0) {
         const age = (Date.now() - row.sentAt.getTime()) / MS_PER_DAY;
         if (age < PAST_EOL_REPEAT_DAYS) {
@@ -188,12 +159,6 @@ export class NotificationsService {
     return suppressed;
   }
 
-  /**
-   * The whole run: find, filter, render, send, record.
-   *
-   * Safe to call by hand — with NOTIFY_DRY_RUN on it renders and logs without
-   * a single request leaving the machine.
-   */
   async run(): Promise<RunResult> {
     const dues = await this.due();
     const suppressed = await this.alreadySent(dues);
@@ -218,8 +183,6 @@ export class NotificationsService {
 
     const appUrl = this.config.appBaseUrl;
 
-    // One summary rather than a wall of cards. Six at once into the only
-    // channel the team has is how a channel gets muted on its first day.
     if (fresh.length > DIGEST_ABOVE) {
       result.asDigest = true;
       const digest = buildDigest(fresh, appUrl);
@@ -237,7 +200,6 @@ export class NotificationsService {
     return result;
   }
 
-  /** Sends one card and records the outcome against everything it covered. */
   private async deliver(
     card: NotificationCard,
     covers: Due[],
@@ -254,16 +216,10 @@ export class NotificationsService {
       this.logger.warn(`Could not post "${card.title}": ${error}`);
     }
 
-    // A dry run must not claim anything was announced. Recording it would mark
-    // every deadline as sent, and the first real run would then find nothing
-    // to say — the rehearsal would have consumed the performance.
     if (this.config.dryRun) {
       return;
     }
 
-    // Otherwise recorded either way. A failure that leaves no trace is
-    // indistinguishable from a quiet week, which is the worst thing this tool
-    // could do.
     for (const due of covers) {
       await this.prisma.notificationLog.upsert({
         where: {
@@ -289,7 +245,6 @@ export class NotificationsService {
     }
   }
 
-  /** The log, newest first, for the bell. */
   async log(limit = 50) {
     const rows = await this.prisma.notificationLog.findMany({
       orderBy: { sentAt: 'desc' },
@@ -310,12 +265,10 @@ export class NotificationsService {
     }));
   }
 
-  /** Whether anything could actually be delivered right now. */
   status() {
     return {
       enabled: this.config.enabled,
       dryRun: this.config.dryRun,
-      // Never the URL itself: it carries the signature.
       configured: Boolean(this.config.teamsWebhookUrl),
       channel: this.channel.name,
       cron: this.config.cron,
@@ -323,7 +276,6 @@ export class NotificationsService {
   }
 }
 
-/** The tightest notice period a cycle has fallen inside. */
 function thresholdFor(days: number, thresholds: number[]): number | null {
   const matching = thresholds
     .filter((t) => days <= t)

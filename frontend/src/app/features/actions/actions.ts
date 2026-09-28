@@ -31,14 +31,6 @@ interface Draft {
   deploymentIds: string[];
 }
 
-/**
- * The work half of the tool.
- *
- * Deadlines are facts; these are what the team does about them. Unlike a ticket
- * board, each one is checked against what the estate actually records — a plan
- * marked complete with no matching change is shown as such rather than taken at
- * its word.
- */
 @Component({
   selector: 'lime-actions',
   imports: [FormsModule, Modal, TechIcon, PlanCard, PlanBoard, PlanDetail],
@@ -91,8 +83,6 @@ interface Draft {
       </div>
     </section>
 
-    <!-- Two zoom levels on the same data: the board to work from, the list to
-         scan when there are more plans than fit in four columns. -->
     <div class="mb-3 flex items-center gap-1">
       @for (mode of views; track mode) {
         <button
@@ -136,7 +126,6 @@ interface Draft {
       <lime-plan-detail [action]="open" (close)="detail.set(null)" />
     }
 
-    <!-- create / edit -->
     @if (draft(); as form) {
       <lime-modal
         [title]="form.id ? 'Edit action' : 'New upgrade action'"
@@ -259,10 +248,6 @@ export class Actions {
   private readonly store = inject(RegistryStore);
   private readonly router = inject(Router);
 
-  /**
-   * Bound from ?technology= and ?cycle=, so "Plan upgrade" on the Overview
-   * opens this form already filled in.
-   */
   readonly technology = input<string>('');
   readonly cycle = input<string>('');
 
@@ -275,8 +260,6 @@ export class Actions {
         return;
       }
 
-      // Read and write the draft untracked. As a dependency, this effect
-      // reopened the form the moment it was closed.
       untracked(() => {
         if (this.draft()) {
           return;
@@ -458,10 +441,6 @@ export class Actions {
     });
   }
 
-  /**
-   * Closes the form and drops the query params that opened it, so returning to
-   * the same cycle from the Overview opens it again.
-   */
   protected closeDraft(): void {
     this.draft.set(null);
     this.error.set(null);

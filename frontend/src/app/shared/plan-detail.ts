@@ -4,17 +4,6 @@ import { formatDate, formatDays, statusFill, statusOf } from '../core/lifecycle'
 import { JiraPanel } from './jira-panel';
 import { Modal } from './modal';
 
-/**
- * One plan, opened from the board.
- *
- * Laid out as plan against reality, because the gap between them is the only
- * thing here Jira could not tell you. Everything below that divider is the
- * Jira panel unchanged — the same list, the same add form.
- *
- * Note what it ends with rather than contains: comments and attachments are a
- * link to Jira, not a thread and an uploader. Rebuilding those would recreate
- * the parallel task system this replaced, and there is nowhere to put a file.
- */
 @Component({
   selector: 'lime-plan-detail',
   imports: [Modal, JiraPanel],
@@ -26,7 +15,6 @@ import { Modal } from './modal';
       [maxWidth]="820"
       (dismiss)="close.emit()"
     >
-      <!-- how far the work has got, as Jira reports it -->
       @if (progress(); as bar) {
         <div class="mb-4">
           <span class="block h-[5px] w-full overflow-hidden rounded-full bg-elevated">
@@ -116,7 +104,6 @@ import { Modal } from './modal';
         </section>
       </div>
 
-      <!-- the work itself, mirrored from Jira, with the add form -->
       <lime-jira-panel [actionId]="action().id" />
 
       <p class="m-0 mt-4 border-t border-rule pt-3 text-[11.5px] text-ink-faint">
@@ -158,7 +145,6 @@ export class PlanDetail {
     return `${formatDate(action.eolDate)} (${formatDays(action.daysToEol)})`;
   });
 
-  /** Null when nothing is linked — an empty bar would claim no progress. */
   protected readonly progress = computed(() => {
     const action = this.action();
     const total = action.jiraSubtaskTotal;

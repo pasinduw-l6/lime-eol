@@ -16,14 +16,6 @@ export interface Session {
 
 const STORAGE_KEY = 'lime.session';
 
-/**
- * Who is signed in.
- *
- * Kept in localStorage so a refresh does not sign you out mid-change. That
- * puts the token where page scripts can read it, which is the accepted
- * trade-off for a first-party tool on an internal network — the alternative is
- * an httpOnly cookie, which needs CSRF handling the API does not have yet.
- */
 @Injectable({ providedIn: 'root' })
 export class SessionStore {
   private readonly http = inject(HttpClient);
@@ -45,8 +37,6 @@ export class SessionStore {
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
-      // Private browsing, or site data blocked. Signing out of this tab is
-      // still the important half.
     }
   }
 
@@ -55,13 +45,10 @@ export class SessionStore {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     } catch {
-      // The session still works for this tab; it just will not survive a
-      // refresh.
     }
   }
 }
 
-/** Reads a stored session, ignoring one that has already expired. */
 function restore(): Session | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -81,17 +68,6 @@ function restore(): Session | null {
   }
 }
 
-/**
- * Sends the token on every request, and reacts when the API rejects it.
- *
- * Now that the whole API requires a token, an expired one turns every panel on
- * the page into a silent failure at once. Treating 401 as "you are signed out"
- * sends someone back to the login screen instead of leaving them looking at an
- * app that has quietly stopped loading anything.
- *
- * 403 is left alone: a viewer being refused a write is a working system
- * telling them something true, not a broken session.
- */
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const store = inject(SessionStore);
   const router = inject(Router);

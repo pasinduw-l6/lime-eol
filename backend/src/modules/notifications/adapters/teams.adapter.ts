@@ -5,17 +5,9 @@ import {
   NotificationChannel,
 } from '../ports/notification-channel.port';
 
-/** A hung flow must not stall the morning run. */
 const TIMEOUT_MS = 10_000;
 const MAX_ATTEMPTS = 3;
 
-/**
- * Posts an Adaptive Card through a Power Automate workflow.
- *
- * This is the replacement for the retired Office 365 "Incoming Webhook"
- * connector, and the payload differs: the flow expects a message with an
- * adaptive-card attachment, not the old MessageCard.
- */
 @Injectable()
 export class TeamsAdapter implements NotificationChannel {
   private readonly logger = new Logger(TeamsAdapter.name);
@@ -30,8 +22,6 @@ export class TeamsAdapter implements NotificationChannel {
   async send(card: NotificationCard): Promise<void> {
     const payload = toAdaptiveCard(card);
 
-    // Dry run stops before the request, not after: the point is that nothing
-    // leaves this machine.
     if (this.config.dryRun) {
       this.logger.log(
         `[dry run] would post "${card.title}" to ${this.name}\n${JSON.stringify(payload, null, 2)}`,
@@ -59,8 +49,6 @@ export class TeamsAdapter implements NotificationChannel {
           return;
         }
 
-        // A 4xx will not fix itself — a bad signature is bad on every attempt.
-        // Only throttling and server faults are worth trying again.
         const retryable = response.status === 429 || response.status >= 500;
         lastError = `HTTP ${response.status} ${response.statusText}`.trim();
 
@@ -80,13 +68,10 @@ export class TeamsAdapter implements NotificationChannel {
       }
     }
 
-    // The URL is never included: it carries the signature, and this message
-    // ends up in the notification log.
     throw new Error(lastError || 'the request failed');
   }
 }
 
-/** The exact body the Power Automate flow receives. */
 export function toAdaptiveCard(card: NotificationCard): Record<string, unknown> {
   const body: Record<string, unknown>[] = [
     {
@@ -144,8 +129,6 @@ export function toAdaptiveCard(card: NotificationCard): Record<string, unknown> 
     })),
   };
 
-  // Without this block the <at> tag renders as plain text and nobody is
-  // pinged — the failure mode that looks like it worked.
   if (card.mention) {
     content['msteams'] = {
       entities: [
@@ -166,7 +149,6 @@ export function toAdaptiveCard(card: NotificationCard): Record<string, unknown> 
   };
 }
 
-/** Honours Retry-After when Power Automate throttles, else backs off. */
 function backoffFor(attempt: number, retryAfter: string | null): number {
   const seconds = Number(retryAfter);
   if (Number.isFinite(seconds) && seconds > 0) {

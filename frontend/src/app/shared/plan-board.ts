@@ -9,7 +9,6 @@ type Stage = 'planned' | 'jira' | 'deployed' | 'verified';
 interface Column {
   key: Stage;
   label: string;
-  /** Nothing can be moved into this one. */
   locked: boolean;
   hint: string;
 }
@@ -31,18 +30,6 @@ const COLUMNS: Column[] = [
   },
 ];
 
-/**
- * Every plan on one board, along its own lifecycle rather than Jira's.
- *
- * The columns are deliberately not Jira statuses. Copying Jira's board would
- * leave no honest answer to "why not just open Jira?" — these four stages are
- * ours, and only this registry can put a card in the last one.
- *
- * Verified is locked. Nothing drags into it and no button puts it there: a
- * plan arrives once every environment it covers has a recorded version change
- * behind it. That rule is the reason this tool exists beside a ticket board,
- * so it is expressed as an interaction rather than a paragraph.
- */
 @Component({
   selector: 'lime-plan-board',
   imports: [PlanTimeline, TechIcon],
@@ -74,7 +61,6 @@ const COLUMNS: Column[] = [
                 [attr.aria-label]="action.technology + ' ' + action.cycle"
                 (click)="open.emit(action)"
               >
-                <!-- Tags carry identity, never status, so they stay neutral. -->
                 <p class="m-0 flex flex-wrap items-center gap-1">
                   <span class="chip">{{ action.technology }}</span>
                   @if (customerOf(action); as customer) {
@@ -102,7 +88,6 @@ const COLUMNS: Column[] = [
                   </p>
                 }
 
-                <!-- Where the estate actually is: one dot per environment. -->
                 <p class="m-0 mt-2 flex items-center justify-between gap-2">
                   <span class="flex items-center gap-1" [attr.title]="envTitle(action)">
                     @for (env of action.environments; track env.deploymentId) {
@@ -183,7 +168,6 @@ export class PlanBoard {
       groups[stageOf(action)].push(action);
     }
 
-    // Most urgent first within a column; anything without a date sinks.
     for (const key of Object.keys(groups) as Stage[]) {
       groups[key].sort(
         (a, b) =>
@@ -207,13 +191,6 @@ export class PlanBoard {
     return names.length === 1 ? names[0] : `${names.length} customers`;
   }
 
-  /**
-   * Jira progress, or nothing.
-   *
-   * Absent rather than zero when no issue is linked: an empty bar reads as
-   * "no progress", which is a different claim from "nobody has broken this
-   * down yet".
-   */
   protected progressOf(
     action: ApiUpgradeAction,
   ): { percent: number; label: string } | null {
@@ -251,12 +228,6 @@ export class PlanBoard {
   }
 }
 
-/**
- * Which column a plan belongs in.
- *
- * Read in order: evidence beats a tick, a tick beats a ticket, and a ticket
- * beats an intention.
- */
 function stageOf(action: ApiUpgradeAction): Stage {
   const envs = action.environments;
 

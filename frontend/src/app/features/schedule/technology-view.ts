@@ -9,7 +9,6 @@ import {
   toneColour,
 } from '../../core/relative-time';
 
-/** Shape returned by GET /api/v1/eol/products/:slug. */
 interface ApiRelease {
   cycle: string;
   label: string;
@@ -35,15 +34,6 @@ const CHART_W = 900;
 const LANE_H = 26;
 const LABEL_W = 54;
 
-/**
- * Every release cycle of one technology, in the shape the team already reads
- * on endoflife.date — a support-phase chart over a date axis, then the release
- * table.
- *
- * What this adds over the public site: the rows we actually run are marked,
- * with how many environments are on them, so a support window turns into our
- * problem rather than a fact about the world.
- */
 @Component({
   selector: 'lime-technology-view',
   host: { class: 'block' },
@@ -78,7 +68,6 @@ const LABEL_W = 54;
         }
       </header>
 
-      <!-- support phases -->
       <div class="overflow-x-auto">
         <svg
           [attr.width]="chartW"
@@ -154,7 +143,6 @@ const LABEL_W = 54;
         </span>
       </div>
 
-      <!-- release table -->
       <div class="overflow-x-auto rounded-xl border border-rule">
         <table class="w-full border-collapse text-[13px]">
           <caption class="sr-only">Release cycles of {{ data.label }}</caption>
@@ -234,14 +222,12 @@ export class TechnologyView {
   protected readonly chartW = CHART_W;
   protected readonly showAll = signal(false);
 
-  /** Live call to our own API, which proxies and caches endoflife.date. */
   protected readonly product = httpResource<ApiProduct>(
     () => `/api/v1/eol/products/${this.slug()}`,
   );
 
   private readonly releases = computed(() => this.product.value()?.releases ?? []);
 
-  /** Versions of this technology actually deployed, by cycle. */
   private readonly estate = computed(() => {
     const counts = new Map<string, number>();
     const cycles = this.store
@@ -280,7 +266,6 @@ export class TechnologyView {
     }),
   );
 
-  /** Unmaintained releases are folded away unless asked for, or in use. */
   protected readonly visibleRows = computed(() =>
     this.showAll()
       ? this.rows()
@@ -291,7 +276,6 @@ export class TechnologyView {
     () => this.rows().length - this.rows().filter((r) => !r.retired || r.environments > 0).length,
   );
 
-  // ---- chart geometry ------------------------------------------------------
 
   private readonly bounds = computed(() => {
     const dates = this.releases()

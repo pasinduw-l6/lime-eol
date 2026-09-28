@@ -10,7 +10,6 @@ export * from './eol.config';
 export * from './jira.config';
 export * from './notification.config';
 
-/** Every namespace loaded by AppConfigModule. */
 export const configNamespaces = [
   appConfig,
   authConfig,

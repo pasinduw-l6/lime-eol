@@ -12,13 +12,6 @@ import { mapReleaseToVersionLifecycle } from './mappers/release-to-version.mappe
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/**
- * Read-only lifecycle lookups against the external source.
- *
- * Deliberately has no database dependency: this is what the registry uses to
- * discover slugs and cycles when a technology is being added. Writing the data
- * into technology_version is EolSyncService's job (Phase 7).
- */
 @Injectable()
 export class EolLookupService {
   private readonly logger = new Logger(EolLookupService.name);
@@ -32,8 +25,6 @@ export class EolLookupService {
     category?: string;
     tag?: string;
   }): Promise<EolProductSummaryDto[]> {
-    // Let the source narrow by category or tag — far cheaper than pulling all
-    // 475 products and filtering here.
     const products = filters.category
       ? await this.dataSource.listProductsByCategory(filters.category)
       : filters.tag

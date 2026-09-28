@@ -1,7 +1,6 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { Api } from '../core/api';
 
-/** Tint per component type, so a technology with no logo still reads as itself. */
 const TYPE_TINT: Record<string, string> = {
   DATABASE: '47A248',
   RUNTIME: '5FA04E',
@@ -14,30 +13,11 @@ const TYPE_TINT: Record<string, string> = {
   OTHER: '648793',
 };
 
-/**
- * The real logo of a technology.
- *
- * The mark comes from the registry, which resolved it against Simple Icons when
- * the technology was registered — so every one of the 477 products
- * endoflife.date publishes can carry its own logo rather than only the handful
- * that were once hardcoded here.
- *
- * Simple Icons carries about two thirds of that catalogue. The rest fall back
- * to a lettered tile tinted by component type: deliberate, consistent, and
- * never a broken image.
- */
 @Component({
   selector: 'lime-tech-icon',
   host: { class: 'inline-flex shrink-0' },
   template: `
     @if (isOwnProduct()) {
-      <!-- Our own product carries our own mark; Simple Icons has no entry for
-           it, and a lettered "L" tile for the thing we sell reads as an
-           oversight.
-
-           The symbol, not the full wordmark: at 2.27:1 the logo fits a square
-           slot by height, rendering under half as tall as the square brand
-           logos beside it. -->
       <img
         src="/lime-mark.png"
         [attr.width]="size()"
@@ -76,10 +56,6 @@ export class TechIcon {
   readonly technology = input.required<string>();
   readonly size = input(20);
 
-  /**
-   * Overrides the registry lookup, for a product that is not registered yet —
-   * the catalogue picker draws rows the registry has never heard of.
-   */
   readonly iconSlug = input<string | null>(null);
   readonly iconColour = input<string | null>(null);
   readonly componentType = input<string | null>(null);

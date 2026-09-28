@@ -36,13 +36,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
   };
 }
 
-/**
- * Registry.
- *
- * The reference data everything else hangs off: what technologies we track,
- * the cycles under them — including ones endoflife.date does not publish, so
- * internal components can be tracked the same way — and who is on the team.
- */
 @Component({
   selector: 'lime-registry',
   imports: [FormsModule, Modal, TechIcon],
@@ -66,7 +59,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
     }
 
     <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <!-- technologies -->
       <section class="card overflow-hidden">
         <header class="border-b border-rule px-6 py-4">
           <h2 class="m-0 text-[15px] font-semibold">Technologies</h2>
@@ -161,7 +153,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
         }
       </section>
 
-      <!-- team: real accounts, not editable here -->
       <section class="card overflow-hidden">
         <header class="border-b border-rule px-6 py-4">
           <h2 class="m-0 text-[15px] font-semibold">Team</h2>
@@ -201,7 +192,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
       </section>
     </div>
 
-    <!-- catalogue picker: the only way a technology enters the registry -->
     @if (catalogueOpen()) {
       <lime-modal
         title="Add technology"
@@ -209,7 +199,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
         (dismiss)="closeCatalogue()"
       >
         @if (chosen(); as product) {
-          <!-- confirm what was picked, with everything already filled in -->
           <div class="grid gap-4">
             <div class="flex items-center gap-3 rounded-xl border border-rule bg-elevated px-4 py-3">
               <lime-tech-icon
@@ -343,7 +332,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
       </lime-modal>
     }
 
-    <!-- technology form: editing only; adding goes through the catalogue -->
     @if (techDraft(); as form) {
       <lime-modal
         title="Edit technology"
@@ -398,7 +386,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
       </lime-modal>
     }
 
-    <!-- cycle form -->
     @if (cycleDraft(); as form) {
       <lime-modal
         [title]="form.id ? 'Edit cycle' : 'Add cycle by hand'"
@@ -499,7 +486,6 @@ export class Registry {
     this.cycleDraft.set({ ...cycle });
   }
 
-  // ---- catalogue -----------------------------------------------------------
 
   protected readonly catalogueOpen = signal(false);
   protected readonly catalogueQuery = signal('');
@@ -513,13 +499,6 @@ export class Registry {
     [...new Set(this.api.catalogue().map((p) => p.category))].sort(),
   );
 
-  /**
-   * Matching products, narrowed as you type.
-   *
-   * Filtered here rather than server-side: the catalogue is a few hundred rows
-   * loaded once, so a request per keystroke would buy nothing. Already-added
-   * products stay in the list, shown as added, so it is clear they exist.
-   */
   protected readonly matches = computed(() => {
     const term = this.catalogueQuery().trim().toLowerCase();
     const category = this.category();
@@ -551,7 +530,6 @@ export class Registry {
     this.error.set(null);
   }
 
-  /** Fills the confirm step from the product, so nothing has to be restated. */
   protected choose(product: ApiCatalogueProduct): void {
     this.draftName.set(product.label);
     this.draftType.set(product.suggestedType as ComponentType);
@@ -572,7 +550,6 @@ export class Registry {
         next: (created) => {
           this.saving.set(false);
           this.closeCatalogue();
-          // Cycles are what make it deployable; say so if none arrived.
           this.error.set(
             created.cycles.length === 0
               ? `${created.name} was added, but no cycles came back. Add one by hand so its end-of-life date is known.`
@@ -592,7 +569,6 @@ export class Registry {
       });
   }
 
-  /** Editing is still local: the registry has no update endpoint yet. */
   protected saveTechnology(event: Event): void {
     event.preventDefault();
     const form = this.techDraft();

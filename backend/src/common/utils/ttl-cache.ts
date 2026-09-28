@@ -3,13 +3,6 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
-/**
- * Minimal in-memory cache with per-entry expiry.
- *
- * Used to keep repeated lookups off the endoflife.date API within a sync run
- * and between UI requests. Process-local on purpose: the data is public,
- * cheap to refetch, and not worth a Redis dependency.
- */
 export class TtlCache<T> {
   private readonly entries = new Map<string, CacheEntry<T>>();
 

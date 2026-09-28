@@ -8,24 +8,11 @@ import { Celebrate } from './shared/celebrate';
 import { NotificationMenu } from './shared/notification-menu';
 import { ShaderBackground } from './shared/shader-background';
 
-/**
- * The signed-in chrome: brand, project switcher, sections, theme, identity.
- *
- * A layout route rather than the root component, so the sign-in and sign-up
- * pages can own the whole window instead of appearing inside a navigation bar
- * that leads nowhere until you have an account.
- *
- * The project switcher is the most-used control here: engineers work inside
- * one customer installation at a time, and picking one scopes every screen.
- */
 @Component({
   selector: 'lime-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Celebrate, ShaderBackground, NotificationMenu],
   host: { class: 'block min-h-screen' },
   template: `
-    <!-- Deferred until the browser is idle: this is decoration, and OGL should
-         not sit in the critical path of showing someone what is expiring. The
-         ground colour is already on <html>, so there is nothing to see arrive. -->
     @defer (on idle) {
       <lime-shader-background />
     }
@@ -43,7 +30,6 @@ import { ShaderBackground } from './shared/shader-background';
           <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
         </a>
 
-        <!-- project switcher -->
         <div class="relative">
           <button
             type="button"
@@ -127,7 +113,6 @@ import { ShaderBackground } from './shared/shader-background';
 
         <lime-notification-menu />
 
-        <!-- light / dark -->
         <button
           type="button"
           class="glass grid h-9 w-9 place-items-center rounded-full border border-rule bg-elevated text-ink-soft hover:text-ink"
@@ -138,20 +123,17 @@ import { ShaderBackground } from './shared/shader-background';
           [title]="theme.mode() === 'dark' ? 'Light theme' : 'Dark theme'"
         >
           @if (theme.mode() === 'dark') {
-            <!-- sun -->
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <circle cx="12" cy="12" r="4" />
               <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round" />
             </svg>
           } @else {
-            <!-- moon -->
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" stroke-linejoin="round" />
             </svg>
           }
         </button>
 
-        <!-- who is signed in: every recorded change is attributed to them -->
         @if (session.user(); as me) {
           <span
             class="glass flex items-center gap-2.5 rounded-full border border-rule bg-elevated py-1 pr-3 pl-1"
@@ -183,7 +165,6 @@ import { ShaderBackground } from './shared/shader-background';
       </main>
     </div>
 
-    <!-- mounted once, fired from anywhere -->
     <lime-celebrate />
   `,
 })

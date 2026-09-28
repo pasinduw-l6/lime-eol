@@ -4,14 +4,12 @@ import { formatDate } from '../../core/lifecycle';
 import { humanGap } from '../../core/relative-time';
 import { RegistryStore } from '../../core/registry.store';
 
-/** The notice thresholds, as seeded in notification_rule. */
 export const THRESHOLDS = [180, 90, 30, 0] as const;
 
 export type Threshold = (typeof THRESHOLDS)[number];
 
 export interface Mention {
   name: string;
-  /** The Teams sign-in address. A display name alone cannot be mentioned. */
   upn: string;
   why: string;
 }
@@ -24,39 +22,21 @@ export interface Fact {
 export interface PendingNotification {
   id: string;
   threshold: Threshold;
-  /** Red past end of life, amber inside the notice window. */
   tone: 'attention' | 'warning';
   heading: string;
   technology: string;
   cycle: string;
   facts: Fact[];
   mention: Mention | null;
-  /** Deep links rendered as card actions. */
   actions: { title: string; url: string }[];
   daysToEol: number | null;
 }
 
-/**
- * What the 08:00 run would send, worked out from the data already on screen.
- *
- * Deliberately computed in the browser: this is a preview, and it must not
- * depend on a notification service that does not exist yet. When the service
- * lands it becomes the same calculation server-side, and this page becomes a
- * window onto it rather than its own implementation.
- */
 @Injectable({ providedIn: 'root' })
 export class NotificationPreview {
   private readonly store = inject(RegistryStore);
   private readonly api = inject(Api);
 
-  /**
-   * Which notice a cycle currently falls under.
-   *
-   * A real run fires on the day a threshold is crossed and then stays quiet.
-   * A preview cannot know what was already sent, so it shows the band each
-   * cycle sits in today — which is what the next run would announce for
-   * anything not yet notified.
-   */
   private thresholdFor(days: number | null): Threshold | null {
     if (days === null) {
       return null;
@@ -128,11 +108,9 @@ export class NotificationPreview {
       });
     }
 
-    // Most urgent first, which is also the order they would be sent in.
     return out.sort((a, b) => (a.daysToEol ?? 0) - (b.daysToEol ?? 0));
   });
 
-  /** Grouped by threshold, because that is how the rules are configured. */
   readonly byThreshold = computed(() => {
     const groups = new Map<Threshold, PendingNotification[]>();
     for (const item of this.pending()) {
@@ -144,13 +122,6 @@ export class NotificationPreview {
     }));
   });
 
-  /**
-   * Who gets pinged.
-   *
-   * The assignee when there is a plan, the project lead when there is not —
-   * someone has to own the gap. Never the whole team: six mentions on twenty
-   * cards is how a channel gets muted.
-   */
   private mentionFor(
     project: { engineers: { name: string; email?: string; isLead: boolean }[] } | undefined,
     assignee: string | null,
@@ -168,8 +139,6 @@ export class NotificationPreview {
 
     return {
       name: person.name,
-      // The API does not return engineer emails on the project payload yet, so
-      // this resolves through the accounts list.
       upn: this.upnFor(person.name),
       why: named ? 'assigned to the plan' : 'project lead — nobody is assigned',
     };
@@ -193,7 +162,6 @@ export class NotificationPreview {
   }
 
   private actionsFor(technology: string, cycle: string) {
-    // One action. Ticket links arrive when Jira does.
     return [
       {
         title: 'Plan the upgrade',
@@ -202,7 +170,6 @@ export class NotificationPreview {
     ];
   }
 
-  /** The exact Adaptive Card body a run would POST. */
   payloadFor(item: PendingNotification): string {
     const body: Record<string, unknown>[] = [
       {

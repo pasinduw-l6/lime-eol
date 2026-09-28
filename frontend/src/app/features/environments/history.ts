@@ -11,19 +11,11 @@ import {
 import { RegistryStore } from '../../core/registry.store';
 import { Revision } from '../../core/models';
 
-/**
- * Revision history for one environment.
- *
- * Commits on the left, a side-by-side diff on the right, with the exact tokens
- * that changed highlighted inside the line. A version bump should read as
- * "8.2.12 became 8.3.11", not as two rewritten lines.
- */
 @Component({
   selector: 'lime-history',
   host: { class: 'block' },
   template: `
     <div class="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <!-- commits -->
       <aside class="border-b border-rule pb-4 xl:border-r xl:border-b-0 xl:pr-4 xl:pb-0">
         <h3 class="m-0 mb-3 text-[13px] font-semibold">
           {{ revisions().length }} revision(s)
@@ -54,7 +46,6 @@ import { Revision } from '../../core/models';
         </ol>
       </aside>
 
-      <!-- diff -->
       <div class="min-w-0">
         @if (selected(); as revision) {
           <header class="mb-3">
@@ -106,7 +97,6 @@ import { Revision } from '../../core/models';
                     </tr>
                   } @else {
                     <tr>
-                      <!-- before -->
                       <td class="w-[46px] border-r border-rule px-2 text-right align-top text-ink-faint select-none">
                         {{ row.old?.no ?? '' }}
                       </td>
@@ -118,7 +108,6 @@ import { Revision } from '../../core/models';
                           <span [class.diff-word-remove]="seg.changed">{{ seg.text }}</span>
                         }
                       </td>
-                      <!-- after -->
                       <td class="w-[46px] border-r border-l border-rule px-2 text-right align-top text-ink-faint select-none">
                         {{ row.new?.no ?? '' }}
                       </td>

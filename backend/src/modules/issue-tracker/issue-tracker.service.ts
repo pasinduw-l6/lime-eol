@@ -13,7 +13,6 @@ import {
   TrackedIssue,
 } from './ports/issue-tracker.port';
 
-/** Jira keys look like ABC-123. Checked here so a typo fails before a request. */
 const ISSUE_KEY = /^[A-Z][A-Z0-9_]+-\d+$/;
 
 @Injectable()
@@ -26,13 +25,6 @@ export class IssueTrackerService {
     @Inject(jiraConfig.KEY) private readonly config: JiraConfig,
   ) {}
 
-  /**
-   * Whether anything could be fetched right now.
-   *
-   * Reports that credentials exist, never what they are — the same rule the
-   * Teams webhook follows. `reachable` costs a request, so it is only run when
-   * something is configured.
-   */
   async status() {
     const configured = this.tracker.configured;
     const check = configured
@@ -44,11 +36,7 @@ export class IssueTrackerService {
       configured,
       reachable: check.ok,
       detail: check.detail,
-      /// The panel badges itself off this, so invented issues always announce
-      /// themselves on screen.
       demo: this.config.demo,
-      /// Which environment variables are still blank, so setting Jira up later
-      /// is a checklist rather than guesswork. Names only — never values.
       missing: this.config.missing,
       projectKey: this.config.projectKey ?? null,
       baseUrl: this.config.baseUrl ?? null,
@@ -56,12 +44,6 @@ export class IssueTrackerService {
     };
   }
 
-  /**
-   * Points an upgrade action at an issue that already exists.
-   *
-   * The issue is fetched before anything is written, so a bad key or an issue
-   * nobody can see fails loudly instead of storing a link that never resolves.
-   */
   async link(actionId: string, issueKey: string) {
     const key = issueKey.trim().toUpperCase();
 
@@ -95,10 +77,6 @@ export class IssueTrackerService {
     return this.sync(actionId);
   }
 
-  /**
-   * Forgets the link. The Jira issue is left completely alone — this tool does
-   * not delete other people's work.
-   */
   async unlink(actionId: string) {
     await this.mustExist(actionId);
 
@@ -124,13 +102,6 @@ export class IssueTrackerService {
     return this.read(actionId);
   }
 
-  /**
-   * Refreshes one action's mirror from Jira.
-   *
-   * A failure is recorded on the row rather than thrown: the panel should be
-   * able to say "last synced an hour ago, and the last attempt failed because
-   * X" instead of showing nothing at all.
-   */
   async sync(actionId: string) {
     const action = await this.mustExist(actionId);
 
@@ -147,9 +118,6 @@ export class IssueTrackerService {
       const done = children.filter((c) => c.statusCategory === 'done').length;
 
       await this.prisma.$transaction([
-        // Replaced wholesale rather than merged: a sub-task deleted in Jira
-        // must disappear here, and diffing to discover that costs more than
-        // rewriting a handful of rows.
         this.prisma.jiraSubtask.deleteMany({
           where: { upgradeActionId: actionId },
         }),
@@ -193,12 +161,6 @@ export class IssueTrackerService {
     return this.read(actionId);
   }
 
-  /**
-   * Refreshes every linked action. Run by the worker, never by the API.
-   *
-   * Sequential on purpose: Jira Cloud rate-limits by cost, and a burst of
-   * parallel requests across twenty plans is exactly what trips it.
-   */
   async syncAll(): Promise<{ linked: number; failed: number }> {
     if (!this.tracker.configured) {
       return { linked: 0, failed: 0 };
@@ -220,17 +182,6 @@ export class IssueTrackerService {
     return { linked: actions.length, failed };
   }
 
-  /**
-   * Adds a step to the linked issue.
-   *
-   * The only write this application makes into the tracker, and it is
-   * deliberately one-way: the sub-task is created over there and everything
-   * afterwards — status, comments, time — happens over there too. Creating
-   * work is not the same as owning it.
-   *
-   * Unlike `sync`, a failure throws rather than being recorded on the row.
-   * Someone is standing at the form waiting to hear whether it worked.
-   */
   async addSubtask(
     actionId: string,
     input: { summary: string; description?: string; dueDate?: string; assigneeId?: string },
@@ -255,19 +206,12 @@ export class IssueTrackerService {
       throw new BadRequestException(`Jira refused that: ${message(error)}`);
     }
 
-    // Re-read, so the mirror holds what Jira actually has rather than what we
-    // think we sent.
     const mirror = await this.sync(actionId);
 
     if (mirror.subtasks.some((task) => task.key === created.key)) {
       return mirror;
     }
 
-    // Jira's JQL index lags creation by a second or two, so the search above
-    // can come back without the issue that was just made. Without this, a step
-    // someone adds disappears until the next scheduled pass — up to fifteen
-    // minutes of looking like it failed. The row is written from the create
-    // response, and the next sync reconciles it either way.
     const last = await this.prisma.jiraSubtask.findFirst({
       where: { upgradeActionId: actionId },
       orderBy: { position: 'desc' },
@@ -296,7 +240,6 @@ export class IssueTrackerService {
     return this.read(actionId);
   }
 
-  /** Who the tracker will let you assign work to on this issue. */
   async assignees(actionId: string) {
     const action = await this.mustExist(actionId);
 
@@ -307,13 +250,11 @@ export class IssueTrackerService {
     try {
       return await this.tracker.getAssignees(action.jiraKey);
     } catch (error) {
-      // An empty picker is a better failure than a broken form.
       this.logger.warn(`Could not list assignees: ${message(error)}`);
       return [];
     }
   }
 
-  /** What the panel renders. Reads the mirror only — never calls Jira. */
   async read(actionId: string) {
     const action = await this.prisma.upgradeAction.findUnique({
       where: { id: actionId },

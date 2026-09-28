@@ -1,16 +1,7 @@
 import { Component, input } from '@angular/core';
 
-/**
- * How long the goose stays up, whatever the server does.
- *
- * A save against a warm cache finishes in about 20ms, and something that
- * appears and vanishes that fast reads as a glitch rather than feedback. The
- * caller holds its modal open for at least this long so the panel is actually
- * seen — see `update-component.ts`.
- */
 export const MIN_WORKING_MS = 2000;
 
-/** Shown while a change is being written. */
 @Component({
   selector: 'lime-working',
   host: { class: 'contents' },
@@ -37,8 +28,6 @@ export const MIN_WORKING_MS = 2000;
     }
   `,
   styles: `
-    /* The drawing is black line art on white, which is invisible on the dark
-       theme. Inverting it there keeps one asset working in both. */
     .working-goose {
       mix-blend-mode: multiply;
       animation:

@@ -7,14 +7,6 @@ import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
 import { MIN_WORKING_MS, Working } from '../../shared/working';
 
-/**
- * Add a technology this environment was not known to run.
- *
- * Deliberately the same write as an upgrade — one endpoint, one history chain —
- * so a component that appears later in an environment's life is as traceable as
- * one recorded on day one. The only difference is that there is no "from"
- * version, which the backend records as an INSTALL.
- */
 @Component({
   selector: 'lime-add-component',
   imports: [FormsModule, Modal, TechIcon, Working],
@@ -160,7 +152,6 @@ export class AddComponent {
   readonly close = output<void>();
   readonly saved = output<void>();
 
-  /** A first record is rarely an upgrade, so that is not the default here. */
   protected readonly reasons = [
     { key: 'INITIAL_RECORD', label: 'First record of what is running' },
     { key: 'PLANNED_UPGRADE', label: 'Added in a planned change' },
@@ -168,7 +159,6 @@ export class AddComponent {
     { key: 'SECURITY_PATCH', label: 'Security patch' },
   ];
 
-  /** Who the entry will be attributed to: the signed-in account. */
   protected readonly actor = computed(
     () => this.session.user()?.displayName ?? 'you',
   );
@@ -184,7 +174,6 @@ export class AddComponent {
   protected readonly loadingVersions = signal(false);
   protected readonly options = signal<ApiVersionOption[]>([]);
 
-  /** Only what is not already recorded here — the rest is an upgrade, not an add. */
   protected readonly available = computed(() => {
     const installed = new Set(this.environment().components.map((c) => c.technology));
     return this.api
@@ -198,9 +187,6 @@ export class AddComponent {
   );
 
   constructor() {
-    // Versions are fetched per technology, and no currentVersion is passed:
-    // there is nothing installed to be newer than, so the whole published
-    // history is fair game — including a deliberately older version.
     effect(() => {
       const name = this.technology();
       this.version.set('');
@@ -276,7 +262,6 @@ export class AddComponent {
       });
   }
 
-  /** Runs the callback once the goose has had its full time on screen. */
   private afterWorking(startedAt: number, then: () => void): void {
     const remaining = MIN_WORKING_MS - (Date.now() - startedAt);
     if (remaining <= 0) {
@@ -286,7 +271,6 @@ export class AddComponent {
     setTimeout(then, remaining);
   }
 
-  /** Says what committing to this cycle actually buys you. */
   protected cycleLabel(group: ApiVersionOption): string {
     if (!group.eolDate) {
       return `Cycle ${group.cycle} — no published end of life`;

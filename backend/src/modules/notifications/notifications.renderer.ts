@@ -16,14 +16,6 @@ export interface Due {
   mention: { upn: string; name: string; why: string } | null;
 }
 
-/**
- * Turning a deadline into something worth reading at 08:00.
- *
- * No ticket reference anywhere: there is no Jira integration yet, and a card
- * that prints a key nobody created is noise. The plan line names the person,
- * which is the part that decides whether anyone acts. When tickets arrive this
- * is the one place that changes.
- */
 export function buildDeadlineCard(due: Due, appUrl: string): NotificationCard {
   const past = due.days <= 0;
   const environments = [...new Set(due.environments)].sort();
@@ -46,7 +38,6 @@ export function buildDeadlineCard(due: Due, appUrl: string): NotificationCard {
     facts.push({ title: 'Latest in cycle', value: due.latestPatch });
   }
 
-  // Named, or plainly unowned. "None" is the finding, not a missing value.
   facts.push({
     title: 'Plan',
     value: due.mention && !due.mention.why.includes('lead')
@@ -75,12 +66,6 @@ export function buildDeadlineCard(due: Due, appUrl: string): NotificationCard {
   };
 }
 
-/**
- * One card instead of many.
- *
- * No mention: a summary is not a request of any one person, and pinging
- * someone for six things at once trains them to ignore the seventh.
- */
 export function buildDigest(dues: Due[], appUrl: string): NotificationCard {
   const past = dues.filter((d) => d.days <= 0);
   const soon = dues.filter((d) => d.days > 0);
@@ -128,7 +113,6 @@ function line(due: Due): string {
   return `${due.technology} ${due.cycle} — ${when} · ${environments} env`;
 }
 
-/** Two units, as people say them: "7 years and 1 month". */
 function humanGap(days: number): string {
   const abs = Math.abs(days);
 

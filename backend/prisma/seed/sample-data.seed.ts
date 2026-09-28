@@ -1,13 +1,5 @@
 import { Environment, PrismaClient } from '@prisma/client';
 
-/**
- * Siyapatha — the first real project.
- *
- * Three environments running one stack. PROD's versions are the ones recorded
- * by the team; DEV and UAT mirror them until someone records otherwise, which
- * is the honest default: assume drift has not been measured rather than
- * inventing numbers.
- */
 const STACK = [
   { technology: 'Red Hat Enterprise Linux', version: '7.4' },
   { technology: 'Docker Engine', version: '18.09.4' },
@@ -26,7 +18,6 @@ const ENVIRONMENTS: {
 ];
 
 export async function seedSampleData(prisma: PrismaClient): Promise<void> {
-  // ---- people ----
   const admin = await prisma.appUser.upsert({
     where: { email: 'admin@linearsix.com' },
     update: {},
@@ -61,7 +52,6 @@ export async function seedSampleData(prisma: PrismaClient): Promise<void> {
     });
   }
 
-  // ---- customer and project ----
   const customer = await prisma.customer.upsert({
     where: { name: 'Siyapatha' },
     update: {},
@@ -91,7 +81,6 @@ export async function seedSampleData(prisma: PrismaClient): Promise<void> {
     });
   }
 
-  // ---- the versions this project runs ----
   const versions = await prisma.technologyVersion.findMany({
     where: {
       OR: STACK.map((s) => ({
@@ -108,7 +97,6 @@ export async function seedSampleData(prisma: PrismaClient): Promise<void> {
     );
   }
 
-  // ---- environments ----
   for (const env of ENVIRONMENTS) {
     const deployment = await prisma.deployment.upsert({
       where: {

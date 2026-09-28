@@ -19,14 +19,6 @@ import {
 
 const MS_PER_DAY = 86_400_000;
 
-/**
- * The registry: technologies and their support cycles.
- *
- * Registering a technology pulls its published cycles in the same call. A
- * technology with no cycles cannot be deployed anywhere — `changeComponent`
- * refuses a version whose cycle has no end-of-life date — so importing later
- * would leave the registry holding entries nobody can use.
- */
 @Injectable()
 export class TechnologiesService {
   private readonly logger = new Logger(TechnologiesService.name);
@@ -51,15 +43,6 @@ export class TechnologiesService {
     return technologies.map((technology) => this.toDto(technology));
   }
 
-  /**
-   * Registers one of the products endoflife.date publishes.
-   *
-   * The slug is the input; name, component type, cycle rule and logo are all
-   * read from the product. A technology invented here would have no published
-   * lifecycle dates, which is the blind spot this tool exists to remove — so
-   * the catalogue is the only way in, and its cycles are imported in the same
-   * call.
-   */
   async create(input: CreateTechnologyDto) {
     if (input.internal) {
       return this.createInternal(input);
@@ -131,14 +114,6 @@ export class TechnologiesService {
     return this.toDto(created);
   }
 
-  /**
-   * Our own software, and anything else nobody publishes dates for.
-   *
-   * No slug, so nothing to sync and no cycles to import: its versions exist to
-   * record what is running where, not to warn about support ending. Cycles are
-   * created as versions are recorded, so nobody has to register a Lime release
-   * before deploying it.
-   */
   private async createInternal(input: CreateTechnologyDto) {
     const name = input.name?.trim();
 
@@ -171,14 +146,6 @@ export class TechnologiesService {
     return this.toDto(technology);
   }
 
-  /**
-   * The whole endoflife.date catalogue, which is what you may add.
-   *
-   * Returned in full rather than searched server-side: it is a few hundred
-   * products, so the picker filters as you type without a request per keystroke.
-   * Each row carries its logo and a suggested component type, so choosing a
-   * product fills the form instead of asking the engineer to restate it.
-   */
   async catalogue() {
     const products = await this.eol.listProducts();
 
@@ -207,14 +174,12 @@ export class TechnologiesService {
             category: product.category,
             tags: product.tags,
           }),
-          /** Already registered — shown as such rather than offered twice. */
           registeredAs: registered.get(product.slug) ?? null,
         };
       })
       .sort((a, b) => a.label.localeCompare(b.label));
   }
 
-  /** Every cycle the source publishes for a slug, with its real dates. */
   private async importCycles(technologyId: string, slug: string): Promise<void> {
     try {
       const product = await this.eol.getProduct(slug);
@@ -237,7 +202,6 @@ export class TechnologiesService {
         skipDuplicates: true,
       });
     } catch (error) {
-      // Registration still stands; the nightly sync will pick the cycles up.
       this.logger.warn(
         `Could not import cycles for "${slug}": ${(error as Error).message}`,
       );
@@ -283,7 +247,6 @@ export class TechnologiesService {
       vendor: technology.vendor,
       eolSlug: technology.eolSlug,
       cycleRule: technology.cycleRule,
-      // Falls back to the catalogue mark when the row predates the icon columns.
       iconSlug: technology.iconSlug ?? iconOf(technology.eolSlug)?.iconSlug ?? null,
       iconColour:
         technology.iconColour ?? iconOf(technology.eolSlug)?.iconColour ?? null,
@@ -309,7 +272,6 @@ export class TechnologiesService {
   }
 }
 
-/** The catalogue's mark for a slug, for rows registered before icons were stored. */
 function iconOf(slug: string | null) {
   return slug ? iconFor(slug) : null;
 }

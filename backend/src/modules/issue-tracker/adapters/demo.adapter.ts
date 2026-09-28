@@ -7,26 +7,6 @@ import {
   TrackedIssue,
 } from '../ports/issue-tracker.port';
 
-/**
- * Invented issues, for showing the integration without access to a Jira.
- *
- * This is a demonstration, not test data. It exists so the whole flow — link,
- * mirror, sync, unlink — can be walked through and reviewed before anyone has
- * credentials, and it runs through exactly the same service, endpoints, mirror
- * table and panel the real adapter does. Swapping to real Jira changes one
- * environment variable and nothing else.
- *
- * Four things keep it from ever being mistaken for real:
- *
- * - It is bound only when JIRA_DEMO=true, never as a fallback for missing
- *   credentials. Forgetting to configure Jira yields "not connected".
- * - The environment schema refuses to start with it on in production.
- * - Every key it mints is prefixed DEMO, so even a screenshot reads as fake.
- * - The panel shows a badge saying the issues are not real.
- *
- * What it writes goes only to the jira_subtask mirror, which is a cache by
- * design: unlinking deletes those rows and no registry table is touched.
- */
 @Injectable()
 export class DemoIssueTracker implements IssueTracker {
   readonly name = 'Jira (demo)';
@@ -42,8 +22,6 @@ export class DemoIssueTracker implements IssueTracker {
   getIssue(key: string): Promise<TrackedIssue> {
     const normalised = key.trim().toUpperCase();
 
-    // A reserved key that always fails, so the error path can be shown too:
-    // a link that breaks is as much a part of the flow as one that works.
     if (normalised === 'DEMO-404') {
       return Promise.reject(
         new Error('HTTP 404 Not Found: Issue does not exist or you do not have permission to see it.'),
@@ -58,7 +36,6 @@ export class DemoIssueTracker implements IssueTracker {
       id: `demo-${normalised}`,
       key: normalised,
       summary: 'Platform upgrade',
-      // The parent tracks its children: still open while any remain.
       status: done === BREAKDOWN.length ? 'Done' : 'In Progress',
       statusCategory: done === BREAKDOWN.length ? 'done' : 'in-progress',
       assignee: 'Pasindu W',
@@ -86,14 +63,6 @@ export class DemoIssueTracker implements IssueTracker {
     );
   }
 
-  /**
-   * Pretends to create, and says so.
-   *
-   * Returning the issue without persisting anything is the honest behaviour
-   * here: the next sync rebuilds the list from the fixed breakdown, so a demo
-   * creation visibly does not stick. Better that than writing invented rows
-   * into the mirror and letting them look permanent.
-   */
   createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue> {
     const key = `DEMO-${900 + Math.floor(Math.random() * 99)}`;
 
@@ -109,12 +78,6 @@ export class DemoIssueTracker implements IssueTracker {
     });
   }
 
-  /**
-   * The breakdown, derived from the key so a re-sync does not reshuffle it.
-   *
-   * Sub-task numbers hang off the parent's own number, so DEMO-101 and
-   * DEMO-205 read as different pieces of work rather than the same list twice.
-   */
   private children(parentKey: string): TrackedIssue[] {
     const base = Number(parentKey.split('-')[1]) || 100;
 
@@ -136,15 +99,6 @@ export class DemoIssueTracker implements IssueTracker {
   }
 }
 
-/**
- * A realistic shape for a platform upgrade: three done, one running, five
- * waiting — enough to exercise the progress bar, all three status colours and
- * the strikethrough at once.
- *
- * The last step points back at this registry, which is the whole argument for
- * the two tools existing side by side: Jira records that someone did the work,
- * and only the registry records that the deployed version actually changed.
- */
 const BREAKDOWN: {
   summary: string;
   status: string;

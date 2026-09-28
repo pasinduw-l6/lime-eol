@@ -14,14 +14,6 @@ import { TechIcon } from '../../shared/tech-icon';
 import { AddComponent } from './add-component';
 import { UpdateComponent } from './update-component';
 
-/**
- * Environments.
- *
- * One card per technology rather than per server: engineers think in "what
- * version of MongoDB is this customer on", and the answer should be readable
- * without opening anything. The card's top edge carries its support status,
- * so a wall of cards reads as a risk summary at a glance.
- */
 @Component({
   selector: 'lime-environments',
   imports: [TechIcon, AddComponent, UpdateComponent, ChangeTimeline],
@@ -67,7 +59,6 @@ import { UpdateComponent } from './update-component';
             </div>
           </div>
 
-          <!-- environment tabs -->
           <div class="mt-5 flex flex-wrap gap-1.5" role="tablist">
             @for (env of project.environments; track env.id) {
               <button
@@ -157,7 +148,6 @@ import { UpdateComponent } from './update-component';
               <lime-change-timeline [changes]="history()" />
             } @else {
 
-            <!-- one card per technology -->
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               @for (component of env.components; track component.technology) {
                 <button
@@ -221,8 +211,6 @@ import { UpdateComponent } from './update-component';
                 </button>
               }
 
-              <!-- The same action as the header button, where the eye already
-                   is after reading the stack. -->
               <button
                 type="button"
                 class="glass grid min-h-[140px] place-items-center rounded-[14px] border border-dashed border-rule text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-ink"
@@ -266,7 +254,6 @@ export class Environments {
   protected readonly api = inject(Api);
   private readonly store = inject(RegistryStore);
 
-  /** Respects the project switcher: one project, or all of them. */
   protected readonly projects = computed(() => {
     const scope = this.store.scope();
     const all = this.api.projects();
@@ -285,7 +272,6 @@ export class Environments {
 
   protected selected(project: ApiProject): ApiEnvironment | null {
     const chosen = project.environments.find((e) => e.id === this.selectedId());
-    // Default to production: the environment that matters most.
     return (
       chosen ??
       project.environments.find((e) => e.environment === 'PROD') ??
@@ -294,7 +280,6 @@ export class Environments {
     );
   }
 
-  // ---- components / history ------------------------------------------------
 
   protected readonly views = [
     { key: 'components' as const, label: 'Components' },
@@ -305,7 +290,6 @@ export class Environments {
   protected readonly history = signal<ApiChange[]>([]);
   protected readonly verification = signal<ApiVerification | null>(null);
 
-  /** History is fetched only when asked for — most visits never open it. */
   protected setView(view: 'components' | 'history', deploymentId: string): void {
     this.view.set(view);
 

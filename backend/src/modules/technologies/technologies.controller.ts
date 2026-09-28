@@ -8,10 +8,6 @@ import {
 import { CreateTechnologyDto } from './dto/create-technology.dto';
 import { TechnologiesService } from './technologies.service';
 
-/**
- * The registry: technologies and their support cycles, including cycles
- * entered by hand for products endoflife.date no longer publishes.
- */
 @ApiTags('registry')
 @Controller('technologies')
 export class TechnologiesController {

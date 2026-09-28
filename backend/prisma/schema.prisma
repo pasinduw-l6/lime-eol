@@ -1,16 +1,3 @@
-// Lime Technology Lifecycle & EOL Registry — database schema
-//
-// Design decisions behind this file are recorded in docs/db-design-notes.md
-// and PLAN.md section 14. The four that shape it most:
-//
-//   1. Lifecycle data lives on TechnologyCycle, not on each version, because
-//      endoflife.date publishes it per cycle. One upstream fact, one row.
-//   2. Deployments are owned by one *or many* teams (DeploymentOwner), so every
-//      responsible team is notified before an EOL.
-//   3. Reference data is archived (archivedAt), never deleted, so the record of
-//      upgrades survives. Only join tables cascade.
-//   4. uuid(7) keys (time-ordered), @db.Date for calendar dates and
-//      @db.Timestamptz(3) for instants.
 
 generator client {
   provider = "prisma-client-js"
@@ -21,9 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---------------------------------------------------------------------------
-// Enums
-// ---------------------------------------------------------------------------
 
 enum ComponentType {
   DATABASE
@@ -37,14 +21,11 @@ enum ComponentType {
   OTHER
 }
 
-/// How a version string is reduced to its support cycle.
-/// MAJOR: 20.11.1 -> 20   ·   MAJOR_MINOR: 6.0.14 -> 6.0
 enum CycleRule {
   MAJOR
   MAJOR_MINOR
 }
 
-/// Which support phase this technology treats as end of life.
 enum EolField {
   EOL
   EOAS
@@ -75,9 +56,6 @@ enum ActionStatus {
   DEFERRED
 }
 
-/// Where a to-do item stands. Blocked is deliberately separate from not
-/// started: work nobody can proceed with is a different problem from work
-/// nobody has picked up, and only one of them needs chasing.
 
 enum CommStatus {
   NOT_REQUIRED
@@ -110,8 +88,6 @@ enum ComponentChangeType {
   REMOVE
 }
 
-/// Why a component changed. Auditors ask this before they ask what changed:
-/// an emergency patch and a planned upgrade are different kinds of event.
 enum ChangeReason {
   INITIAL_RECORD
   PLANNED_UPGRADE
@@ -121,29 +97,19 @@ enum ChangeReason {
   DECOMMISSION
 }
 
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
 
-/// A technology used in the Lime Platform: MongoDB, Node.js, RHEL, ...
 model Technology {
   id            String        @id @default(uuid(7)) @db.Uuid
   name          String        @unique
   componentType ComponentType @map("component_type")
   vendor        String?
-  /// endoflife.date product slug. Null for technologies it does not track.
   eolSlug       String?       @unique @map("eol_slug")
   cycleRule     CycleRule     @default(MAJOR) @map("cycle_rule")
   eolField      EolField      @default(EOL) @map("eol_field")
   referenceUrl  String?       @map("reference_url")
-  /// Simple Icons slug and brand colour, resolved once when the technology is
-  /// registered. Stored rather than derived per render so the logo stays put if
-  /// the icon set renames something, and so every screen shows the same mark.
   iconSlug      String?       @map("icon_slug")
   iconColour    String?       @map("icon_colour")
   notes         String?
-  /// Set instead of deleting. Archived rows keep their name reserved; to reuse
-  /// a name, un-archive the row rather than creating a duplicate.
   archivedAt    DateTime?     @map("archived_at") @db.Timestamptz(3)
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -156,27 +122,19 @@ model Technology {
   @@map("technology")
 }
 
-/// One support cycle of a technology — MongoDB 6.0, Node.js 24.
-/// All lifecycle dates live here, because the data source publishes them per
-/// cycle. This is the row the nightly sync writes to.
 model TechnologyCycle {
   id                 String    @id @default(uuid(7)) @db.Uuid
   technologyId       String    @map("technology_id") @db.Uuid
-  /// Cycle identifier as the source names it: "24", "6.0".
   cycle              String
-  /// Display label from the source, e.g. "24 (LTS)".
   label              String?
   releaseDate        DateTime? @map("release_date") @db.Date
-  /// End of life for this technology's configured eolField.
   eolDate            DateTime? @map("eol_date") @db.Date
   activeSupportEnd   DateTime? @map("active_support_end") @db.Date
   extendedSupportEnd DateTime? @map("extended_support_end") @db.Date
   isLts              Boolean   @default(false) @map("is_lts")
   isMaintained       Boolean   @default(true) @map("is_maintained")
-  /// Newest patch release in this cycle, e.g. "6.0.29".
   latestPatch        String?   @map("latest_patch")
   latestPatchDate    DateTime? @map("latest_patch_date") @db.Date
-  /// MANUAL rows are never overwritten by the sync.
   eolSource          EolSource @default(API) @map("eol_source")
   lastSyncedAt       DateTime? @map("last_synced_at") @db.Timestamptz(3)
   notes              String?
@@ -195,14 +153,10 @@ model TechnologyCycle {
   @@map("technology_cycle")
 }
 
-/// A specific build we actually run: 6.0.14. Carries no lifecycle dates —
-/// those belong to its cycle.
 model TechnologyVersion {
   id                String   @id @default(uuid(7)) @db.Uuid
   technologyCycleId String   @map("technology_cycle_id") @db.Uuid
   fullVersion       String   @map("full_version")
-  /// Parsed for correct ordering: '6.0.9' sorts before '6.0.14' numerically,
-  /// not as text. Populated by the same parser that derives the cycle.
   major             Int
   minor             Int?
   patch             Int?
@@ -221,8 +175,6 @@ model TechnologyVersion {
   @@map("technology_version")
 }
 
-/// Audit of lifecycle values that changed, so "why did this become urgent?"
-/// has an answer. Written by the sync only when a value actually moves.
 model TechnologyCycleHistory {
   id                String    @id @default(uuid(7)) @db.Uuid
   technologyCycleId String    @map("technology_cycle_id") @db.Uuid
@@ -238,9 +190,6 @@ model TechnologyCycleHistory {
   @@map("technology_cycle_history")
 }
 
-// ---------------------------------------------------------------------------
-// Lime releases
-// ---------------------------------------------------------------------------
 
 model LimeVersion {
   id            String    @id @default(uuid(7)) @db.Uuid
@@ -257,7 +206,6 @@ model LimeVersion {
   @@map("lime_version")
 }
 
-/// The component set a Lime release ships with.
 model LimeVersionComponent {
   limeVersionId String @map("lime_version_id") @db.Uuid
   techVersionId String @map("tech_version_id") @db.Uuid
@@ -270,9 +218,6 @@ model LimeVersionComponent {
   @@map("lime_version_component")
 }
 
-// ---------------------------------------------------------------------------
-// Customers, deployments and ownership
-// ---------------------------------------------------------------------------
 
 model Customer {
   id         String    @id @default(uuid(7)) @db.Uuid
@@ -291,15 +236,11 @@ model Customer {
   @@map("customer")
 }
 
-/// One customer installation of the Lime platform — the unit engineers work
-/// in. A customer may run more than one (a second brand, a separate region),
-/// so this is deliberately not the same record as the customer.
 model Project {
   id          String        @id @default(uuid(7)) @db.Uuid
   customerId  String        @map("customer_id") @db.Uuid
   name        String
   code        String        @unique
-  /// Which Lime release this customer is on. Differs per project.
   limeVersion String?       @map("lime_version")
   status      ProjectStatus @default(ACTIVE)
   startedAt   DateTime?     @map("started_at") @db.Date
@@ -316,8 +257,6 @@ model Project {
   @@map("project")
 }
 
-/// Who is staffed on a project. Plural on purpose — notifications go to all of
-/// them, and is_lead marks who to escalate to.
 model ProjectEngineer {
   projectId String  @map("project_id") @db.Uuid
   userId    String  @map("user_id") @db.Uuid
@@ -331,7 +270,6 @@ model ProjectEngineer {
   @@map("project_engineer")
 }
 
-/// One environment of one customer: "Acme UAT".
 model Deployment {
   id             String             @id @default(uuid(7)) @db.Uuid
   customerId     String             @map("customer_id") @db.Uuid
@@ -340,8 +278,6 @@ model Deployment {
   name           String
   environment    Environment
   location       DeploymentLocation
-  /// The specific site or account, e.g. "eu-west-1" or "Acme DC, Colombo".
-  /// Free text so a new hosting arrangement is not a schema change.
   locationDetail String?            @map("location_detail")
   notes          String?
   archivedAt     DateTime?          @map("archived_at") @db.Timestamptz(3)
@@ -363,8 +299,6 @@ model Deployment {
   @@map("deployment")
 }
 
-/// A deployment may be owned by several teams; every owner is notified.
-/// is_primary marks who to escalate to.
 model DeploymentOwner {
   deploymentId String  @map("deployment_id") @db.Uuid
   teamId       String  @map("team_id") @db.Uuid
@@ -378,8 +312,6 @@ model DeploymentOwner {
   @@map("deployment_owner")
 }
 
-/// A component this deployment runs *instead of* its Lime version's default.
-/// Resolution is defined once, in v_deployment_effective_component.
 model DeploymentComponent {
   deploymentId  String @map("deployment_id") @db.Uuid
   techVersionId String @map("tech_version_id") @db.Uuid
@@ -392,37 +324,22 @@ model DeploymentComponent {
   @@map("deployment_component")
 }
 
-/// What actually changed in an environment, and when.
-///
-/// Append-only: corrections are new rows, never edits, because history that
-/// can be rewritten is not history. Version strings are stored alongside the
-/// foreign keys so a change still reads after a version row is removed.
 model ComponentChange {
   id            String              @id @default(uuid(7)) @db.Uuid
   deploymentId  String              @map("deployment_id") @db.Uuid
   technologyId  String              @map("technology_id") @db.Uuid
   fromVersionId String?             @map("from_version_id") @db.Uuid
   toVersionId   String?             @map("to_version_id") @db.Uuid
-  /// Denormalised so history survives the version being deleted.
   fromVersion   String?             @map("from_version")
   toVersion     String?             @map("to_version")
   changeType    ComponentChangeType @map("change_type")
   reason        ChangeReason        @default(PLANNED_UPGRADE)
-  /// Change request or ticket this was carried out under.
   ticketRef     String?             @map("ticket_ref")
-  /// Runbook, PR or pipeline run that evidences it.
   evidenceUrl   String?             @map("evidence_url")
-  /// Position in this environment's chain, 1-based and gap-free.
   sequence      Int
-  /// SHA-256 over this entry and the one before it. A silently edited or
-  /// deleted row breaks the chain, which /history/verify reports.
   hash          String
   previousHash  String?             @map("previous_hash")
-  /// Set when this entry exists to correct an earlier one. Entries are never
-  /// edited or deleted; a mistake is answered with a compensating entry.
   correctsId    String?             @map("corrects_id") @db.Uuid
-  /// When it happened in the environment — not when someone typed it in.
-  /// Reports use this; recordedAt only says when the paperwork caught up.
   effectiveAt   DateTime            @map("effective_at") @db.Date
   recordedAt    DateTime            @default(now()) @map("recorded_at") @db.Timestamptz(3)
   recordedById  String?             @map("recorded_by_id") @db.Uuid
@@ -442,15 +359,11 @@ model ComponentChange {
   @@map("component_change")
 }
 
-// ---------------------------------------------------------------------------
-// Teams and users
-// ---------------------------------------------------------------------------
 
 model Team {
   id              String    @id @default(uuid(7)) @db.Uuid
   name            String    @unique
   email           String?
-  /// Power Automate Workflows webhook. Masked in API responses.
   teamsWebhookUrl String?   @map("teams_webhook_url")
   archivedAt      DateTime? @map("archived_at") @db.Timestamptz(3)
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -468,8 +381,6 @@ model AppUser {
   entraOid    String?   @unique @map("entra_oid")
   email       String    @unique
   displayName String?   @map("display_name")
-  /// scrypt digest, stored as "scrypt$N$r$p$salt$hash". Null for accounts that
-  /// sign in through Entra, which never hold a password here.
   passwordHash String?  @map("password_hash")
   role        Role      @default(VIEWER)
   isActive    Boolean   @default(true) @map("is_active")
@@ -498,13 +409,7 @@ model TeamMember {
   @@map("team_member")
 }
 
-// ---------------------------------------------------------------------------
-// Upgrade tracking
-// ---------------------------------------------------------------------------
 
-/// Work to move off a cycle that is reaching end of life.
-/// Targets a cycle, because that is what goes EOL; affected deployments are
-/// listed explicitly.
 model UpgradeAction {
   id                String       @id @default(uuid(7)) @db.Uuid
   technologyCycleId String       @map("technology_cycle_id") @db.Uuid
@@ -514,29 +419,15 @@ model UpgradeAction {
   plannedDate       DateTime?    @map("planned_date") @db.Date
   completedDate     DateTime?    @map("completed_date") @db.Date
   status            ActionStatus @default(NOT_STARTED)
-  /// The issue key as a person types it, e.g. OPS-1042. Kept even when the
-  /// mirror below is stale or Jira is unreachable.
-  ///
-  /// Written only by the issue-tracker link flow, never by the plan form. It
-  /// once had two writers, and editing a plan could silently point this at a
-  /// different issue than jiraIssueId and the mirror below — which then failed
-  /// as "issue does not exist" on the next call.
   jiraKey           String?      @map("jira_key")
-  /// Jira's own immutable id. The key changes if an issue moves project; this
-  /// does not, so the link survives.
   jiraIssueId       String?      @map("jira_issue_id")
   jiraUrl           String?      @map("jira_url")
-  /// Mirrored from Jira, never edited here. A cache: if it disagrees with Jira,
-  /// Jira wins and the next sync corrects it.
   jiraStatus        String?      @map("jira_status")
-  /// to-do, indeterminate or done. Jira's own grouping, which survives a
-  /// workflow being renamed.
   jiraStatusCategory String?     @map("jira_status_category")
   jiraAssignee      String?      @map("jira_assignee")
   jiraSubtaskDone   Int?         @map("jira_subtask_done")
   jiraSubtaskTotal  Int?         @map("jira_subtask_total")
   jiraSyncedAt      DateTime?    @map("jira_synced_at") @db.Timestamptz(3)
-  /// Why the last sync failed, shown in the UI. Never holds a credential.
   jiraSyncError     String?      @map("jira_sync_error")
   customerComm      CommStatus   @default(NOT_REQUIRED) @map("customer_comm")
   customerCommNotes String?      @map("customer_comm_notes")
@@ -557,17 +448,10 @@ model UpgradeAction {
   @@map("upgrade_action")
 }
 
-/// One item on an upgrade's to-do list.
-///
-/// Ordered and worked through in sequence. Timings are recorded rather than
-/// typed: startedAt and completedAt give the real duration, which is the only
-/// honest basis for estimating the next upgrade of the same thing.
 
 model UpgradeActionDeployment {
   upgradeActionId String @map("upgrade_action_id") @db.Uuid
   deploymentId    String @map("deployment_id") @db.Uuid
-  /// Set when this environment is done. A rollout runs DEV, then UAT, then
-  /// PROD over weeks, and one status across all three hides which is left.
   completedAt     DateTime? @map("completed_at") @db.Date
 
   upgradeAction UpgradeAction @relation(fields: [upgradeActionId], references: [id], onDelete: Cascade)
@@ -578,13 +462,9 @@ model UpgradeActionDeployment {
   @@map("upgrade_action_deployment")
 }
 
-// ---------------------------------------------------------------------------
-// Notifications
-// ---------------------------------------------------------------------------
 
 model NotificationRule {
   id            String   @id @default(uuid(7)) @db.Uuid
-  /// 180, 90, 30, 0 days before EOL.
   thresholdDays Int      @unique @map("threshold_days")
   emailEnabled  Boolean  @default(true) @map("email_enabled")
   teamsEnabled  Boolean  @default(true) @map("teams_enabled")
@@ -595,15 +475,10 @@ model NotificationRule {
   @@map("notification_rule")
 }
 
-/// One row per thing actually sent. The unique key includes the date the alert
-/// was about, so a moved EOL date re-arms the notifications instead of being
-/// silently suppressed.
 model NotificationLog {
   id                String    @id @default(uuid(7)) @db.Uuid
   technologyCycleId String    @map("technology_cycle_id") @db.Uuid
   upgradeActionId   String?   @map("upgrade_action_id") @db.Uuid
-  /// The date the alert was about: the EOL date, or an action's planned date
-  /// for an overdue reminder (threshold -1).
   referenceDate     DateTime  @map("reference_date") @db.Date
   thresholdDays     Int       @map("threshold_days")
   recipient         String
@@ -620,9 +495,6 @@ model NotificationLog {
   @@map("notification_log")
 }
 
-// ---------------------------------------------------------------------------
-// Operational logs
-// ---------------------------------------------------------------------------
 
 model EolSyncLog {
   id           String    @id @default(uuid(7)) @db.Uuid
@@ -640,14 +512,11 @@ model EolSyncLog {
   @@map("eol_sync_log")
 }
 
-/// Who changed what. uuid rather than bigint: JSON.stringify throws on BigInt
-/// in Node, and this table is served over the API.
 model AuditLog {
   id         String   @id @default(uuid(7)) @db.Uuid
   userId     String?  @map("user_id") @db.Uuid
   entity     String
   entityId   String?  @map("entity_id")
-  /// CREATE | UPDATE | DELETE | ARCHIVE | SYNC | LOGIN
   action     String
   beforeData Json?    @map("before_data")
   afterData  Json?    @map("after_data")
@@ -660,25 +529,16 @@ model AuditLog {
   @@map("audit_log")
 }
 
-/// A sub-task of a linked Jira issue, mirrored so the board renders without a
-/// request to Jira on every page load.
-///
-/// Read-only by construction: nothing in this application writes to it except
-/// the sync, and the UI offers no way to edit a row. The work is managed in
-/// Jira; this table only remembers what Jira last said.
 model JiraSubtask {
   id              String   @id @default(uuid(7)) @db.Uuid
   upgradeActionId String   @map("upgrade_action_id") @db.Uuid
-  /// e.g. OPS-1043
   issueKey        String   @map("issue_key")
   issueId         String   @map("issue_id")
   summary         String
   status          String
-  /// to-do, indeterminate or done
   statusCategory  String   @map("status_category")
   assignee        String?
   url             String
-  /// Jira's order within the parent, so the mirror lists them as Jira does.
   position        Int
   syncedAt        DateTime @default(now()) @map("synced_at") @db.Timestamptz(3)
 

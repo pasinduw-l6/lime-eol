@@ -38,14 +38,6 @@ const KIND_LABEL: Record<Kind, string> = {
   DONE: 'done',
 };
 
-/**
- * Calendar, as an agenda.
- *
- * A month grid is built for dense daily events; lifecycle work is a handful a
- * year, so a grid would be mostly empty cells. This lists only months that
- * contain something and names the quiet stretches between them — an empty
- * quarter is information, not blank space.
- */
 @Component({
   selector: 'lime-calendar',
   imports: [NgTemplateOutlet, TechIcon],
@@ -81,8 +73,6 @@ const KIND_LABEL: Record<Kind, string> = {
       </div>
     </header>
 
-    <!-- One definition, used above a month heading, between two rows, or at the
-         end — so the line looks identical wherever now happens to fall. -->
     <ng-template #todayLine let-trailing="trailing">
       <div class="flex items-center gap-3 py-3">
         <span
@@ -101,14 +91,10 @@ const KIND_LABEL: Record<Kind, string> = {
 
     <section class="card px-7 py-6">
       @for (group of groups(); track group.key) {
-        <!-- Today belongs above the heading when the month's own first entry is
-             what comes next: under it, the line reads as though today fell in
-             that month. -->
         @if (group.entries[0].id === todayMarker()) {
           <ng-container [ngTemplateOutlet]="todayLine" />
         }
 
-        <!-- month heading, with a rule running to the count -->
         <div class="mt-7 mb-1 flex items-baseline gap-3 first:mt-0">
           <h2 class="m-0 text-[13px] font-semibold tracking-[0.04em] uppercase">
             {{ group.label }}
@@ -122,7 +108,6 @@ const KIND_LABEL: Record<Kind, string> = {
 
         <ol class="m-0 list-none p-0">
           @for (entry of group.entries; track entry.id) {
-            <!-- $first is already handled above the heading. -->
             @if (entry.id === todayMarker() && !$first) {
               <li>
                 <ng-container [ngTemplateOutlet]="todayLine" />
@@ -205,9 +190,6 @@ export class Calendar {
   private readonly recorded = signal<ApiActivity[]>([]);
 
   constructor() {
-    // Projects arrive asynchronously and the scope switcher can change which
-    // ones are in view, so the fetch is reactive rather than a one-shot in the
-    // constructor — which would run before any project id existed.
     effect(() => {
       const scoped = this.store.activeProject();
       const ids = scoped
@@ -219,8 +201,6 @@ export class Calendar {
         return;
       }
 
-      // One call per project in scope — usually one, since engineers work
-      // inside a single customer installation.
       Promise.all(
         ids.map(
           (id) =>
@@ -235,12 +215,10 @@ export class Calendar {
     });
   }
 
-  /** Everything, from three sources, on one timeline. */
   private readonly all = computed<Entry[]>(() => {
     const now = today().getTime();
     const out: Entry[] = [];
 
-    // what has already been done
     for (const change of this.recorded()) {
       const date = parseDate(change.date);
       if (!date) {
@@ -268,7 +246,6 @@ export class Calendar {
       });
     }
 
-    // what is planned
     for (const action of this.store.actions()) {
       const date = parseDate(action.plannedDate);
       if (!date || action.status === 'COMPLETED') {
@@ -289,7 +266,6 @@ export class Calendar {
       });
     }
 
-    // what is coming whether we like it or not
     for (const entry of this.store.cyclesInUse()) {
       const date = parseDate(entry.cycle.eolDate);
       if (!date) {
@@ -327,13 +303,6 @@ export class Calendar {
     timeZone: 'UTC',
   });
 
-  /**
-   * The entry the "today" line sits above — the first thing not yet behind us.
-   *
-   * Null when everything in view has already happened, in which case the line
-   * is drawn after the last group instead, so the reader is never left
-   * wondering which side of now they are on.
-   */
   protected readonly todayMarker = computed(() => {
     const now = today().getTime();
     return this.visible().find((e) => e.date.getTime() >= now)?.id ?? null;
@@ -343,7 +312,6 @@ export class Calendar {
     () => this.visible().length > 0 && this.todayMarker() === null,
   );
 
-  /** Grouped by month. Months with nothing in them are simply not listed. */
   protected readonly groups = computed<MonthGroup[]>(() => {
     const byMonth = new Map<string, Entry[]>();
 

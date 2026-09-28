@@ -1,9 +1,5 @@
 import { EolField, EolRelease } from '../ports/eol-data-source.port';
 
-/**
- * The lifecycle fields a TechnologyVersion takes from the data source.
- * Matches the API-owned columns in the Prisma model (Phase 2).
- */
 export interface MappedVersionLifecycle {
   cycle: string;
   releaseDate: Date | null;
@@ -13,13 +9,6 @@ export interface MappedVersionLifecycle {
   latestSupported: string | null;
 }
 
-/**
- * Picks the date a technology treats as its end of life.
- *
- * Which phase counts differs per product: for most it is `eol`, but a product
- * with paid extended support may track `eoes`, and a team that will not run
- * security-only builds may track `eoas`. Technology.eolField decides.
- */
 export function selectEolDate(
   release: EolRelease,
   eolField: EolField,
@@ -40,8 +29,6 @@ export function toDate(value: string | null | undefined): Date | null {
     return null;
   }
 
-  // Date-only values are anchored at UTC midnight so the stored DATE does not
-  // shift when the container runs in Asia/Colombo.
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
@@ -60,7 +47,6 @@ export function mapReleaseToVersionLifecycle(
   };
 }
 
-/** Finds the release matching a registered version's cycle. */
 export function findReleaseForCycle(
   releases: EolRelease[],
   cycle: string,

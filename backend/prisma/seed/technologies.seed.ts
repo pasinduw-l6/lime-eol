@@ -7,14 +7,6 @@ import {
 } from '@prisma/client';
 import { deriveCycle, parseVersion } from '../../src/lifecycle/version.util';
 
-/**
- * The technologies the Lime Platform actually runs on.
- *
- * Every slug and every date below was verified against endoflife.date on
- * 2026-09-22. The nightly sync keeps API-sourced cycles current; cycles marked
- * MANUAL are ones the source no longer publishes, and the sync must never
- * overwrite them.
- */
 interface CycleSeed {
   cycle: string;
   label?: string;
@@ -26,7 +18,6 @@ interface CycleSeed {
   latestPatch?: string;
   eolSource?: EolSource;
   notes?: string;
-  /** Builds actually deployed somewhere. */
   versions: string[];
 }
 
@@ -103,9 +94,6 @@ const TECHNOLOGIES: TechnologySeed[] = [
     vendor: 'CNCF',
     cycles: [
       {
-        // endoflife.date no longer publishes cycles this old, so the dates are
-        // entered by hand from the Kubernetes release history and marked
-        // MANUAL: the sync must not clear them.
         cycle: '1.14',
         releaseDate: '2019-03-25',
         eolDate: '2019-12-11',
@@ -190,8 +178,6 @@ export async function seedTechnologies(prisma: PrismaClient): Promise<void> {
       cycleCount++;
 
       for (const fullVersion of cycleSeed.versions) {
-        // The parser that derives a cycle also fills the sort columns, so seed
-        // data exercises the same code path as the API.
         const derived = deriveCycle(fullVersion, tech.cycleRule);
         if (derived !== cycleSeed.cycle) {
           throw new Error(

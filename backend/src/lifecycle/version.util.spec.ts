@@ -39,16 +39,12 @@ describe('deriveCycle', () => {
     ['19.03.15', '19.03'],
     ['20.10.24', '20.10'],
   ])('keeps a zero-padded minor: %s -> %s', (input, expected) => {
-    // Docker's cycles are 18.09 and 19.03, not 18.9 and 19.3. Rebuilding the
-    // string from parsed numbers would silently invent a cycle that upstream
-    // has never published.
     expect(deriveCycle(input, 'MAJOR_MINOR')).toBe(expected);
   });
 });
 
 describe('compareVersions', () => {
   it('orders numerically, not as text', () => {
-    // The reason major/minor/patch are stored as integers.
     expect(compareVersions('6.0.9', '6.0.14')).toBeLessThan(0);
     expect('6.0.9' < '6.0.14').toBe(false);
   });

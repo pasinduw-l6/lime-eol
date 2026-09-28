@@ -10,19 +10,6 @@ interface Row extends ApiNotificationLog {
   when: string;
 }
 
-/**
- * The bell, and what it drops down.
- *
- * A log of what this tool actually announced — read from the API, not from a
- * fixture. Follows the pattern every web tool has settled on: newest first,
- * unread in bold, relative times for recent entries and absolute ones for
- * older, a count meaning "new since you last looked", and one place to clear
- * it.
- *
- * The channel status stays pinned in the panel rather than a settings screen:
- * a drawer should not be the only place something important is said, and
- * "not connected" is important.
- */
 @Component({
   selector: 'lime-notification-menu',
   imports: [TechIcon],
@@ -73,7 +60,6 @@ interface Row extends ApiNotificationLog {
           }
         </header>
 
-        <!-- real state, from /notifications/status -->
         <div class="border-b border-rule px-4 py-2.5 text-[12px]">
           <p class="m-0 flex items-center gap-2" [style.color]="health().colour">
             <span
@@ -143,8 +129,6 @@ export class NotificationMenu {
   private readonly seenAt = signal<number>(restoreSeen());
 
   protected readonly rows = computed<Row[]>(() =>
-    // Newest first, which is what everyone expects and what makes the count
-    // mean anything.
     [...this.api.notificationLog()]
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
       .map((entry) => ({
@@ -158,17 +142,10 @@ export class NotificationMenu {
     () => this.rows().filter((r) => r.unread).length,
   );
 
-  /** A failed send turns the badge red: it is not just new, it is wrong. */
   protected readonly hasFailure = computed(() =>
     this.rows().some((r) => r.unread && !r.success),
   );
 
-  /**
-   * Whether anything can actually get out, in the order that matters.
-   *
-   * A failed send is reported ahead of configuration, because a channel that
-   * was working and stopped is more urgent than one never set up.
-   */
   protected readonly health = computed(() => {
     const status = this.api.notificationStatus();
     const pending = this.preview.pending().length;
@@ -223,7 +200,6 @@ export class NotificationMenu {
 
   protected toggle(): void {
     this.open.update((v) => !v);
-    // Reopened after a run, the panel should show it.
     if (this.open()) {
       this.api.notificationLogResource.reload();
       this.api.notificationStatusResource.reload();
@@ -236,8 +212,6 @@ export class NotificationMenu {
     try {
       localStorage.setItem(SEEN_KEY, String(now));
     } catch {
-      // Site data blocked. Cleared for this tab, back next reload — better
-      // than refusing to clear at all.
     }
   }
 }
@@ -250,7 +224,6 @@ function restoreSeen(): number {
   }
 }
 
-/** Relative while it is recent, absolute once it stops being "ago". */
 function relative(iso: string): string {
   const then = Date.parse(iso);
   const minutes = Math.round((Date.now() - then) / 60_000);

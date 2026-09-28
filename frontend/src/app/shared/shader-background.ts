@@ -10,18 +10,7 @@ import {
 import { Mesh, Program, Renderer, Triangle } from 'ogl';
 import { Theme } from '../core/theme';
 
-/**
- * Flowing colour behind the whole app.
- *
- * One fullscreen triangle and one fragment shader, drawn by OGL — about 12 KB,
- * against ~150 KB for Three.js, which would be a lot of library for a single
- * quad.
- *
- * Deliberately slow and low-contrast. This sits behind live data that someone
- * reads all day, so it has to be atmosphere rather than something the eye keeps
- * returning to.
- */
-const VERTEX = /* glsl */ `
+const VERTEX =  `
   attribute vec2 uv;
   attribute vec2 position;
   varying vec2 vUv;
@@ -32,7 +21,7 @@ const VERTEX = /* glsl */ `
   }
 `;
 
-const FRAGMENT = /* glsl */ `
+const FRAGMENT =  `
   precision highp float;
 
   uniform float uTime;
@@ -42,12 +31,10 @@ const FRAGMENT = /* glsl */ `
   uniform vec3 uLime;
   uniform float uStrength;
 
-  /** How much of the flow survives at the edges of the screen. */
   uniform float uEdgeFloor;
 
   varying vec2 vUv;
 
-  // Classic 2D value noise. Cheap, and smooth enough once layered.
   vec2 hash(vec2 p) {
     p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
     return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
@@ -67,7 +54,6 @@ const FRAGMENT = /* glsl */ `
     );
   }
 
-  /** Layered noise. Four octaves is plenty at this scale and stays cheap. */
   float fbm(vec2 p) {
     float total = 0.0;
     float amplitude = 0.5;
@@ -81,14 +67,11 @@ const FRAGMENT = /* glsl */ `
   }
 
   void main() {
-    // Aspect-corrected, so the flow does not stretch on a wide monitor.
     vec2 uv = vUv;
     vec2 p = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
 
     float t = uTime * 0.035;
 
-    // Domain warping: noise displacing the lookup of more noise, which is what
-    // turns flat clouds into something that looks like it is flowing.
     vec2 warp = vec2(
       fbm(p * 1.4 + vec2(t, t * 0.7)),
       fbm(p * 1.4 + vec2(-t * 0.8, t * 0.6) + 5.2)
@@ -100,20 +83,13 @@ const FRAGMENT = /* glsl */ `
     float teal = smoothstep(0.30, 0.78, flow);
     float lime = smoothstep(0.58, 0.95, flow) * 0.55;
 
-    // The ground tinted toward the brand colours — teal through the middle of
-    // the range, lime at the peaks.
     vec3 colour = uGround;
     colour = mix(colour, uTeal, teal * uStrength);
     colour = mix(colour, uLime, lime * uStrength);
 
-    // Settled toward the flat ground at the edges, so cards near the rim keep
-    // their contrast. The light theme keeps far more of it: the margins are
-    // exactly where its background shows between cards, and flattening them
-    // there hides the effect where it is most needed.
     float vignette = 1.0 - smoothstep(0.35, 1.25, length(uv - 0.5) * 1.6);
     colour = mix(uGround, colour, uEdgeFloor + vignette * (1.0 - uEdgeFloor));
 
-    // A little dither. Eight-bit gradients this wide band badly without it.
     float grain = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
     colour += (grain - 0.5) * 0.015;
 
@@ -121,7 +97,6 @@ const FRAGMENT = /* glsl */ `
   }
 `;
 
-/** Brand palette per theme, as the shader wants it: 0-1 linear-ish RGB. */
 const PALETTE = {
   dark: {
     ground: [0.027, 0.102, 0.137],
@@ -131,17 +106,10 @@ const PALETTE = {
     edgeFloor: 0.35,
   },
   light: {
-    // A whiter ground than the theme's own, so the green has something to read
-    // against rather than a grey that swallows it.
     ground: [0.902, 0.937, 0.941],
-    // Darker than the flow's dark-theme counterparts, not lighter. A pale
-    // green on a near-white ground has almost no contrast to spend; these are
-    // close to the light theme's own accent and lime tokens.
     teal: [0.32, 0.68, 0.62],
     lime: [0.36, 0.62, 0.16],
     strength: 1.0,
-    // Much higher than the dark theme's: the light background is only visible
-    // in the gutters at the rim, so the flow has to survive out there.
     edgeFloor: 0.58,
   },
 } as const;
@@ -162,9 +130,6 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
   private readonly canvas = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
 
   constructor() {
-    // Follows the theme switch. Read once at startup, the canvas stayed navy
-    // behind a light interface — the background and the cards disagreeing about
-    // which theme was on.
     effect(() => {
       const mode = this.theme.mode();
       const program = this.program;
@@ -205,13 +170,9 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
         canvas,
         alpha: false,
         antialias: false,
-        // Half resolution. The image is all soft gradients, so nobody can tell,
-        // and it quarters the work on a high-DPI screen.
         dpr: Math.min(window.devicePixelRatio, 2) * 0.5,
       });
     } catch {
-      // No WebGL — a locked-down machine, or a browser with it disabled. The
-      // app keeps its flat token background and nothing else changes.
       return;
     }
 
@@ -242,7 +203,6 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
     document.addEventListener('visibilitychange', this.onVisibility);
 
     if (this.still()) {
-      // One frame, then nothing: a still image rather than a blank rectangle.
       this.draw(0);
       return;
     }
@@ -257,12 +217,9 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
     this.observer?.disconnect();
     document.removeEventListener('visibilitychange', this.onVisibility);
 
-    // Releases the GL context rather than waiting for the browser to collect
-    // it; they are a limited resource and leaking one breaks the next canvas.
     this.renderer?.gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
-  /** Runs only while the tab is visible, so a background tab costs nothing. */
   private pump(): void {
     if (this.frame !== undefined) {
       cancelAnimationFrame(this.frame);
@@ -300,7 +257,6 @@ export class ShaderBackground implements AfterViewInit, OnDestroy {
     this.renderer.setSize(width, height);
     this.program.uniforms['uResolution'].value = [width, height];
 
-    // Redrawn immediately so a resize is not a frame of stale image.
     if (this.still()) {
       this.draw(0);
     }

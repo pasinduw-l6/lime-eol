@@ -10,39 +10,14 @@ import {
 
 const MAX_ATTEMPTS = 3;
 
-/** Jira Cloud caps a page at 100; we ask for that and follow the cursor. */
 const PAGE_SIZE = 100;
 
-/**
- * Jira Cloud, REST API v3.
- *
- * Four things here are not obvious and are easy to get wrong:
- *
- * - Search is `/rest/api/3/search/jql`. The old `/rest/api/3/search` has been
- *   removed, not merely deprecated, and paging is a `nextPageToken` cursor
- *   rather than `startAt`. Most tutorials still show the old one.
- * - Auth is Basic with `email:apiToken`, which is Cloud's scheme. Data Center
- *   uses a bare bearer PAT instead, which is why this adapter is Cloud-only
- *   and a second adapter would be needed for Data Center.
- * - A scoped token and a classic one are both opaque strings, but they are
- *   sent to different hosts: scoped tokens go through Atlassian's gateway at
- *   api.atlassian.com and need the site's cloud id, classic tokens go to the
- *   site itself. Nothing in the token says which it is, so the type is
- *   configured rather than sniffed.
- * - v3 wants rich text as ADF (nested JSON), not a string; a plain string in
- *   `description` is a 400. Hence `toAdf` on the one write path here.
- *
- * The token is never logged and never returned. Errors carry status codes and
- * Jira's own message, both of which are safe; the Authorization header is not.
- */
 @Injectable()
 export class JiraAdapter implements IssueTracker {
   private readonly logger = new Logger(JiraAdapter.name);
 
-  /** Resolved once. A site's cloud id does not change. */
   private cachedCloudId: string | null = null;
 
-  /** Sub-task issue type id, per project. Differs per project and per site. */
   private readonly subtaskTypes = new Map<string, string>();
 
   readonly name = 'Jira';
@@ -63,8 +38,6 @@ export class JiraAdapter implements IssueTracker {
     const style = this.config.scopedToken ? 'scoped' : 'classic';
 
     try {
-      // Cheapest authenticated call that proves both reachability and that the
-      // credentials are accepted.
       const me = await this.request<{ displayName?: string }>('/rest/api/3/myself');
       return {
         ok: true,
@@ -73,9 +46,6 @@ export class JiraAdapter implements IssueTracker {
     } catch (error) {
       const detail = message(error);
 
-      // The two token types are sent to different hosts, so the wrong setting
-      // fails as a 401 that reads like bad credentials. Saying which one was
-      // assumed turns a guessing game into a one-line fix.
       const hint =
         detail.includes('401') || detail.includes('403')
           ? ` Sent as a ${style} token — if it is the other kind, set JIRA_TOKEN_TYPE=${
@@ -96,8 +66,6 @@ export class JiraAdapter implements IssueTracker {
   }
 
   async getChildren(key: string): Promise<TrackedIssue[]> {
-    // `parent = X` covers both sub-tasks and the children of an epic on
-    // team-managed projects, which is why it is used rather than `subtasks`.
     const jql = `parent = "${key.replace(/"/g, '')}" ORDER BY created ASC`;
     const issues: RawIssue[] = [];
     let cursor: string | undefined;
@@ -117,7 +85,6 @@ export class JiraAdapter implements IssueTracker {
       );
       issues.push(...(page.issues ?? []));
       cursor = page.nextPageToken;
-      // `isLast` is absent on older responses, so the cursor is the condition.
     } while (cursor);
 
     return issues.map((issue) => this.toTracked(issue));
@@ -134,9 +101,6 @@ export class JiraAdapter implements IssueTracker {
   }
 
   async createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue> {
-    // The project comes from the parent rather than JIRA_PROJECT_KEY: a plan
-    // may be linked to an issue that lives somewhere else entirely, and the
-    // child has to be created beside its parent.
     const projectKey = parentKey.split('-')[0];
     const issueTypeId = await this.subtaskTypeId(projectKey);
 
@@ -147,7 +111,6 @@ export class JiraAdapter implements IssueTracker {
       summary: input.summary,
     };
 
-    // v3 rejects a plain string here — rich text has to be ADF.
     if (input.description) {
       fields['description'] = toAdf(input.description);
     }
@@ -162,18 +125,9 @@ export class JiraAdapter implements IssueTracker {
       fields,
     });
 
-    // Read it back rather than assembling the response from what we sent:
-    // Jira applies its own defaults, and the status is one of them.
     return this.getIssue(created.key);
   }
 
-  /**
-   * The id of the project's sub-task type.
-   *
-   * Issue type ids differ per project and per site, so they cannot be
-   * hardcoded. Cached because it only changes if someone edits the project's
-   * issue type scheme.
-   */
   private async subtaskTypeId(projectKey: string): Promise<string> {
     const cached = this.subtaskTypes.get(projectKey);
     if (cached) {
@@ -210,14 +164,6 @@ export class JiraAdapter implements IssueTracker {
     };
   }
 
-  /**
-   * Where REST calls go, which depends on the kind of token.
-   *
-   * A scoped token is rejected at the site URL and a classic one is rejected
-   * at the gateway, so getting this wrong produces a 401 that looks like bad
-   * credentials rather than a wrong address — which is why the type is
-   * configured explicitly and named in the error below.
-   */
   private async apiRoot(): Promise<string> {
     if (!this.config.scopedToken) {
       return this.config.baseUrl!;
@@ -225,13 +171,6 @@ export class JiraAdapter implements IssueTracker {
     return `https://api.atlassian.com/ex/jira/${await this.cloudId()}`;
   }
 
-  /**
-   * The site's cloud id, from its own public tenant-info endpoint.
-   *
-   * Unauthenticated on purpose: it runs before the token is ever used, so a
-   * failure here is clearly "the site URL is wrong" rather than "the
-   * credentials are wrong". Cached for the life of the process.
-   */
   private async cloudId(): Promise<string> {
     if (this.cachedCloudId) {
       return this.cachedCloudId;
@@ -259,11 +198,6 @@ export class JiraAdapter implements IssueTracker {
     return body.cloudId;
   }
 
-  /**
-   * A write. Deliberately not folded into `request`: reads retry freely, and a
-   * create that is retried after an ambiguous failure can leave two issues
-   * behind. This one tries once.
-   */
   private async send<T>(
     path: string,
     method: 'POST' | 'PUT',
@@ -321,9 +255,6 @@ export class JiraAdapter implements IssueTracker {
           return (await response.json()) as T;
         }
 
-        // 401/403/404 will not fix themselves — bad credentials are bad every
-        // time, and a missing issue stays missing. Only throttling and server
-        // faults are worth another attempt.
         const retryable = response.status === 429 || response.status >= 500;
         lastError = await describe(response);
 
@@ -341,13 +272,10 @@ export class JiraAdapter implements IssueTracker {
       }
     }
 
-    // Deliberately does not include the URL or any header: this message is
-    // stored on the action and shown in the UI.
     throw new Error(lastError || 'the request failed');
   }
 }
 
-/** Jira's category keys, mapped to ours. */
 function toCategory(key: string | undefined): IssueStatusCategory {
   switch (key) {
     case 'new':
@@ -362,7 +290,6 @@ function toCategory(key: string | undefined): IssueStatusCategory {
   }
 }
 
-/** Jira's own error text when it gives one, so a 400 says what was wrong. */
 async function describe(response: Response): Promise<string> {
   const fallback = `HTTP ${response.status} ${response.statusText}`.trim();
   try {
@@ -384,7 +311,6 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : 'the request failed';
 }
 
-/** Honours Retry-After when Jira throttles, else backs off. */
 function backoffFor(attempt: number, retryAfter: string | null): number {
   const seconds = Number(retryAfter);
   if (Number.isFinite(seconds) && seconds > 0) {
@@ -397,12 +323,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Plain text as an Atlassian Document Format paragraph per line.
- *
- * v3 returns 400 for a plain string in `description`, so even one sentence has
- * to be wrapped. Blank lines are dropped rather than becoming empty paragraphs.
- */
 function toAdf(text: string): Record<string, unknown> {
   const paragraphs = text
     .split(/\r?\n/)

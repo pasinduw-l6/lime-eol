@@ -20,20 +20,12 @@ const REASON_LABEL: Record<string, string> = {
   PLANNED_UPGRADE: 'Planned upgrade',
 };
 
-/**
- * Version history as a timeline.
- *
- * Entries thread onto one line so the eye follows the sequence rather than
- * reading a table row by row, and the dot's colour says why each change
- * happened before any of the text is read.
- */
 @Component({
   selector: 'lime-change-timeline',
   imports: [TechIcon],
   host: { class: 'block' },
   template: `
     <ol class="relative m-0 list-none p-0">
-      <!-- the thread -->
       @if (entries().length > 1) {
         <span
           class="absolute top-3 bottom-3 w-px"
@@ -99,9 +91,6 @@ const REASON_LABEL: Record<string, string> = {
     </ol>
   `,
   styles: `
-    /* Entries rise into place in sequence, which reads as the timeline being
-       drawn. Held to one short movement; the global reduced-motion rule
-       flattens it to nothing. */
     .timeline-item {
       animation: timeline-rise 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
     }

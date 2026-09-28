@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthLayout } from './auth-layout';
 
-/** Length is what makes a passphrase hard, so that is what the meter measures. */
 const MIN_LENGTH = 12;
 
 @Component({
@@ -71,8 +70,6 @@ const MIN_LENGTH = 12;
             </button>
           </span>
 
-          <!-- Four segments rather than a word: it shows progress while typing
-               without pretending to score the password precisely. -->
           <span class="mt-2 flex gap-1.5" aria-hidden="true">
             @for (segment of [0, 1, 2, 3]; track segment) {
               <span
@@ -103,9 +100,6 @@ const MIN_LENGTH = 12;
           }
         </label>
 
-        <!-- Accounts are issued by an administrator, not self-service: this
-             tool records who changed a customer's production estate, and an
-             account anyone could create would make that record worthless. -->
         <p
           class="m-0 rounded-xl border border-rule px-4 py-3 text-[12.5px] text-ink-soft"
           style="background: color-mix(in oklab, var(--color-soon) 10%, transparent)"
@@ -156,7 +150,6 @@ export class SignUp {
       : 'That does not look like an email address.';
   });
 
-  /** 0–4, driven mostly by length with a nudge for variety. */
   protected readonly strength = computed(() => {
     const value = this.password();
     if (!value) {
@@ -223,8 +216,6 @@ export class SignUp {
       return;
     }
 
-    // Deliberately not wired to the API. The form validates so it is ready for
-    // the day registration is opened up, but it cannot create an account today.
     this.error.set(
       'Registration is not open. Ask an administrator to issue your account, then sign in.',
     );

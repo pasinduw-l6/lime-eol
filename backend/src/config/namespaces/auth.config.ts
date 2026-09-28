@@ -21,13 +21,6 @@ export const authConfig = registerAs(AUTH_CONFIG_KEY, () => {
         : undefined,
     },
 
-    /**
-     * The provider, reduced to the three things a token check needs.
-     *
-     * Entra fills these from the tenant id because its URLs are predictable;
-     * anything else states them outright. The strategy reads only this, so it
-     * never learns which provider it is talking to.
-     */
     oidc: resolveProvider(env),
   };
 });

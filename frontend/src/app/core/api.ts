@@ -1,13 +1,6 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, computed, inject } from '@angular/core';
 
-/**
- * The API, as the UI sees it.
- *
- * These shapes are what /api/v1/projects and /api/v1/technologies return; the
- * backend resolves lifecycle state server-side, so nothing here recomputes
- * what the database already knows.
- */
 
 export interface ApiComponent {
   technology: string;
@@ -74,19 +67,12 @@ export interface ApiTechnology {
   vendor: string | null;
   eolSlug: string | null;
   cycleRule: string;
-  /** Simple Icons slug and brand colour, resolved when it was registered. */
   iconSlug: string | null;
   iconColour: string | null;
   notes: string | null;
   cycles: ApiCycle[];
 }
 
-/**
- * One product endoflife.date publishes.
- *
- * The registry can only hold these: a technology invented locally would have no
- * published lifecycle dates, which is the blind spot this tool exists to close.
- */
 export interface ApiCatalogueProduct {
   slug: string;
   label: string;
@@ -96,24 +82,20 @@ export interface ApiCatalogueProduct {
   iconSlug: string | null;
   iconColour: string | null;
   suggestedType: string;
-  /** The local name it is already registered under, or null. */
   registeredAs: string | null;
 }
 
-/** Someone who can be staffed on a project. */
 export interface ApiUser {
   id: string;
   email: string;
   name: string;
   initials: string;
   role: 'ADMIN' | 'EDITOR' | 'VIEWER';
-  /** False for viewers, who can look but not record. */
   canEdit: boolean;
   projectCount: number;
   lastLoginAt: string | null;
 }
 
-/** Whether anything could actually be delivered. Never carries the webhook URL. */
 export interface ApiNotificationStatus {
   enabled: boolean;
   dryRun: boolean;
@@ -122,7 +104,6 @@ export interface ApiNotificationStatus {
   cron: string;
 }
 
-/** One send attempt, successful or not. */
 export interface ApiNotificationLog {
   id: string;
   at: string;
@@ -135,14 +116,12 @@ export interface ApiNotificationLog {
   error: string | null;
 }
 
-/** One environment an action covers, with whether the estate agrees it moved. */
 export interface ApiActionEnvironment {
   deploymentId: string;
   project: string;
   projectId: string | null;
   environment: 'DEV' | 'UAT' | 'PROD';
   completedAt: string | null;
-  /** A recorded change confirms this environment is on the new version. */
   verified: boolean;
 }
 
@@ -155,14 +134,12 @@ export interface ApiUpgradeAction {
   daysToEol: number | null;
   targetVersion: string | null;
   status: string;
-  /** Computed from progress and dates — OVERDUE and IN_PROGRESS are facts. */
   derivedStatus: string;
   plannedDate: string | null;
   completedDate: string | null;
   assignee: { id: string; name: string } | null;
   team: { id: string; name: string } | null;
   jiraKey: string | null;
-  /** Mirrored from Jira, so the board needs no extra request per plan. */
   jiraStatusCategory: JiraStatusCategory | null;
   jiraSubtaskDone: number | null;
   jiraSubtaskTotal: number | null;
@@ -171,17 +148,13 @@ export interface ApiUpgradeAction {
   remarks: string | null;
   environments: ApiActionEnvironment[];
   progress: { done: number; total: number };
-  /** Marked complete with no recorded change behind it. */
   unverifiedCompletion: boolean;
-  /** The plan finishes after support ends. */
   planTooLate: boolean;
   createdAt: string;
 }
 
-/** Jira's own status grouping. Survives a workflow being renamed. */
 export type JiraStatusCategory = 'to-do' | 'in-progress' | 'done' | 'unknown';
 
-/** One sub-task, as Jira last reported it. Read-only here by design. */
 export interface ApiJiraSubtask {
   key: string;
   summary: string;
@@ -191,13 +164,6 @@ export interface ApiJiraSubtask {
   url: string;
 }
 
-/**
- * The mirrored issue behind a plan.
- *
- * Everything here is a cache of Jira, refreshed by the worker. It is served
- * from our own database, so the panel still renders when Jira is unreachable —
- * `syncError` is how it says so.
- */
 export interface ApiJiraLink {
   linked: boolean;
   key: string | null;
@@ -212,21 +178,17 @@ export interface ApiJiraLink {
   subtasks: ApiJiraSubtask[];
 }
 
-/** Someone Jira will accept as an assignee. Not one of our engineer records. */
 export interface ApiJiraAssignee {
   id: string;
   name: string;
 }
 
-/** Whether Jira could be reached. Never carries the token. */
 export interface ApiJiraStatus {
   tracker: string;
   configured: boolean;
   reachable: boolean;
   detail: string;
-  /** Issues are invented. The panel must say so on screen. */
   demo: boolean;
-  /** Which JIRA_* variables are still blank. Names only, never values. */
   missing: string[];
   projectKey: string | null;
   baseUrl: string | null;
@@ -258,17 +220,9 @@ export interface ApiChange {
   note: string | null;
 }
 
-/**
- * One thing that happened on a project, from any of its environments.
- *
- * The backend flattens every environment's history into one stream so the
- * calendar does not have to fan out a request per environment and interleave
- * the results itself.
- */
 export interface ApiActivity {
   id: string;
   kind: 'DONE';
-  /** The day it took effect, which is what the agenda sorts by. */
   date: string;
   recordedAt: string;
   technology: string;
@@ -286,7 +240,6 @@ export interface ApiActivity {
 export interface ApiVersionOption {
   cycle: string;
   eolDate: string | null;
-  /** False when the cycle comes from the source but is not in our registry. */
   registered: boolean;
   versions: string[];
 }
@@ -295,7 +248,6 @@ export interface ApiVersionOption {
 export class Api {
   private readonly http = inject(HttpClient);
 
-  /** Records the version an environment now runs, and the change itself. */
   changeComponent(
     deploymentId: string,
     body: {
@@ -315,7 +267,6 @@ export class Api {
     );
   }
 
-  /** Creates a project, its environments and what each of them runs. */
   createProject(body: {
     name: string;
     customer: string;
@@ -334,11 +285,6 @@ export class Api {
     return this.http.post<ApiProject>('/api/v1/projects', body);
   }
 
-  /**
-   * Registers a catalogue product. Name, type, cycle rule and logo come from
-   * the product; every published cycle is imported in the same call, so it is
-   * deployable immediately.
-   */
   createTechnology(body: {
     slug: string;
     name?: string;
@@ -350,19 +296,12 @@ export class Api {
     return this.http.post<ApiTechnology>('/api/v1/technologies', body);
   }
 
-  /**
-   * The whole endoflife.date catalogue, loaded once and filtered in the browser.
-   *
-   * A few hundred rows, so a request per keystroke would be wasteful — and the
-   * list is the same for everyone, which makes it worth caching for the session.
-   */
   readonly catalogueResource = httpResource<ApiCatalogueProduct[]>(
     () => '/api/v1/technologies/catalogue',
   );
 
   readonly catalogue = computed(() => this.catalogueResource.value() ?? []);
 
-  /** Every recorded change across a project, newest first. Accepts id or code. */
   activity(projectId: string) {
     return this.http.get<ApiActivity[]>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/activity`,
@@ -373,7 +312,6 @@ export class Api {
     return this.http.get<ApiChange[]>(`/api/v1/deployments/${deploymentId}/history`);
   }
 
-  /** Recomputes the hash chain, so the UI can say whether it is intact. */
   verifyHistory(deploymentId: string) {
     return this.http.get<ApiVerification>(
       `/api/v1/deployments/${deploymentId}/history/verify`,
@@ -384,7 +322,6 @@ export class Api {
     return `/api/v1/deployments/${deploymentId}/history.csv`;
   }
 
-  /** Upgrade targets: versions newer than the one running, grouped by cycle. */
   versionsFor(technology: string, currentVersion?: string) {
     const current = currentVersion
       ? `&currentVersion=${encodeURIComponent(currentVersion)}`
@@ -393,7 +330,6 @@ export class Api {
       `/api/v1/deployments/versions/available?technology=${encodeURIComponent(technology)}${current}`,
     );
   }
-  /** Replaces who is staffed on a project, as the complete list. */
   setEngineers(projectId: string, engineerIds: string[], leadId?: string) {
     return this.http.patch<ApiProject>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/engineers`,
@@ -404,7 +340,6 @@ export class Api {
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
   readonly usersResource = httpResource<ApiUser[]>(() => '/api/v1/users');
 
-  // ---- upgrade actions ------------------------------------------------------
 
   readonly actionsResource = httpResource<ApiUpgradeAction[]>(
     () => '/api/v1/upgrade-actions',
@@ -420,7 +355,6 @@ export class Api {
     return this.http.patch<ApiUpgradeAction>(`/api/v1/upgrade-actions/${id}`, body);
   }
 
-  /** Marks one environment done; the action completes once all of them are. */
   completeActionEnvironment(id: string, deploymentId: string) {
     return this.http.post<ApiUpgradeAction>(
       `/api/v1/upgrade-actions/${id}/environments/complete`,
@@ -432,12 +366,10 @@ export class Api {
     return this.http.delete<void>(`/api/v1/upgrade-actions/${id}`);
   }
 
-  /** The mirrored Jira issue for a plan. Reads our cache, never Jira. */
   jiraLink(actionId: string) {
     return this.http.get<ApiJiraLink>(`/api/v1/upgrade-actions/${actionId}/jira`);
   }
 
-  /** Points a plan at an issue that already exists. Fails if Jira cannot read it. */
   linkJiraIssue(actionId: string, issueKey: string) {
     return this.http.post<ApiJiraLink>(
       `/api/v1/upgrade-actions/${actionId}/jira/link`,
@@ -445,7 +377,6 @@ export class Api {
     );
   }
 
-  /** Pulls this plan's issue and sub-tasks from Jira now. */
   syncJiraIssue(actionId: string) {
     return this.http.post<ApiJiraLink>(
       `/api/v1/upgrade-actions/${actionId}/jira/sync`,
@@ -453,21 +384,18 @@ export class Api {
     );
   }
 
-  /** Forgets the link. The Jira issue itself is left alone. */
   unlinkJiraIssue(actionId: string) {
     return this.http.delete<ApiJiraLink>(
       `/api/v1/upgrade-actions/${actionId}/jira/link`,
     );
   }
 
-  /** Who Jira will let you assign this issue's children to. */
   jiraAssignees(actionId: string) {
     return this.http.get<ApiJiraAssignee[]>(
       `/api/v1/upgrade-actions/${actionId}/jira/assignees`,
     );
   }
 
-  /** Creates a step in Jira under the linked issue, and returns the mirror. */
   addJiraSubtask(
     actionId: string,
     body: {
@@ -517,7 +445,6 @@ export class Api {
     this.technologiesResource.reload();
     this.usersResource.reload();
     this.actionsResource.reload();
-    // The catalogue's "already registered" marks go stale on every add.
     this.catalogueResource.reload();
   }
 }

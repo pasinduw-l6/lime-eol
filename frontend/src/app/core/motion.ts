@@ -1,29 +1,12 @@
 import { ElementRef, Injectable } from '@angular/core';
 import gsap from 'gsap';
 
-/**
- * Motion, used sparingly and on purpose.
- *
- * This is an operations tool, not a landing page: one orchestrated moment when
- * a screen arrives, and movement when data actually changes. Anything a CSS
- * transition can do is left to CSS — GSAP is here for the two things it
- * cannot: interpolating a number, and orchestrating a stagger.
- */
 @Injectable({ providedIn: 'root' })
 export class Motion {
-  /**
-   * Whether movement is welcome, read fresh each time.
-   *
-   * This service is a singleton, so registering gsap.matchMedia contexts here
-   * accumulated one per component instance and re-ran old animations against
-   * elements that no longer existed. Checking the query directly keeps every
-   * call self-contained.
-   */
   private get animates(): boolean {
     return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
-  /** Counts a number up to its value. */
   countUp(target: ElementRef<HTMLElement> | HTMLElement, to: number): void {
     const element = target instanceof ElementRef ? target.nativeElement : target;
     if (!element) {
@@ -46,7 +29,6 @@ export class Motion {
     });
   }
 
-  /** Reveals a set of elements in sequence — the one arrival moment. */
   stagger(
     host: ElementRef<HTMLElement>,
     selector: string,
@@ -67,7 +49,6 @@ export class Motion {
     });
   }
 
-  /** Grows bars from their baseline when the underlying data changes. */
   grow(host: ElementRef<HTMLElement>, selector: string): void {
     const targets = this.targets(host, selector);
     if (!targets) {
@@ -80,7 +61,6 @@ export class Motion {
       duration: 0.4,
       ease: 'power3.out',
       stagger: 0.02,
-      // Transforms are cleared so nothing is left composited afterwards.
       clearProps: 'transform',
     });
   }

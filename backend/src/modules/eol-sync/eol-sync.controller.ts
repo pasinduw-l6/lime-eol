@@ -63,7 +63,6 @@ export class EolSyncController {
     return this.lookup.getProduct(slug, query.eolField ?? 'eol');
   }
 
-  // Declared before the :cycle route so "latest" is not read as a cycle name.
   @Get('products/:slug/releases/latest')
   @ApiOperation({
     summary: 'Newest release cycle of a product',

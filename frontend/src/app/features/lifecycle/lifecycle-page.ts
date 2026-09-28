@@ -2,13 +2,6 @@ import { Component, signal } from '@angular/core';
 import { Registry } from '../registry/registry';
 import { Schedule } from '../schedule/schedule';
 
-/**
- * Lifecycle — when support ends.
- *
- * Two views of the same question: the timeline of what we run, and the
- * registry of what we track. They were separate tabs; they belong together,
- * because you look one up to understand the other.
- */
 @Component({
   selector: 'lime-lifecycle-page',
   imports: [Schedule, Registry],

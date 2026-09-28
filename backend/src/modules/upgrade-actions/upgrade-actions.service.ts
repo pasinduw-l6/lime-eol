@@ -13,14 +13,6 @@ import {
 
 const MS_PER_DAY = 86_400_000;
 
-/**
- * What the team intends to do about a deadline, and whether it happened.
- *
- * The part worth having is the second half. A ticket system will happily show
- * "done" while production still runs the old version; this holds the plan and
- * the recorded change side by side, so the claim can be checked against the
- * estate rather than believed.
- */
 @Injectable()
 export class UpgradeActionsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -85,9 +77,6 @@ export class UpgradeActionsService {
   async update(id: string, input: UpdateUpgradeActionDto) {
     await this.findOne(id);
 
-    // Sent whole rather than as a delta: the picker knows the final list, and
-    // two people editing coverage at once should not interleave into a set
-    // neither of them chose.
     if (input.deploymentIds) {
       await this.prisma.$transaction([
         this.prisma.upgradeActionDeployment.deleteMany({
@@ -127,13 +116,6 @@ export class UpgradeActionsService {
     return this.toDto(action);
   }
 
-  /**
-   * Marks one environment done.
-   *
-   * Per environment rather than per action: a rollout reaches DEV weeks before
-   * PROD, and "in progress" cannot say which is left. The action completes on
-   * its own once every environment has.
-   */
   async completeEnvironment(id: string, input: CompleteEnvironmentDto) {
     const completedAt = toDate(input.completedAt) ?? today();
 
@@ -171,13 +153,6 @@ export class UpgradeActionsService {
     await this.prisma.upgradeAction.delete({ where: { id } });
   }
 
-  /**
-   * Whether the estate actually moved.
-   *
-   * For each environment an action covers, looks for a recorded change of that
-   * technology onto the target cycle. This is what separates "somebody ticked
-   * a box" from "production is on the new version".
-   */
   private async verify(action: ActionRow) {
     const technologyId = action.cycle.technologyId;
     const deploymentIds = action.deployments.map((d) => d.deploymentId);
@@ -200,8 +175,6 @@ export class UpgradeActionsService {
         continue;
       }
 
-      // Either the exact version planned, or anything in a newer cycle — an
-      // upgrade that overshot the target still satisfies the intent.
       const matchesTarget =
         (action.targetVersion && change.toVersion === action.targetVersion) ||
         landedOn.id !== action.technologyCycleId;
@@ -223,7 +196,6 @@ export class UpgradeActionsService {
       projectId: link.deployment.projectId,
       environment: link.deployment.environment,
       completedAt: isoDate(link.completedAt),
-      /** The estate agrees this environment moved. */
       verified: verified.has(link.deploymentId),
     }));
 
@@ -251,8 +223,6 @@ export class UpgradeActionsService {
         : null,
       team: action.team ? { id: action.team.id, name: action.team.name } : null,
       jiraKey: action.jiraKey,
-      /// Mirrored from Jira by the issue-tracker sync. Carried here so a
-      /// board of twenty plans draws from one request rather than twenty.
       jiraStatusCategory: action.jiraStatusCategory,
       jiraSubtaskDone: action.jiraSubtaskDone,
       jiraSubtaskTotal: action.jiraSubtaskTotal,
@@ -261,13 +231,8 @@ export class UpgradeActionsService {
       remarks: action.remarks,
       environments,
       progress: { done, total: environments.length },
-      /**
-       * Marked complete with nothing recorded against it. The finding no
-       * ticket system can produce, because it does not know what is deployed.
-       */
       unverifiedCompletion:
         done > 0 && environments.some((e) => e.completedAt !== null && !e.verified),
-      /** The plan itself finishes after support ends. */
       planTooLate:
         plannedDate !== null &&
         eolDate !== null &&
@@ -304,12 +269,6 @@ type ActionRow = Awaited<
   }[];
 };
 
-/**
- * What the state actually is, rather than what someone selected.
- *
- * Progress and dates are facts; a dropdown anyone can set to "Completed" is
- * not. Only PLANNED and DEFERRED survive as genuine human decisions.
- */
 function deriveStatus(
   stored: ActionStatus,
   done: number,

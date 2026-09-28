@@ -16,8 +16,6 @@ export const jiraConfig = registerAs(JIRA_CONFIG_KEY, () => {
     demo: env.JIRA_DEMO,
     scopedToken: env.JIRA_TOKEN_TYPE === 'scoped',
 
-    /// Which of the four are still blank, for the setup checklist. Reports
-    /// only whether each is set, never what it is.
     missing: (
       [
         ['JIRA_BASE_URL', env.JIRA_BASE_URL],
@@ -29,8 +27,6 @@ export const jiraConfig = registerAs(JIRA_CONFIG_KEY, () => {
       .filter(([, value]) => !value)
       .map(([name]) => name),
 
-    /// The env schema enforces all-four-or-none, so one check answers whether
-    /// the real adapter can do anything at all.
     get configured(): boolean {
       return Boolean(
         env.JIRA_BASE_URL &&

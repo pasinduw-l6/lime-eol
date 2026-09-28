@@ -13,7 +13,6 @@ import { RegistryStore } from '../../core/registry.store';
 import { Cycle } from '../../core/models';
 import { TechnologyView } from './technology-view';
 
-/** endoflife.date product slugs for the technologies in the registry. */
 const SLUGS: Record<string, string> = {
   MongoDB: 'mongodb',
   'Node.js': 'nodejs',
@@ -45,13 +44,6 @@ interface Row {
   customers: number;
 }
 
-/**
- * The schedule: one row per cycle in use, each ending on its EOL date.
- *
- * Position carries urgency before colour does — anything left of the today
- * rule is already out of support. The dashed rule is the notice horizon
- * (STATUS_APPROACHING_DAYS); a bar ending before it is what "EOL near" means.
- */
 @Component({
   selector: 'lime-schedule',
   imports: [TechnologyView, RouterLink],
@@ -180,7 +172,6 @@ interface Row {
             role="img"
             [attr.aria-label]="'Support schedule for ' + rows().length + ' technology cycles'"
           >
-            <!-- month gridlines and year labels -->
             @for (tick of ticks(); track tick.x) {
               <line
                 [attr.x1]="tick.x" [attr.x2]="tick.x"
@@ -194,7 +185,6 @@ interface Row {
               }
             }
 
-            <!-- the notice horizon: bars ending left of this are "EOL near" -->
             <line
               [attr.x1]="noticeX()" [attr.x2]="noticeX()" y1="18" [attr.y2]="height() - 18"
               stroke="var(--color-soon)" stroke-width="1" stroke-dasharray="3 3"
@@ -203,7 +193,6 @@ interface Row {
               notice horizon · {{ noticeDays }} days
             </text>
 
-            <!-- today -->
             <line
               [attr.x1]="todayX()" [attr.x2]="todayX()" y1="18" [attr.y2]="height() - 18"
               stroke="var(--color-ink)" stroke-width="1.5"
@@ -331,14 +320,8 @@ export class Schedule {
   protected readonly showTable = signal(false);
   protected readonly inbox = this.store.inbox;
 
-  /** 'estate' for the cross-customer timeline, otherwise a technology name. */
   protected readonly picked = signal<string>('estate');
 
-  /**
-   * Bound from ?status= by withComponentInputBinding, so the Overview's status
-   * bands link straight into a filtered schedule and the filter survives a
-   * refresh or a shared URL.
-   */
   readonly status = input<'ALL' | 'EOL' | 'NEAR' | 'SUPPORTED'>('ALL');
 
   protected readonly statusText = computed(() => {
@@ -351,7 +334,6 @@ export class Schedule {
     return status === 'ALL' ? 'var(--color-ink-soft)' : statusFill(status);
   });
 
-  /** Technologies in the registry, worst first, with a count of risky cycles. */
   protected readonly technologies = computed(() => {
     const names = [...new Set(this.store.cycles().map((c) => c.technology))];
 

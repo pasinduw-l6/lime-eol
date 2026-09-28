@@ -2,11 +2,9 @@ import { Component, computed, input } from '@angular/core';
 import { ApiUpgradeAction } from '../core/api';
 
 interface Marker {
-  /** Position across the ribbon, 0–100. */
   at: number;
   kind: 'target' | 'eol';
   label: string;
-  /** A target that lands after its own end of life. */
   late: boolean;
 }
 
@@ -17,24 +15,12 @@ interface Tick {
 
 const DAY = 86_400_000;
 
-/**
- * Every plan on one date axis.
- *
- * This is the view a ticket board cannot give you, because Jira does not know
- * when support ends. Two marks per plan — the date it is meant to land, and
- * the date its support runs out — so "will we make it" is answered by
- * position rather than by reading two fields and subtracting.
- *
- * A target sitting to the right of its own end-of-life mark is drawn in the
- * overdue colour. That is `planTooLate` as geometry.
- */
 @Component({
   selector: 'lime-plan-timeline',
   host: { class: 'block' },
   template: `
     @if (markers().length > 0) {
       <div class="relative h-[62px] select-none">
-        <!-- month ticks -->
         <div class="absolute inset-x-0 top-[26px] h-px" style="background: var(--color-rule)"></div>
 
         @for (tick of ticks(); track tick.at) {
@@ -51,7 +37,6 @@ const DAY = 86_400_000;
           </span>
         }
 
-        <!-- today -->
         <span
           class="absolute top-[14px] bottom-[20px] w-px"
           style="background: var(--color-accent-bright)"
@@ -65,7 +50,6 @@ const DAY = 86_400_000;
           today
         </span>
 
-        <!-- one mark per date that matters -->
         @for (marker of markers(); track $index) {
           <span
             class="absolute top-[21px] -translate-x-1/2 text-[11px] leading-none"
@@ -89,7 +73,6 @@ const DAY = 86_400_000;
 export class PlanTimeline {
   readonly actions = input.required<ApiUpgradeAction[]>();
 
-  /** Every date on the axis, so the range covers all of them and today. */
   private readonly span = computed(() => {
     const now = Date.now();
     const stamps: number[] = [now];
@@ -108,7 +91,6 @@ export class PlanTimeline {
     const min = Math.min(...stamps);
     const max = Math.max(...stamps);
 
-    // A single date would give a zero-width axis; give it a season either way.
     const pad = Math.max((max - min) * 0.08, 20 * DAY);
     return { from: min - pad, to: max + pad };
   });
@@ -149,7 +131,6 @@ export class PlanTimeline {
     return out;
   });
 
-  /** A month tick wherever one starts inside the range, thinned if crowded. */
   protected readonly ticks = computed<Tick[]>(() => {
     const { from, to } = this.span();
     const out: Tick[] = [];
@@ -172,7 +153,6 @@ export class PlanTimeline {
       cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     }
 
-    // Beyond about a year the labels collide, so show every other one.
     return out.length > 14 ? out.filter((_, index) => index % 2 === 0) : out;
   });
 

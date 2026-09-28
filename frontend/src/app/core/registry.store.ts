@@ -14,7 +14,6 @@ import {
   UpgradeAction,
 } from './models';
 
-/** Everything, or one project. The switcher writes this. */
 export type ProjectScope = 'all' | string;
 
 export interface NewProject {
@@ -45,14 +44,6 @@ export interface InboxItem {
   action: UpgradeAction | null;
 }
 
-/**
- * Application state.
- *
- * Reads come from the API and are held in linked signals, so the server is the
- * source of truth but the UI can still edit locally. Anything the API does not
- * serve yet — upgrade actions, environment revisions — lives in plain signals
- * and is clearly marked as unsaved in the screens that write it.
- */
 @Injectable({ providedIn: 'root' })
 export class RegistryStore {
   private readonly api = inject(Api);
@@ -60,10 +51,8 @@ export class RegistryStore {
   readonly isLoading = this.api.isLoading;
   readonly loadError = this.api.error;
 
-  /** True while writes are not yet persisted anywhere. */
   readonly writesArePersisted = false;
 
-  // ---- server-derived state ------------------------------------------------
 
   private readonly _technologies = linkedSignal<Technology[]>(() =>
     this.api.technologies().map((t) => ({
@@ -134,13 +123,6 @@ export class RegistryStore {
     ),
   );
 
-  /**
-   * Everyone who could be staffed, from the accounts API.
-   *
-   * Previously read off the projects themselves, which meant the picker only
-   * ever offered people who were already assigned — a closed loop in which
-   * nobody new could be added to anything.
-   */
   private readonly _engineers = linkedSignal<Engineer[]>(() =>
     this.api.users().map((user) => ({
       id: user.id,
@@ -152,21 +134,12 @@ export class RegistryStore {
     })),
   );
 
-  /**
-   * Upgrade actions, from the API.
-   *
-   * The Plan screen owns the writes; this is the read every other screen uses
-   * — the Overview inbox to say whether a deadline has a plan, the Calendar to
-   * place it on the timeline.
-   */
   private readonly _actions = linkedSignal<UpgradeAction[]>(() =>
     this.api.actions().map((a) => ({
       id: a.id,
       technology: a.technology,
       cycle: a.cycle,
       targetVersion: a.targetVersion,
-      // The derived one: OVERDUE and IN_PROGRESS are facts about progress,
-      // not something anybody typed.
       status: (a.derivedStatus === 'OVERDUE'
         ? 'IN_PROGRESS'
         : a.derivedStatus) as UpgradeAction['status'],
@@ -179,7 +152,6 @@ export class RegistryStore {
     })),
   );
 
-  // ---- client-only state (no API yet) --------------------------------------
 
   private readonly _revisions = signal<Revision[]>([]);
   private readonly _topologies = signal<EnvTopology[]>([]);
@@ -194,7 +166,6 @@ export class RegistryStore {
   readonly topologies = this._topologies.asReadonly();
   readonly allDeployments = this._deployments.asReadonly();
 
-  /** Deployments in scope — what every screen reads. */
   readonly deployments = computed(() => {
     const scope = this.scope();
     const all = this._deployments();
@@ -208,7 +179,6 @@ export class RegistryStore {
       : (this._projects().find((p) => p.id === scope) ?? null);
   });
 
-  /** The API's own view of a project, for screens that want it whole. */
   apiProject(id: string): ApiProject | undefined {
     return this.api.projects().find((p) => p.id === id);
   }
@@ -314,7 +284,6 @@ export class RegistryStore {
       }),
   );
 
-  // ---- writes (local until the write API lands) -----------------------------
 
   saveTechnology(input: Omit<Technology, 'id'> & { id?: string }): Technology {
     const technology: Technology = { ...input, id: input.id ?? newId('t') };
@@ -433,7 +402,6 @@ export class RegistryStore {
     this._actions.update((all) => all.filter((a) => a.id !== id));
   }
 
-  // ---- revision history (awaiting a write API) ------------------------------
 
   readonly changeEvents = computed(() => {
     const out: {
@@ -515,7 +483,6 @@ export class RegistryStore {
   }
 }
 
-/** Short unique id for records created in the browser. */
 function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 }

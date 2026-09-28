@@ -2,12 +2,6 @@ import { Routes } from '@angular/router';
 import { signedIn, signedOut } from './core/auth.guard';
 import { Shell } from './shell';
 
-/**
- * Two groups: the auth pages, which own the whole window, and everything else,
- * which renders inside the signed-in chrome.
- *
- * Older paths redirect, so links shared before the consolidation still work.
- */
 export const routes: Routes = [
   {
     path: 'login',
@@ -46,8 +40,6 @@ export const routes: Routes = [
           import('./features/lifecycle/lifecycle-page').then((m) => m.LifecyclePage),
       },
       {
-        // Query params bind straight to the component's inputs, so
-        // /plan?technology=…&cycle=… opens the form already filled in.
         path: 'plan',
         title: 'Plan · Lime Lifecycle',
         loadComponent: () =>
@@ -60,7 +52,6 @@ export const routes: Routes = [
           import('./features/calendar/calendar').then((m) => m.Calendar),
       },
 
-      // consolidated away
       { path: 'environments', redirectTo: 'projects' },
       { path: 'schedule', redirectTo: 'lifecycle' },
       { path: 'registry', redirectTo: 'lifecycle' },

@@ -36,19 +36,11 @@ interface Bucket {
   title: string;
 }
 
-/**
- * Overview.
- *
- * Three questions, one per panel, and deliberately not the same question
- * twice: when support ends, which customers carry the risk, and what needs a
- * decision today.
- */
 @Component({
   selector: 'lime-overview',
   imports: [RouterLink, TechIcon],
   host: { class: 'block' },
   template: `
-    <!-- headline -->
     <section class="card mb-5 px-7 py-6">
       <div class="mb-7 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -129,7 +121,6 @@ interface Bucket {
       </div>
     </section>
 
-    <!-- needs you: the one panel that asks for a decision -->
     @if (alerts().length > 0) {
       <section class="card mb-5 px-7 py-6" aria-labelledby="needs-you">
         <header class="mb-4 flex flex-wrap items-baseline justify-between gap-3">
@@ -189,9 +180,7 @@ interface Bucket {
       </section>
     }
 
-    <!-- panels: equal columns, each header / body / footer -->
     <div class="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
-      <!-- 1. when support ends -->
       <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
           <h2 class="m-0 text-[15px] font-semibold">Support ending</h2>
@@ -199,7 +188,6 @@ interface Bucket {
         </header>
 
         <div class="flex gap-3" [style.height.px]="bodyH">
-          <!-- y axis -->
           <div
             class="tabular flex w-6 flex-col justify-between text-right text-[10px] text-ink-faint"
             aria-hidden="true"
@@ -237,7 +225,6 @@ interface Bucket {
         </footer>
       </section>
 
-      <!-- 2. who carries it -->
       <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
           <h2 class="m-0 text-[15px] font-semibold">Risk by project</h2>
@@ -294,7 +281,6 @@ interface Bucket {
         </footer>
       </section>
 
-      <!-- 3. are we gaining or losing ground -->
       <section class="card grid grid-rows-[auto_1fr_auto] px-6 py-5">
         <header class="mb-4 flex items-baseline justify-between gap-3">
           <h2 class="m-0 text-[15px] font-semibold">Upgrade velocity</h2>
@@ -362,8 +348,6 @@ export class Overview implements AfterViewInit {
     viewChild<ElementRef<HTMLElement>>('atRiskFigure');
 
   constructor() {
-    // Re-grow the columns whenever the horizon changes: the movement is the
-    // feedback that the chart responded.
     effect(() => {
       this.horizon();
       queueMicrotask(() => this.motion.grow(this.host, '.month-bar'));
@@ -433,11 +417,6 @@ export class Overview implements AfterViewInit {
     ];
   });
 
-  /**
-   * One column per month, plus a leading bucket for everything already past
-   * end of life — otherwise the most urgent work is the one thing the chart
-   * cannot show.
-   */
   protected readonly buckets = computed<Bucket[]>(() => {
     const start = today();
     const months = this.horizon();
@@ -502,7 +481,6 @@ export class Overview implements AfterViewInit {
     return [max, Math.round(max / 2), 0];
   });
 
-  /** Which customers actually carry the risk — the panel that replaced a heatmap. */
   protected readonly projectRisk = computed(() =>
     this.store
       .projects()
@@ -521,13 +499,6 @@ export class Overview implements AfterViewInit {
     Math.max(1, ...this.projectRisk().map((r) => r.eol + r.near)),
   );
 
-  /**
-   * The things asking for a decision, stated as consequences.
-   *
-   * "Unsupported for 7 years" lands where "−2588 d" does not: the number is
-   * precise but says nothing about whether to care. The signed day count still
-   * exists on the Schedule for people doing arithmetic.
-   */
   protected readonly alerts = computed(() =>
     this.inbox()
       .slice(0, 8)
@@ -559,14 +530,6 @@ export class Overview implements AfterViewInit {
     () => this.alerts().filter((a) => !a.plan).length,
   );
 
-  /**
-   * Upgrades completed against cycles that expired, month by month.
-   *
-   * The honest measure of whether the team is gaining ground: doing three
-   * upgrades in a quarter means nothing if five cycles went out of support in
-   * the same period. Upgrades come from the revision history, so this counts
-   * what was actually recorded, not what was planned.
-   */
   protected readonly velocity = computed(() => {
     const start = today();
     const events = this.store.changeEvents().filter((e) => e.kind === 'UPGRADE');
@@ -622,7 +585,6 @@ export class Overview implements AfterViewInit {
     this.net() >= 0 ? 'var(--color-good)' : 'var(--color-overdue)',
   );
 
-  /** Raw counts behind the bars, kept separate so totals stay readable. */
   private readonly velocitySource = computed(() => {
     const start = today();
     const events = this.store.changeEvents().filter((e) => e.kind === 'UPGRADE');

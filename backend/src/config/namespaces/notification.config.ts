@@ -8,13 +8,9 @@ export const notificationConfig = registerAs(NOTIFICATION_CONFIG_KEY, () => {
 
   return {
     enabled: env.NOTIFY_ENABLED,
-    /// True until someone deliberately turns it off: the safe default for
-    /// something that posts into a company channel.
     dryRun: env.NOTIFY_DRY_RUN,
     cron: env.NOTIFY_CRON,
     teamsWebhookUrl: env.TEAMS_WEBHOOK_URL,
-    /// Where a card points back to. Deep links carry the technology and cycle
-    /// as query params, which opens the plan form already filled in.
     appBaseUrl: env.APP_BASE_URL,
     mailFrom: env.MAIL_FROM,
     smtp: {

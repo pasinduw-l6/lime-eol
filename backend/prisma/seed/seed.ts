@@ -4,12 +4,6 @@ import { seedSampleData } from './sample-data.seed';
 import { seedTechnologies } from './technologies.seed';
 import { seedUsers } from './users.seed';
 
-/**
- * Seeds reference data and a small sample estate.
- *
- * Every step upserts, so running it twice changes nothing and it is safe
- * against a database that already holds real data.
- */
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {

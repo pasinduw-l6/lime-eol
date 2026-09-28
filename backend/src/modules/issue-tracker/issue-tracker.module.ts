@@ -8,21 +8,6 @@ import { IssueTrackerController } from './issue-tracker.controller';
 import { IssueTrackerService } from './issue-tracker.service';
 import { ISSUE_TRACKER } from './ports/issue-tracker.port';
 
-/**
- * Binds ISSUE_TRACKER to one of three adapters: the demo, real Jira, or
- * nothing at all.
- *
- * Choosing at bind time rather than inside an adapter means an unconfigured
- * deployment has no Jira code in its path, and the panel's "not connected"
- * state is a property of the wiring rather than a branch repeated in every
- * method.
- *
- * Demo takes precedence over real credentials on purpose. Someone who has
- * turned it on wants invented issues; silently preferring the live Jira
- * because credentials happen to be present would be the surprising outcome,
- * and would post a demo walkthrough at a real project. It is logged as a
- * warning every start so it can never be on without anyone noticing.
- */
 @Module({
   controllers: [IssueTrackerController],
   providers: [

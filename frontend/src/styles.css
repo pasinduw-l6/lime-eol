@@ -1,44 +1,25 @@
 @import 'tailwindcss';
 
-/* ---------------------------------------------------------------------------
-   Lime Lifecycle — dark product theme.
-
-   Every screen reads from these tokens, so the palette is the skin: changing
-   the values here re-skins the whole app without touching a component.
-
-   Urgency is still carried by position on the time axis and by a signed day
-   count (−681 d) before colour does any work, so the theme stays readable
-   without colour vision.
---------------------------------------------------------------------------- */
 @theme {
-  /* Surfaces: the navy of the Lime wordmark, deepened into a ground.
-     Not a neutral near-black — the whole app should feel like the logo. */
   --color-ground: #071a23;
   --color-surface: #0d2430;
   --color-elevated: #14323f;
   --color-rule: #1f4353;
 
-  /* text */
   --color-ink: #e9f4f5;
   --color-ink-soft: #9bb8c2;
   --color-ink-faint: #648793;
 
-  /* Brand: the teal→lime gradient of the mark, split into roles. */
   --color-accent: #00b3a4;
   --color-accent-bright: #3fd9c2;
   --color-accent-deep: #0a6f66;
   --color-lime: #8dc63f;
   --color-lime-bright: #a8d957;
 
-  /* Status. Warm hues only, so nothing competes with the brand teal/lime —
-     except "good", which *is* the brand lime: healthy things look like Lime. */
   --color-overdue: #ff6f61;
   --color-soon: #ffb547;
   --color-good: #8dc63f;
 
-  /* The platform's own UI face first — SF on Apple, Segoe on Windows — which
-     is most of where the iOS feel comes from. Plex Mono stays for figures,
-     because tabular alignment is a job, not a style. */
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI Variable Text',
     'Segoe UI', system-ui, 'IBM Plex Sans', sans-serif;
@@ -53,19 +34,9 @@
   color-scheme: dark;
 }
 
-/* ---------------------------------------------------------------------------
-   Light theme.
-
-   Same brand, inverted: the wordmark navy becomes the ink it was drawn as, and
-   the teal and lime are darkened enough to stay readable on white — the values
-   that glow on navy are far too pale here.
---------------------------------------------------------------------------- */
 :root[data-theme='light'] {
   color-scheme: light;
 
-  /* Softened deliberately: pure white surfaces on a near-white ground glare
-     over a long session. The cards sit just off white, on a ground with
-     enough depth that they still read as raised. */
   --color-ground: #e6eff0;
   --color-surface: #f1f7f8;
   --color-elevated: #e5eef0;
@@ -86,8 +57,6 @@
   --color-good: #5f9c1f;
 }
 
-/* The logo's wordmark is navy: it needs a light plate on the dark theme and
-   none at all on the light one. */
 .brand-plate {
   background: #ffffff;
   padding: 0.35rem 0.75rem;
@@ -99,15 +68,6 @@
   padding: 0.35rem 0;
 }
 
-/* ---------------------------------------------------------------------------
-   Sign in and sign up are dark in both themes.
-
-   They are the product's front door and the only screen that is all brand: the
-   teal-to-navy gradient and the white logo plate are the mark itself, and there
-   is no washed-out version of them worth showing. Re-declaring the dark tokens
-   on this scope means every utility inside resolves to them, whatever the root
-   theme is set to.
---------------------------------------------------------------------------- */
 .auth-shell {
   color-scheme: dark;
 
@@ -134,7 +94,6 @@
   color: var(--color-ink);
 }
 
-/* The navy wordmark needs its plate back, which the light theme takes away. */
 .auth-shell .brand-plate {
   background: #ffffff;
   padding: 0.35rem 0.75rem;
@@ -156,9 +115,6 @@ html {
 
 body {
   margin: 0;
-  /* The ground colour lives on html so the shader canvas, which sits behind
-     the page at -z-10, is not painted over. It also means the correct colour
-     is already there before WebGL starts, and stays if it never does. */
   background: transparent;
   color: var(--color-ink);
   font-family: var(--font-sans);
@@ -167,9 +123,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Tailwind v4's reset does not restore the pointer cursor on buttons, and the
-   browser default for <button> is the plain arrow — so without this nothing
-   clickable looks clickable. */
 :where(button, [role='button'], summary):not(:disabled) {
   cursor: pointer;
 }
@@ -178,25 +131,11 @@ body {
   cursor: not-allowed;
 }
 
-/* Figures that must align down a column: day counts, versions, dates. */
 .tabular {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-/* Lensed glass.
-
-   Four inset highlights on opposing diagonal edges, an inner core shade and an
-   outer drop — the bevel stack that makes an edge look ground rather than
-   drawn. Paired with the sheen on ::after below.
-
-   Three parts of the usual recipe are deliberately left out. `filter:
-   contrast(3)` on a wrapper would crush every colour inside it, and these cards
-   carry red and amber that mean "past end of life"; `backdrop-filter` per card
-   is the blur-per-frame that made this app stutter; and blurred ::before/::after
-   caustics would add two more blurred layers to each of the twenty-odd cards on
-   a screen. The bevel and the sheen are pure box-shadow and gradient, so they
-   cost nothing and carry most of the look. */
 .card {
   background:
     linear-gradient(
@@ -234,18 +173,7 @@ body {
     0 10px 24px -14px rgb(13 36 48 / 22%);
 }
 
-/* Overlay panels are opaque, not glass.
-
-   Translucency works over the shader, which is a soft gradient with nothing to
-   read. Over live content it is just unreadable — the text behind shows
-   through the text in front. There are only ever one or two of these on screen,
-   so unlike cards they can afford a real backdrop blur, which is what keeps
-   them feeling like the same material. */
 .popover {
-  /* Fully opaque, and a step lighter than the cards behind it. At 97% the
-     three per cent still showed through on the dark theme, and because the
-     panel was the same navy as the cards there was no edge either — it read as
-     glass laid over text. An overlay has to win against whatever it covers. */
   background: var(--color-elevated);
   border-color: color-mix(in oklab, #ffffff 16%, transparent);
   box-shadow:
@@ -261,14 +189,10 @@ body {
     0 20px 45px -14px rgb(13 36 48 / 28%);
 }
 
-/* No diagonal glare on an overlay: it lands across the content rather than an
-   empty pane, which is exactly what made the small buttons wash out. */
 .popover::after {
   content: none;
 }
 
-/* Scrolls, without the bar. The content is obviously a list and the panel is
-   obviously cut off, so the bar only adds a rail through the layout. */
 .scroll-hidden {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -280,16 +204,10 @@ body {
   display: none;
 }
 
-/* The sheen below needs a positioned ancestor — but only where the card is not
-   already positioned by a utility. This file is unlayered, so it outranks
-   Tailwind: a blanket `position: relative` beat `.absolute` on the project
-   dropdown, dropping it back into the layout and stretching the header. */
 .card:not(.absolute):not(.fixed):not(.sticky) {
   position: relative;
 }
 
-/* The diagonal glare across two opposite corners, which is what reads as a
-   curved pane catching a light source. A gradient, not a blurred layer. */
 .card::after,
 .btn::after,
 .pill::after {
@@ -319,24 +237,10 @@ body {
   );
 }
 
-/* A card sitting inside another must not stack two translucent layers into
-   something opaque — it gets the faintest fill and leans on its border.
-
-   Overlays are excluded. The notification dropdown and the project switcher
-   are cards rendered inside the header, which is itself a card, so this rule
-   matched them and forced them to 34% — the exact opposite of what a panel
-   laid over live content needs. It also outranked .popover, which is why
-   raising that rule's opacity changed nothing. */
 .card .card:not(.popover) {
   background: color-mix(in oklab, var(--color-elevated) 34%, transparent);
 }
 
-/* The same treatment for the smaller rounded surfaces, so the whole interface
-   is made of one material rather than glass panes holding solid boxes.
-
-   The filled variants are excluded by name. Left in, the light theme's
-   descendant selector outranked .btn-primary, which lost its accent fill and
-   kept its white text — an invisible button. */
 :where(.input, .btn, .pill):not(.btn-primary, .pill-active, .btn-danger) {
   background: color-mix(in oklab, var(--color-elevated) 72%, transparent);
   border-color: color-mix(in oklab, #ffffff 8%, transparent);
@@ -348,13 +252,6 @@ body {
   border-color: color-mix(in oklab, var(--color-rule) 65%, transparent);
 }
 
-/* For controls built from utility classes rather than .btn — the project
-   switcher, the theme toggle, the identity chip. Adding .glass gives them the
-   same material without inheriting .btn's padding and type size. */
-/* The fill sits in the components layer, which Tailwind's utilities layer
-   overrides. Unlayered (and worse, !important) it beat every `hover:bg-*` and
-   `[class.bg-ink]` on the elements it was added to — hovering "Plan upgrade"
-   did nothing, and a selected environment tab lost its fill. */
 @layer components {
   .glass {
     background: color-mix(in oklab, var(--color-elevated) 72%, transparent);
@@ -366,10 +263,6 @@ body {
     border-color: color-mix(in oklab, var(--color-rule) 55%, transparent);
   }
 
-  /* Accent-tinted glass, for a call to action that should still read as the
-     same material. Setting `border-accent` on plain .glass instead replaced
-     the glass edge with a flat outline — which on the dark theme left nothing
-     but an outline, since the fill barely differs from the card behind it. */
   .glass-accent {
     background: color-mix(in oklab, var(--color-accent) 24%, transparent);
     border-color: color-mix(in oklab, var(--color-accent) 65%, transparent);
@@ -422,8 +315,6 @@ body {
   );
 }
 
-/* Buttons and pills are the capsules the effect suits best, so they get the
-   same bevel stack, scaled down to their size. */
 .btn,
 .pill,
 .glass {
@@ -446,8 +337,6 @@ body {
     0 2px 5px rgb(13 36 48 / 12%);
 }
 
-/* Interactive glass lifts on hover. Also in the components layer, so an
-   element carrying its own hover:bg-* still wins. */
 @layer components {
   button.glass:hover,
   a.glass:hover {
@@ -455,8 +344,6 @@ body {
     border-color: color-mix(in oklab, var(--color-accent) 55%, transparent);
   }
 
-  /* Tinted with the brand rather than merely lighter: on a pale ground, a
-     slightly paler pale is not a state change anyone can see. */
   :root[data-theme='light'] button.glass:hover,
   :root[data-theme='light'] a.glass:hover {
     background: color-mix(in oklab, var(--color-accent) 14%, var(--color-elevated));
@@ -469,16 +356,11 @@ a.glass:active {
   transform: scale(0.96);
 }
 
-/* The filled variants stay solid accent, defined further down. They are the
-   emphasis in a screen made of glass, and a call to action you can read at a
-   glance is worth more here than another translucent panel. */
 
-/* bg-elevated is used inline all over the app for inner tiles and chips. */
 .bg-elevated {
   background: color-mix(in oklab, var(--color-elevated) 70%, transparent) !important;
 }
 
-/* The bar stays put and the content slides under it, frosted. */
 .app-bar {
   position: sticky;
   top: 0;
@@ -487,7 +369,6 @@ a.glass:active {
   backdrop-filter: saturate(180%) blur(22px);
 }
 
-/* Navigation pills. The active one inverts, as in a segmented control. */
 .pill {
   display: inline-flex;
   align-items: center;
@@ -521,7 +402,6 @@ a.glass:active {
   font-weight: 500;
 }
 
-/* Form controls, so every create/edit form looks and behaves the same. */
 .field {
   display: block;
   font-size: 12px;
@@ -555,8 +435,6 @@ a.glass:active {
   background: color-mix(in oklab, var(--color-overdue) 14%, transparent);
 }
 
-/* Calendar event chip: tinted to its kind, readable at 10px, truncating
-   rather than wrapping so a day cell keeps its rhythm. */
 .chip {
   display: block;
   overflow: hidden;
@@ -569,7 +447,6 @@ a.glass:active {
   border-left: 2px solid transparent;
 }
 
-/* Day cells: quiet by default, lifting on hover so the grid feels live. */
 .day {
   transition: background-color 140ms ease;
 }
@@ -587,8 +464,6 @@ a.glass:active {
   box-shadow: inset 0 0 0 1px var(--color-accent-bright);
 }
 
-/* Diff rendering: whole-line tint for the change, stronger tint for the exact
-   tokens that moved, so a version bump reads at a glance. */
 .diff-line-add {
   background: color-mix(in oklab, var(--color-good) 10%, transparent);
 }
@@ -624,7 +499,6 @@ a.glass:active {
     transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* The press is the feedback, as on a phone. */
 .btn:active {
   transform: scale(0.96);
 }
@@ -644,7 +518,6 @@ a.glass:active {
   background: var(--color-accent-bright);
 }
 
-/* The mark’s gradient, reused wherever a brand flourish earns its place. */
 .brand-gradient {
   background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-lime) 100%);
 }

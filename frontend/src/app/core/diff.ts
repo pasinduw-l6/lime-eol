@@ -1,13 +1,5 @@
 import { EnvTopology } from './models';
 
-/**
- * Line diffing for environment revisions.
- *
- * Each environment is a JSON document, each save is a revision, and history is
- * read as a diff — the form DevOps already know from code review. Serialisation
- * is normalised first so a diff only ever shows real changes, never key order
- * or whitespace noise.
- */
 
 export type DiffType = 'same' | 'add' | 'remove';
 
@@ -18,7 +10,6 @@ export interface DiffLine {
   newNo: number | null;
 }
 
-/** Deterministic serialisation: fixed key order, so diffs stay meaningful. */
 export function stringifyTopology(topology: EnvTopology): string {
   const normalised = {
     deploymentId: topology.deploymentId,
@@ -44,13 +35,6 @@ export function stringifyTopology(topology: EnvTopology): string {
   return JSON.stringify(normalised, null, 2);
 }
 
-/**
- * Longest-common-subsequence line diff.
- *
- * O(n·m), which is irrelevant at a few hundred lines and keeps the output
- * minimal — a changed version string shows as one removal and one addition,
- * not a rewritten block.
- */
 export function diffLines(before: string, after: string): DiffLine[] {
   const a = before.split('\n');
   const b = after.split('\n');
@@ -97,7 +81,6 @@ export function diffLines(before: string, after: string): DiffLine[] {
   return out;
 }
 
-/** Collapses long runs of unchanged lines, the way a code review does. */
 export function withContext(lines: DiffLine[], context = 3): (DiffLine | 'gap')[] {
   const keep = new Set<number>();
 
@@ -128,7 +111,6 @@ export function withContext(lines: DiffLine[], context = 3): (DiffLine | 'gap')[
   return out;
 }
 
-/** One token of a line, flagged when it differs from its counterpart. */
 export interface Segment {
   text: string;
   changed: boolean;
@@ -141,13 +123,6 @@ export interface SideRow {
 
 const TOKEN = /[A-Za-z0-9_.-]+|\s+|./g;
 
-/**
- * Word-level diff of two lines.
- *
- * A version bump changes a few characters in a long line; highlighting the
- * whole line hides which. This narrows the highlight to the tokens that
- * actually moved.
- */
 export function diffWords(before: string, after: string): [Segment[], Segment[]] {
   const a = before.match(TOKEN) ?? [];
   const b = after.match(TOKEN) ?? [];
@@ -200,10 +175,6 @@ export function diffWords(before: string, after: string): [Segment[], Segment[]]
   return [left, right];
 }
 
-/**
- * Lays a line diff out as two columns, pairing each removed line with the
- * added line that replaced it so word highlighting has something to compare.
- */
 export function toSideBySide(lines: DiffLine[]): SideRow[] {
   const rows: SideRow[] = [];
   let index = 0;
@@ -257,7 +228,6 @@ export function toSideBySide(lines: DiffLine[]): SideRow[] {
   return rows;
 }
 
-/** Drops long runs of untouched lines, leaving a few for context. */
 export function collapse(rows: SideRow[], context = 3): (SideRow | 'gap')[] {
   const changed = (row: SideRow) => row.old?.changed || row.new?.changed || !row.old || !row.new;
   const keep = new Set<number>();
@@ -297,10 +267,6 @@ export interface ComponentChange {
   to: string | null;
 }
 
-/**
- * The human summary of a revision: what actually changed in the estate, as
- * opposed to which lines moved. This is what feeds reporting later.
- */
 export function summariseChange(
   before: EnvTopology | null,
   after: EnvTopology,
@@ -360,7 +326,6 @@ export function summariseChange(
   return changes;
 }
 
-/** Numeric version comparison, so 6.0.9 sorts before 6.0.14. */
 function compare(a: string, b: string): number {
   const parse = (v: string) =>
     v.split('.').map((part) => Number.parseInt(part, 10) || 0);
