@@ -13,6 +13,20 @@ export const jiraConfig = registerAs(JIRA_CONFIG_KEY, () => {
     projectKey: env.JIRA_PROJECT_KEY,
     cron: env.JIRA_SYNC_CRON,
     timeoutMs: env.JIRA_HTTP_TIMEOUT_MS,
+    demo: env.JIRA_DEMO,
+
+    /// Which of the four are still blank, for the setup checklist. Reports
+    /// only whether each is set, never what it is.
+    missing: (
+      [
+        ['JIRA_BASE_URL', env.JIRA_BASE_URL],
+        ['JIRA_EMAIL', env.JIRA_EMAIL],
+        ['JIRA_API_TOKEN', env.JIRA_API_TOKEN],
+        ['JIRA_PROJECT_KEY', env.JIRA_PROJECT_KEY],
+      ] as const
+    )
+      .filter(([, value]) => !value)
+      .map(([name]) => name),
 
     /// The env schema enforces all-four-or-none, so one check answers whether
     /// the real adapter can do anything at all.

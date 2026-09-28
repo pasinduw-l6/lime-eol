@@ -81,7 +81,17 @@ export const envSchema = z
     /// How often the worker reconciles linked issues. Jira is a cache here.
     JIRA_SYNC_CRON: z.string().default('*/15 * * * *'),
     JIRA_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+    /// Serves invented issues so the integration can be shown without access
+    /// to a real Jira. Never a fallback for missing credentials: it has to be
+    /// turned on deliberately, and the panel says so on screen.
+    JIRA_DEMO: booleanish.default(false),
   })
+  // Invented issues must never reach a real deployment. The same rule
+  // AUTH_MODE=dev follows.
+  .refine(
+    (env) => !(env.NODE_ENV === 'production' && env.JIRA_DEMO),
+    'JIRA_DEMO=true is not allowed when NODE_ENV=production',
+  )
   // Partial credentials are worse than none: the app would look connected and
   // fail on every call. Either all four, or none.
   .refine((env) => {

@@ -19,6 +19,18 @@ import { Api, ApiJiraLink, JiraStatusCategory } from '../core/api';
   host: { class: 'block' },
   template: `
     <div class="mt-4 border-t border-rule pt-4">
+      <!-- Invented issues always announce themselves. Nobody looking at this
+           screen, or a screenshot of it, should have to wonder. -->
+      @if (demo()) {
+        <p
+          class="m-0 mb-2.5 flex items-center gap-2 rounded-xl border px-3 py-1.5 text-[11.5px]"
+          style="border-color: var(--color-soon); color: var(--color-soon)"
+        >
+          <span aria-hidden="true">●</span>
+          Demo mode — these issues are not real and no Jira is connected.
+        </p>
+      }
+
       @if (link(); as jira) {
         @if (jira.linked) {
           <!-- the issue -->
@@ -137,7 +149,7 @@ import { Api, ApiJiraLink, JiraStatusCategory } from '../core/api';
                   class="input tabular mt-0 w-[150px]"
                   [(ngModel)]="issueKey"
                   name="issuekey"
-                  placeholder="OPS-1042"
+                  [placeholder]="demo() ? 'DEMO-101' : 'OPS-1042'"
                   aria-label="Jira issue key"
                 />
                 <button type="submit" class="btn" [disabled]="busy()">
@@ -150,6 +162,21 @@ import { Api, ApiJiraLink, JiraStatusCategory } from '../core/api';
               </span>
             }
           </div>
+
+          @if (demo()) {
+            <p class="m-0 mt-2 text-[11.5px] text-ink-faint">
+              Try <span class="tabular">DEMO-101</span> for a worked example, or
+              <span class="tabular">DEMO-404</span> to see how a broken link reports itself.
+            </p>
+          }
+
+          <!-- So that setting Jira up later is a checklist, not guesswork. -->
+          @if (missing().length > 0 && !demo()) {
+            <p class="m-0 mt-2 text-[11.5px] text-ink-faint">
+              Still to set in <span class="tabular">.env</span>:
+              <span class="tabular">{{ missing().join(', ') }}</span>
+            </p>
+          }
         }
       }
 
@@ -176,6 +203,15 @@ export class JiraPanel {
 
   protected readonly statusDetail = computed(
     () => this.api.jiraStatusResource.value()?.detail ?? 'checking…',
+  );
+
+  /** Drives the badge. Issues must never be invented without the panel saying so. */
+  protected readonly demo = computed(
+    () => this.api.jiraStatusResource.value()?.demo ?? false,
+  );
+
+  protected readonly missing = computed(
+    () => this.api.jiraStatusResource.value()?.missing ?? [],
   );
 
   protected readonly percent = computed(() => {

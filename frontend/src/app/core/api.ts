@@ -214,6 +214,10 @@ export interface ApiJiraStatus {
   configured: boolean;
   reachable: boolean;
   detail: string;
+  /** Issues are invented. The panel must say so on screen. */
+  demo: boolean;
+  /** Which JIRA_* variables are still blank. Names only, never values. */
+  missing: string[];
   projectKey: string | null;
   baseUrl: string | null;
   cron: string;

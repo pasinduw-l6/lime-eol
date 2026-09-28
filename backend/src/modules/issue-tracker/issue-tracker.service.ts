@@ -44,6 +44,12 @@ export class IssueTrackerService {
       configured,
       reachable: check.ok,
       detail: check.detail,
+      /// The panel badges itself off this, so invented issues always announce
+      /// themselves on screen.
+      demo: this.config.demo,
+      /// Which environment variables are still blank, so setting Jira up later
+      /// is a checklist rather than guesswork. Names only — never values.
+      missing: this.config.missing,
       projectKey: this.config.projectKey ?? null,
       baseUrl: this.config.baseUrl ?? null,
       cron: this.config.cron,
