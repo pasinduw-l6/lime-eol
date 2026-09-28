@@ -12,8 +12,8 @@ import { Router } from '@angular/router';
 import { Api, ApiUpgradeAction } from '../../core/api';
 import { formatDate, formatDays, statusFill, SupportStatus } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
-import { JiraPanel } from '../../shared/jira-panel';
 import { Modal } from '../../shared/modal';
+import { PlanCard } from '../../shared/plan-card';
 import { TechIcon } from '../../shared/tech-icon';
 
 const STATUSES = ['NOT_STARTED', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED'];
@@ -40,7 +40,7 @@ interface Draft {
  */
 @Component({
   selector: 'lime-actions',
-  imports: [FormsModule, Modal, TechIcon, JiraPanel],
+  imports: [FormsModule, Modal, TechIcon, PlanCard],
   host: { class: 'block' },
   template: `
     <section class="card mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
@@ -92,110 +92,12 @@ interface Draft {
 
     <div class="grid gap-4">
       @for (action of filtered(); track action.id) {
-        <article class="card px-6 py-5">
-          <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="flex min-w-0 items-start gap-3">
-              <lime-tech-icon [technology]="action.technology" [size]="30" />
-              <div class="min-w-0">
-                <h2 class="m-0 text-[17px] font-semibold">
-                  {{ action.technology }} {{ action.cycle }}
-                  <span class="text-ink-soft">→ {{ action.targetVersion || 'no target' }}</span>
-                </h2>
-                <p class="tabular m-0 text-[12.5px] text-ink-soft">
-                  {{ action.jiraKey || 'no ticket' }} ·
-                  {{ action.assignee?.name || 'unassigned' }}
-                  @if (action.eolDate) {
-                    · support ends {{ date(action.eolDate) }}
-                    <span [style.color]="fill(statusOf(action.daysToEol))">
-                      ({{ days(action.daysToEol) }})
-                    </span>
-                  }
-                </p>
-              </div>
-            </div>
-
-            <div class="flex shrink-0 items-center gap-2">
-              <span
-                class="rounded-full border px-3 py-1 text-[12px] capitalize"
-                [style.border-color]="statusColour(action.derivedStatus)"
-                [style.color]="statusColour(action.derivedStatus)"
-              >
-                {{ action.derivedStatus.toLowerCase().replace('_', ' ') }}
-              </span>
-              <button type="button" class="text-[12px] text-accent-bright" (click)="edit(action)">
-                Edit
-              </button>
-              <button
-                type="button"
-                class="text-[12px] text-overdue"
-                (click)="confirmDelete.set(action)"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-
-          <!-- the two findings a ticket board cannot make -->
-          @if (action.planTooLate) {
-            <p
-              class="m-0 mt-3 rounded-xl border px-3 py-2 text-[12.5px]"
-              style="border-color: var(--color-soon); color: var(--color-soon)"
-            >
-              This plan finishes after support ends — the environments would run
-              unsupported in between.
-            </p>
-          }
-          @if (action.unverifiedCompletion) {
-            <p
-              class="m-0 mt-3 rounded-xl border px-3 py-2 text-[12.5px]"
-              style="border-color: var(--color-overdue); color: var(--color-overdue)"
-            >
-              Marked complete, but no matching version change is recorded. Either
-              it did not happen, or it was not written down.
-            </p>
-          }
-
-          <!-- per-environment progress -->
-          <div class="mt-4 flex flex-wrap items-center gap-2">
-            <span class="tabular text-[12px] text-ink-soft">
-              {{ action.progress.done }}/{{ action.progress.total }} environments
-            </span>
-            @for (env of action.environments; track env.deploymentId) {
-              <button
-                type="button"
-                class="glass flex items-center gap-2 rounded-full border px-3 py-1 text-[12px]"
-                [style.border-color]="
-                  env.completedAt
-                    ? env.verified
-                      ? 'var(--color-good)'
-                      : 'var(--color-overdue)'
-                    : null
-                "
-                [disabled]="!!env.completedAt"
-                [attr.title]="
-                  env.completedAt
-                    ? env.verified
-                      ? 'Done, and confirmed by a recorded change'
-                      : 'Marked done, but nothing is recorded'
-                    : 'Mark ' + env.environment + ' done'
-                "
-                (click)="completeEnvironment(action, env.deploymentId)"
-              >
-                {{ env.environment }}
-                @if (env.completedAt) {
-                  <span
-                    [style.color]="env.verified ? 'var(--color-good)' : 'var(--color-overdue)'"
-                    >{{ env.verified ? '✓' : '!' }}</span
-                  >
-                } @else {
-                  <span class="text-ink-faint">mark done</span>
-                }
-              </button>
-            }
-          </div>
-
-          <lime-jira-panel [actionId]="action.id" />
-        </article>
+        <lime-plan-card
+          [action]="action"
+          (editing)="edit(action)"
+          (removing)="confirmDelete.set(action)"
+          (complete)="completeEnvironment(action, $event)"
+        />
       } @empty {
         <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
           @if (api.actionsResource.isLoading()) {
