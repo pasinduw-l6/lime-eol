@@ -16,7 +16,6 @@ import { Modal } from '../../shared/modal';
 import { PlanBoard } from '../../shared/plan-board';
 import { PlanCard } from '../../shared/plan-card';
 import { PlanDetail } from '../../shared/plan-detail';
-import { TechIcon } from '../../shared/tech-icon';
 
 const STATUSES = ['NOT_STARTED', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED'];
 
@@ -33,7 +32,7 @@ interface Draft {
 
 @Component({
   selector: 'lime-actions',
-  imports: [FormsModule, Modal, TechIcon, PlanCard, PlanBoard, PlanDetail],
+  imports: [FormsModule, Modal, PlanCard, PlanBoard, PlanDetail],
   host: { class: 'block' },
   template: `
     <section class="card mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
