@@ -76,8 +76,14 @@ export const envSchema = z
     /// Carries full access as that user. Treated like TEAMS_WEBHOOK_URL: env
     /// only, never committed, never logged, never returned by an endpoint.
     JIRA_API_TOKEN: blankable(z.string().optional()),
-    /// Where upgrade epics are created, e.g. OPS.
+    /// Where upgrade epics are created, e.g. KAN.
     JIRA_PROJECT_KEY: blankable(z.string().optional()),
+    /// Scoped tokens are restricted to chosen scopes and must be sent through
+    /// Atlassian's gateway; classic tokens carry full account access and go to
+    /// the site URL. The two are indistinguishable as strings, so which one it
+    /// is has to be stated rather than detected. Classic tokens are being
+    /// phased out, so scoped is the default.
+    JIRA_TOKEN_TYPE: z.enum(['scoped', 'classic']).default('scoped'),
     /// How often the worker reconciles linked issues. Jira is a cache here.
     JIRA_SYNC_CRON: z.string().default('*/15 * * * *'),
     JIRA_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),

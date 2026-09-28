@@ -14,6 +14,7 @@ export const jiraConfig = registerAs(JIRA_CONFIG_KEY, () => {
     cron: env.JIRA_SYNC_CRON,
     timeoutMs: env.JIRA_HTTP_TIMEOUT_MS,
     demo: env.JIRA_DEMO,
+    scopedToken: env.JIRA_TOKEN_TYPE === 'scoped',
 
     /// Which of the four are still blank, for the setup checklist. Reports
     /// only whether each is set, never what it is.

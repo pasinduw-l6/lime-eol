@@ -14,7 +14,7 @@ const PAGE_SIZE = 100;
 /**
  * Jira Cloud, REST API v3.
  *
- * Three things here are not obvious and are easy to get wrong:
+ * Four things here are not obvious and are easy to get wrong:
  *
  * - Search is `/rest/api/3/search/jql`. The old `/rest/api/3/search` has been
  *   removed, not merely deprecated, and paging is a `nextPageToken` cursor
@@ -22,6 +22,11 @@ const PAGE_SIZE = 100;
  * - Auth is Basic with `email:apiToken`, which is Cloud's scheme. Data Center
  *   uses a bare bearer PAT instead, which is why this adapter is Cloud-only
  *   and a second adapter would be needed for Data Center.
+ * - A scoped token and a classic one are both opaque strings, but they are
+ *   sent to different hosts: scoped tokens go through Atlassian's gateway at
+ *   api.atlassian.com and need the site's cloud id, classic tokens go to the
+ *   site itself. Nothing in the token says which it is, so the type is
+ *   configured rather than sniffed.
  * - v3 wants rich text as ADF (nested JSON), not a string. Nothing here writes
  *   yet, so that arrives with provisioning.
  *
@@ -31,6 +36,9 @@ const PAGE_SIZE = 100;
 @Injectable()
 export class JiraAdapter implements IssueTracker {
   private readonly logger = new Logger(JiraAdapter.name);
+
+  /** Resolved once. A site's cloud id does not change. */
+  private cachedCloudId: string | null = null;
 
   readonly name = 'Jira';
 
@@ -47,16 +55,30 @@ export class JiraAdapter implements IssueTracker {
       return { ok: false, detail: 'No Jira credentials are configured.' };
     }
 
+    const style = this.config.scopedToken ? 'scoped' : 'classic';
+
     try {
       // Cheapest authenticated call that proves both reachability and that the
       // credentials are accepted.
       const me = await this.request<{ displayName?: string }>('/rest/api/3/myself');
       return {
         ok: true,
-        detail: `Connected as ${me.displayName ?? 'an unnamed account'}.`,
+        detail: `Connected as ${me.displayName ?? 'an unnamed account'} (${style} token).`,
       };
     } catch (error) {
-      return { ok: false, detail: message(error) };
+      const detail = message(error);
+
+      // The two token types are sent to different hosts, so the wrong setting
+      // fails as a 401 that reads like bad credentials. Saying which one was
+      // assumed turns a guessing game into a one-line fix.
+      const hint =
+        detail.includes('401') || detail.includes('403')
+          ? ` Sent as a ${style} token — if it is the other kind, set JIRA_TOKEN_TYPE=${
+              this.config.scopedToken ? 'classic' : 'scoped'
+            }.`
+          : '';
+
+      return { ok: false, detail: detail + hint };
     }
   }
 
@@ -110,12 +132,61 @@ export class JiraAdapter implements IssueTracker {
     };
   }
 
+  /**
+   * Where REST calls go, which depends on the kind of token.
+   *
+   * A scoped token is rejected at the site URL and a classic one is rejected
+   * at the gateway, so getting this wrong produces a 401 that looks like bad
+   * credentials rather than a wrong address — which is why the type is
+   * configured explicitly and named in the error below.
+   */
+  private async apiRoot(): Promise<string> {
+    if (!this.config.scopedToken) {
+      return this.config.baseUrl!;
+    }
+    return `https://api.atlassian.com/ex/jira/${await this.cloudId()}`;
+  }
+
+  /**
+   * The site's cloud id, from its own public tenant-info endpoint.
+   *
+   * Unauthenticated on purpose: it runs before the token is ever used, so a
+   * failure here is clearly "the site URL is wrong" rather than "the
+   * credentials are wrong". Cached for the life of the process.
+   */
+  private async cloudId(): Promise<string> {
+    if (this.cachedCloudId) {
+      return this.cachedCloudId;
+    }
+
+    const response = await fetch(`${this.config.baseUrl}/_edge/tenant_info`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.config.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not resolve the Jira cloud id from ${this.config.baseUrl} ` +
+          `(HTTP ${response.status}). Check JIRA_BASE_URL.`,
+      );
+    }
+
+    const body = (await response.json()) as { cloudId?: string };
+    if (!body.cloudId) {
+      throw new Error('The Jira site did not return a cloud id.');
+    }
+
+    this.cachedCloudId = body.cloudId;
+    this.logger.log(`Jira cloud id resolved for ${this.config.baseUrl}`);
+    return body.cloudId;
+  }
+
   private async request<T>(path: string): Promise<T> {
     if (!this.configured) {
       throw new Error('No Jira credentials are configured.');
     }
 
-    const url = `${this.config.baseUrl}${path}`;
+    const url = `${await this.apiRoot()}${path}`;
     const auth = Buffer.from(
       `${this.config.email}:${this.config.apiToken}`,
     ).toString('base64');
