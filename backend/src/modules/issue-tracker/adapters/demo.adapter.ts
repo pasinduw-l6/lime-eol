@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Assignee,
   IssueStatusCategory,
   IssueTracker,
+  NewSubtask,
   TrackedIssue,
 } from '../ports/issue-tracker.port';
 
@@ -73,6 +75,38 @@ export class DemoIssueTracker implements IssueTracker {
     }
 
     return Promise.resolve(this.children(normalised));
+  }
+
+  getAssignees(): Promise<Assignee[]> {
+    return Promise.resolve(
+      ['Dinith', 'Kushantha', 'Pamodha', 'Randula', 'Suran'].map((name) => ({
+        id: `demo-${name.toLowerCase()}`,
+        name,
+      })),
+    );
+  }
+
+  /**
+   * Pretends to create, and says so.
+   *
+   * Returning the issue without persisting anything is the honest behaviour
+   * here: the next sync rebuilds the list from the fixed breakdown, so a demo
+   * creation visibly does not stick. Better that than writing invented rows
+   * into the mirror and letting them look permanent.
+   */
+  createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue> {
+    const key = `DEMO-${900 + Math.floor(Math.random() * 99)}`;
+
+    return Promise.resolve({
+      id: `demo-${key}`,
+      key,
+      summary: input.summary,
+      status: 'To Do',
+      statusCategory: 'to-do' as IssueStatusCategory,
+      assignee: null,
+      url: `https://example.invalid/browse/${key}`,
+      parentKey: parentKey.trim().toUpperCase(),
+    });
   }
 
   /**

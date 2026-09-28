@@ -1,6 +1,11 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, ApiJiraLink, JiraStatusCategory } from '../core/api';
+import {
+  Api,
+  ApiJiraAssignee,
+  ApiJiraLink,
+  JiraStatusCategory,
+} from '../core/api';
 
 /**
  * The work behind a plan, as Jira holds it.
@@ -133,8 +138,49 @@ import { Api, ApiJiraLink, JiraStatusCategory } from '../core/api';
             </ul>
           } @else if (!jira.syncError) {
             <p class="m-0 mt-3 text-[12px] text-ink-faint">
-              No sub-tasks on this issue yet. Break the work down in Jira.
+              No steps on this issue yet.
             </p>
+          }
+
+          <!-- Add a step. Creates it in Jira; everything after that is Jira's. -->
+          @if (!jira.syncError) {
+            <form
+              class="mt-2 grid items-center gap-2"
+              style="grid-template-columns: minmax(0, 1fr) 150px 140px auto"
+              (submit)="addStep($event)"
+            >
+              <input
+                class="input mt-0"
+                [(ngModel)]="newSummary"
+                name="stepsummary"
+                placeholder="Add a step in Jira"
+                [disabled]="adding()"
+              />
+              <select
+                class="input mt-0"
+                [(ngModel)]="newAssignee"
+                name="stepassignee"
+                [disabled]="adding()"
+                aria-label="Assign to"
+              >
+                <option value="">Unassigned</option>
+                @for (person of assignees(); track person.id) {
+                  <option [value]="person.id">{{ person.name }}</option>
+                }
+              </select>
+              <input
+                class="input mt-0"
+                type="date"
+                [(ngModel)]="newDue"
+                name="stepdue"
+                [disabled]="adding()"
+                aria-label="Due date"
+                title="Due date"
+              />
+              <button type="submit" class="btn" [disabled]="adding()">
+                {{ adding() ? 'Adding…' : 'Add' }}
+              </button>
+            </form>
           }
         } @else {
           <!-- not linked -->
@@ -196,6 +242,12 @@ export class JiraPanel {
   protected readonly busy = signal(false);
   protected readonly issueKey = signal('');
 
+  protected readonly assignees = signal<ApiJiraAssignee[]>([]);
+  protected readonly adding = signal(false);
+  protected readonly newSummary = signal('');
+  protected readonly newAssignee = signal('');
+  protected readonly newDue = signal('');
+
   /** Whether linking is even possible, from the integration status endpoint. */
   protected readonly connected = computed(
     () => this.api.jiraStatusResource.value()?.configured ?? false,
@@ -228,8 +280,50 @@ export class JiraPanel {
 
   private load(): void {
     this.api.jiraLink(this.actionId()).subscribe({
-      next: (link) => this.link.set(link),
+      next: (link) => {
+        this.link.set(link);
+        if (link.linked) {
+          this.loadAssignees();
+        }
+      },
     });
+  }
+
+  /** Jira's account list. Ours cannot be used — different identity system. */
+  private loadAssignees(): void {
+    this.api.jiraAssignees(this.actionId()).subscribe({
+      next: (people) => this.assignees.set(people),
+    });
+  }
+
+  protected addStep(event: Event): void {
+    event.preventDefault();
+    const summary = this.newSummary().trim();
+    if (!summary) {
+      return;
+    }
+
+    this.adding.set(true);
+    this.error.set(null);
+    this.api
+      .addJiraSubtask(this.actionId(), {
+        summary,
+        assigneeId: this.newAssignee() || undefined,
+        dueDate: this.newDue() || undefined,
+      })
+      .subscribe({
+        next: (link) => {
+          this.link.set(link);
+          this.newSummary.set('');
+          this.newAssignee.set('');
+          this.newDue.set('');
+          this.adding.set(false);
+        },
+        error: (err: { error?: { message?: string } }) => {
+          this.adding.set(false);
+          this.error.set(err.error?.message ?? 'Could not add that step.');
+        },
+      });
   }
 
   protected submitLink(event: Event): void {
@@ -262,6 +356,13 @@ export class JiraPanel {
       next: (link) => {
         this.link.set(link);
         this.busy.set(false);
+        // Assignable users are per issue, so a freshly linked issue needs its
+        // own list rather than whatever the last one had.
+        if (link.linked) {
+          this.loadAssignees();
+        } else {
+          this.assignees.set([]);
+        }
         after?.();
       },
       error: (err: { error?: { message?: string } }) => {

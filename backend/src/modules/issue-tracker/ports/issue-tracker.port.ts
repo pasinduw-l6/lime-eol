@@ -30,16 +30,25 @@ export interface TrackedIssue {
   parentKey: string | null;
 }
 
-/** What a new issue needs. Descriptions are plain text here; the adapter is
- *  responsible for whatever format its tracker wants. */
-export interface NewIssue {
+/**
+ * What a new child issue needs.
+ *
+ * The description is plain text: the tracker's own format is the adapter's
+ * problem, so callers never build Atlassian Document Format by hand.
+ */
+export interface NewSubtask {
   summary: string;
-  description: string;
-  /** Sub-tasks pass the parent's key; a top-level issue passes null. */
-  parentKey: string | null;
+  description: string | null;
   /** ISO date, or null to leave it unset. */
   dueDate: string | null;
-  labels: string[];
+  /** The tracker's own account id, not one of ours. Null leaves it open. */
+  assigneeId: string | null;
+}
+
+/** Someone who can be given work on a particular issue. */
+export interface Assignee {
+  id: string;
+  name: string;
 }
 
 export interface IssueTracker {
@@ -54,6 +63,18 @@ export interface IssueTracker {
 
   /** Sub-tasks of an issue, in Jira's own order. */
   getChildren(key: string): Promise<TrackedIssue[]>;
+
+  /**
+   * Adds a child under an existing issue.
+   *
+   * The only write this application makes. It creates work in the tracker and
+   * then forgets about it — status, comments and time all stay over there, so
+   * this stops short of becoming a second place to manage the same task.
+   */
+  createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue>;
+
+  /** Who can be given work on this issue, as the tracker sees it. */
+  getAssignees(issueKey: string): Promise<Assignee[]>;
 
   /** A quick reachability and credential check for the status endpoint. */
   check(): Promise<{ ok: boolean; detail: string }>;

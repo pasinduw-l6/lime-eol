@@ -67,12 +67,6 @@ export class CreateUpgradeActionDto {
   @IsIn(ACTION_STATUSES)
   status?: (typeof ACTION_STATUSES)[number];
 
-  @ApiPropertyOptional({ example: 'LIME-1042' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  jiraKey?: string;
-
   @ApiPropertyOptional({
     enum: COMM_STATUSES,
     description: 'Whether the customer has been told, where it affects them',

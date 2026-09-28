@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { LinkIssueDto } from './dto/link-issue.dto';
+import { CreateSubtaskDto, LinkIssueDto } from './dto/link-issue.dto';
 import { IssueTrackerService } from './issue-tracker.service';
 
 @ApiTags('issue-tracker')
@@ -43,6 +43,27 @@ export class IssueTrackerController {
   @ApiOperation({ summary: 'Refresh this plan from Jira now' })
   sync(@Param('id') id: string) {
     return this.tracker.sync(id);
+  }
+
+  @Get('upgrade-actions/:id/jira/assignees')
+  @ApiOperation({
+    summary: 'Who the tracker will let you assign work to',
+    description:
+      "Jira's own account list for this issue. Our engineer records are separate and cannot be used as assignees.",
+  })
+  assignees(@Param('id') id: string) {
+    return this.tracker.assignees(id);
+  }
+
+  @Post('upgrade-actions/:id/jira/subtasks')
+  @ApiOperation({
+    summary: 'Add a step under the linked issue',
+    description:
+      'Creates it in Jira and re-reads the mirror. Status, comments and time stay in Jira — this creates work, it does not manage it.',
+  })
+  @ApiOkResponse({ description: 'The mirror, including the new step' })
+  addSubtask(@Param('id') id: string, @Body() body: CreateSubtaskDto) {
+    return this.tracker.addSubtask(id, body);
   }
 
   @Delete('upgrade-actions/:id/jira/link')

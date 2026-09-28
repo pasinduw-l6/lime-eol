@@ -208,6 +208,12 @@ export interface ApiJiraLink {
   subtasks: ApiJiraSubtask[];
 }
 
+/** Someone Jira will accept as an assignee. Not one of our engineer records. */
+export interface ApiJiraAssignee {
+  id: string;
+  name: string;
+}
+
 /** Whether Jira could be reached. Never carries the token. */
 export interface ApiJiraStatus {
   tracker: string;
@@ -447,6 +453,29 @@ export class Api {
   unlinkJiraIssue(actionId: string) {
     return this.http.delete<ApiJiraLink>(
       `/api/v1/upgrade-actions/${actionId}/jira/link`,
+    );
+  }
+
+  /** Who Jira will let you assign this issue's children to. */
+  jiraAssignees(actionId: string) {
+    return this.http.get<ApiJiraAssignee[]>(
+      `/api/v1/upgrade-actions/${actionId}/jira/assignees`,
+    );
+  }
+
+  /** Creates a step in Jira under the linked issue, and returns the mirror. */
+  addJiraSubtask(
+    actionId: string,
+    body: {
+      summary: string;
+      description?: string;
+      dueDate?: string;
+      assigneeId?: string;
+    },
+  ) {
+    return this.http.post<ApiJiraLink>(
+      `/api/v1/upgrade-actions/${actionId}/jira/subtasks`,
+      body,
     );
   }
 

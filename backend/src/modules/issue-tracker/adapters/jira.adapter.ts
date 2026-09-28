@@ -1,8 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { jiraConfig, JiraConfig } from '../../../config';
 import {
+  Assignee,
   IssueStatusCategory,
   IssueTracker,
+  NewSubtask,
   TrackedIssue,
 } from '../ports/issue-tracker.port';
 
@@ -27,8 +29,8 @@ const PAGE_SIZE = 100;
  *   api.atlassian.com and need the site's cloud id, classic tokens go to the
  *   site itself. Nothing in the token says which it is, so the type is
  *   configured rather than sniffed.
- * - v3 wants rich text as ADF (nested JSON), not a string. Nothing here writes
- *   yet, so that arrives with provisioning.
+ * - v3 wants rich text as ADF (nested JSON), not a string; a plain string in
+ *   `description` is a 400. Hence `toAdf` on the one write path here.
  *
  * The token is never logged and never returned. Errors carry status codes and
  * Jira's own message, both of which are safe; the Authorization header is not.
@@ -39,6 +41,9 @@ export class JiraAdapter implements IssueTracker {
 
   /** Resolved once. A site's cloud id does not change. */
   private cachedCloudId: string | null = null;
+
+  /** Sub-task issue type id, per project. Differs per project and per site. */
+  private readonly subtaskTypes = new Map<string, string>();
 
   readonly name = 'Jira';
 
@@ -118,6 +123,79 @@ export class JiraAdapter implements IssueTracker {
     return issues.map((issue) => this.toTracked(issue));
   }
 
+  async getAssignees(issueKey: string): Promise<Assignee[]> {
+    const users = await this.request<RawUser[]>(
+      `/rest/api/3/user/assignable/search?issueKey=${encodeURIComponent(issueKey)}&maxResults=50`,
+    );
+
+    return users
+      .filter((user) => user.active !== false)
+      .map((user) => ({ id: user.accountId, name: user.displayName }));
+  }
+
+  async createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue> {
+    // The project comes from the parent rather than JIRA_PROJECT_KEY: a plan
+    // may be linked to an issue that lives somewhere else entirely, and the
+    // child has to be created beside its parent.
+    const projectKey = parentKey.split('-')[0];
+    const issueTypeId = await this.subtaskTypeId(projectKey);
+
+    const fields: Record<string, unknown> = {
+      project: { key: projectKey },
+      parent: { key: parentKey },
+      issuetype: { id: issueTypeId },
+      summary: input.summary,
+    };
+
+    // v3 rejects a plain string here — rich text has to be ADF.
+    if (input.description) {
+      fields['description'] = toAdf(input.description);
+    }
+    if (input.dueDate) {
+      fields['duedate'] = input.dueDate;
+    }
+    if (input.assigneeId) {
+      fields['assignee'] = { accountId: input.assigneeId };
+    }
+
+    const created = await this.send<{ key: string }>('/rest/api/3/issue', 'POST', {
+      fields,
+    });
+
+    // Read it back rather than assembling the response from what we sent:
+    // Jira applies its own defaults, and the status is one of them.
+    return this.getIssue(created.key);
+  }
+
+  /**
+   * The id of the project's sub-task type.
+   *
+   * Issue type ids differ per project and per site, so they cannot be
+   * hardcoded. Cached because it only changes if someone edits the project's
+   * issue type scheme.
+   */
+  private async subtaskTypeId(projectKey: string): Promise<string> {
+    const cached = this.subtaskTypes.get(projectKey);
+    if (cached) {
+      return cached;
+    }
+
+    const meta = await this.request<{ issueTypes?: RawIssueType[] }>(
+      `/rest/api/3/issue/createmeta/${encodeURIComponent(projectKey)}/issuetypes`,
+    );
+
+    const type = (meta.issueTypes ?? []).find((t) => t.subtask);
+    if (!type) {
+      throw new Error(
+        `Project ${projectKey} has no sub-task issue type enabled. ` +
+          'Add one under Project settings, Issue types.',
+      );
+    }
+
+    this.subtaskTypes.set(projectKey, type.id);
+    return type.id;
+  }
+
   private toTracked(issue: RawIssue): TrackedIssue {
     const fields = issue.fields ?? {};
     return {
@@ -179,6 +257,42 @@ export class JiraAdapter implements IssueTracker {
     this.cachedCloudId = body.cloudId;
     this.logger.log(`Jira cloud id resolved for ${this.config.baseUrl}`);
     return body.cloudId;
+  }
+
+  /**
+   * A write. Deliberately not folded into `request`: reads retry freely, and a
+   * create that is retried after an ambiguous failure can leave two issues
+   * behind. This one tries once.
+   */
+  private async send<T>(
+    path: string,
+    method: 'POST' | 'PUT',
+    body: unknown,
+  ): Promise<T> {
+    if (!this.configured) {
+      throw new Error('No Jira credentials are configured.');
+    }
+
+    const auth = Buffer.from(
+      `${this.config.email}:${this.config.apiToken}`,
+    ).toString('base64');
+
+    const response = await fetch(`${await this.apiRoot()}${path}`, {
+      method,
+      headers: {
+        Authorization: `Basic ${auth}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(this.config.timeoutMs),
+    });
+
+    if (!response.ok) {
+      throw new Error(await describe(response));
+    }
+
+    return (await response.json()) as T;
   }
 
   private async request<T>(path: string): Promise<T> {
@@ -281,6 +395,41 @@ function backoffFor(attempt: number, retryAfter: string | null): number {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Plain text as an Atlassian Document Format paragraph per line.
+ *
+ * v3 returns 400 for a plain string in `description`, so even one sentence has
+ * to be wrapped. Blank lines are dropped rather than becoming empty paragraphs.
+ */
+function toAdf(text: string): Record<string, unknown> {
+  const paragraphs = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => ({
+      type: 'paragraph',
+      content: [{ type: 'text', text: line }],
+    }));
+
+  return {
+    type: 'doc',
+    version: 1,
+    content: paragraphs.length > 0 ? paragraphs : [{ type: 'paragraph' }],
+  };
+}
+
+interface RawUser {
+  accountId: string;
+  displayName: string;
+  active?: boolean;
+}
+
+interface RawIssueType {
+  id: string;
+  name: string;
+  subtask: boolean;
 }
 
 interface RawIssue {

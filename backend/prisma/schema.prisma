@@ -516,6 +516,11 @@ model UpgradeAction {
   status            ActionStatus @default(NOT_STARTED)
   /// The issue key as a person types it, e.g. OPS-1042. Kept even when the
   /// mirror below is stale or Jira is unreachable.
+  ///
+  /// Written only by the issue-tracker link flow, never by the plan form. It
+  /// once had two writers, and editing a plan could silently point this at a
+  /// different issue than jiraIssueId and the mirror below — which then failed
+  /// as "issue does not exist" on the next call.
   jiraKey           String?      @map("jira_key")
   /// Jira's own immutable id. The key changes if an issue moves project; this
   /// does not, so the link survives.

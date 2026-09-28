@@ -220,6 +220,99 @@ export class IssueTrackerService {
     return { linked: actions.length, failed };
   }
 
+  /**
+   * Adds a step to the linked issue.
+   *
+   * The only write this application makes into the tracker, and it is
+   * deliberately one-way: the sub-task is created over there and everything
+   * afterwards — status, comments, time — happens over there too. Creating
+   * work is not the same as owning it.
+   *
+   * Unlike `sync`, a failure throws rather than being recorded on the row.
+   * Someone is standing at the form waiting to hear whether it worked.
+   */
+  async addSubtask(
+    actionId: string,
+    input: { summary: string; description?: string; dueDate?: string; assigneeId?: string },
+  ) {
+    const action = await this.mustExist(actionId);
+
+    if (!action.jiraKey) {
+      throw new BadRequestException(
+        'Link this plan to an issue before adding steps to it.',
+      );
+    }
+
+    let created;
+    try {
+      created = await this.tracker.createSubtask(action.jiraKey, {
+        summary: input.summary.trim(),
+        description: input.description?.trim() || null,
+        dueDate: input.dueDate || null,
+        assigneeId: input.assigneeId || null,
+      });
+    } catch (error) {
+      throw new BadRequestException(`Jira refused that: ${message(error)}`);
+    }
+
+    // Re-read, so the mirror holds what Jira actually has rather than what we
+    // think we sent.
+    const mirror = await this.sync(actionId);
+
+    if (mirror.subtasks.some((task) => task.key === created.key)) {
+      return mirror;
+    }
+
+    // Jira's JQL index lags creation by a second or two, so the search above
+    // can come back without the issue that was just made. Without this, a step
+    // someone adds disappears until the next scheduled pass — up to fifteen
+    // minutes of looking like it failed. The row is written from the create
+    // response, and the next sync reconciles it either way.
+    const last = await this.prisma.jiraSubtask.findFirst({
+      where: { upgradeActionId: actionId },
+      orderBy: { position: 'desc' },
+      select: { position: true },
+    });
+
+    await this.prisma.jiraSubtask.create({
+      data: {
+        upgradeActionId: actionId,
+        issueKey: created.key,
+        issueId: created.id,
+        summary: created.summary,
+        status: created.status,
+        statusCategory: created.statusCategory,
+        assignee: created.assignee,
+        url: created.url,
+        position: (last?.position ?? -1) + 1,
+      },
+    });
+
+    await this.prisma.upgradeAction.update({
+      where: { id: actionId },
+      data: { jiraSubtaskTotal: mirror.total + 1 },
+    });
+
+    return this.read(actionId);
+  }
+
+  /** Who the tracker will let you assign work to on this issue. */
+  async assignees(actionId: string) {
+    const action = await this.mustExist(actionId);
+
+    if (!action.jiraKey) {
+      return [];
+    }
+
+    try {
+      return await this.tracker.getAssignees(action.jiraKey);
+    } catch (error) {
+      // An empty picker is a better failure than a broken form.
+      this.logger.warn(`Could not list assignees: ${message(error)}`);
+      return [];
+    }
+  }
+
   /** What the panel renders. Reads the mirror only — never calls Jira. */
   async read(actionId: string) {
     const action = await this.prisma.upgradeAction.findUnique({

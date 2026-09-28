@@ -26,7 +26,6 @@ interface Draft {
   status: string;
   plannedDate: string;
   assigneeId: string;
-  jiraKey: string;
   deploymentIds: string[];
 }
 
@@ -177,15 +176,6 @@ interface Draft {
                   <option [value]="e.id">{{ e.name }}</option>
                 }
               </select>
-            </label>
-            <label class="field">
-              Jira / change request
-              <input
-                class="input tabular"
-                [(ngModel)]="form.jiraKey"
-                name="jira"
-                placeholder="LIME-1042"
-              />
             </label>
           </div>
 
@@ -352,7 +342,6 @@ export class Actions {
       status: action.status,
       plannedDate: action.plannedDate ?? '',
       assigneeId: action.assignee?.id ?? '',
-      jiraKey: action.jiraKey ?? '',
       deploymentIds: action.environments.map((e) => e.deploymentId),
     });
   }
@@ -397,7 +386,6 @@ export class Actions {
       assigneeId: form.assigneeId || undefined,
       plannedDate: form.plannedDate || undefined,
       status: form.status,
-      jiraKey: form.jiraKey || undefined,
     };
 
     this.saving.set(true);
@@ -490,7 +478,6 @@ function blank(): Draft {
     status: 'PLANNED',
     plannedDate: '',
     assigneeId: '',
-    jiraKey: '',
     deploymentIds: [],
   };
 }
