@@ -44,6 +44,14 @@
     'Segoe UI', system-ui, 'IBM Plex Sans', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
 
+  /* What a person wrote, as distinct from what the system knows.
+     A typed index card rather than a handwritten one: note bodies are full of
+     version strings, config keys and hostnames, and those need a face that
+     renders them exactly rather than approximately. Plex Mono is already
+     loaded and was designed alongside Plex Sans, so paper and glass stay
+     related without the note reading as a novelty. */
+  --font-note: var(--font-mono);
+
   --radius-card: 22px;
   --radius-control: 13px;
 }

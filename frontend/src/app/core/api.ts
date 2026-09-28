@@ -420,6 +420,23 @@ export class Api {
     );
   }
 
+  /** Edits a step. Omit a field to leave it; pass null to clear it. */
+  updateActionStep(
+    id: string,
+    stepId: string,
+    body: {
+      title?: string;
+      description?: string | null;
+      dueDate?: string | null;
+      assigneeId?: string | null;
+    },
+  ) {
+    return this.http.patch<ApiActionStep[]>(
+      `/api/v1/upgrade-actions/${id}/steps/${stepId}`,
+      body,
+    );
+  }
+
   pauseActionStep(id: string, stepId: string) {
     return this.http.post<ApiActionStep[]>(
       `/api/v1/upgrade-actions/${id}/steps/${stepId}/pause`,

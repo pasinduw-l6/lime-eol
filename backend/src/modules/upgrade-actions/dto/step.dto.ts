@@ -55,6 +55,12 @@ export class CreateStepDto {
   assigneeId?: string;
 }
 
+/**
+ * Every field is optional, and null is distinct from absent.
+ *
+ * Absent leaves the value alone; null clears it. Without that distinction a
+ * step could be given an owner but never have one taken away.
+ */
 export class UpdateStepDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -63,11 +69,11 @@ export class UpdateStepDto {
   @MaxLength(200)
   title?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  description?: string;
+  description?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -76,15 +82,15 @@ export class UpdateStepDto {
   @Max(MAX_ESTIMATE_MINUTES)
   estimateMinutes?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true, description: 'null clears the date' })
   @IsOptional()
   @IsISO8601()
-  dueDate?: string;
+  dueDate?: string | null;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true, description: 'null unassigns' })
   @IsOptional()
   @IsUUID()
-  assigneeId?: string;
+  assigneeId?: string | null;
 }
 
 export class LogTimeDto {

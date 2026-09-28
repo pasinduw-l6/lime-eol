@@ -65,6 +65,12 @@ export class ActionStepsService {
     return this.list(actionId);
   }
 
+  /**
+   * Edits a step. Absent fields are left alone, null clears them.
+   *
+   * That relies on Prisma reading `undefined` as "do not touch" and `null` as
+   * "set to null", so the two must not be collapsed into one falsy check.
+   */
   async update(actionId: string, stepId: string, input: UpdateStepDto) {
     await this.prisma.upgradeActionStep.update({
       where: { id: stepId },
