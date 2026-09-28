@@ -1,6 +1,8 @@
 import { HttpClient, HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { tap } from 'rxjs';
+import { catchError, tap, throwError } from 'rxjs';
+import { Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 
 export interface Session {
   token: string;
@@ -79,13 +81,33 @@ function restore(): Session | null {
   }
 }
 
-/** Sends the token on every request, so the API can attribute and authorise. */
+/**
+ * Sends the token on every request, and reacts when the API rejects it.
+ *
+ * Now that the whole API requires a token, an expired one turns every panel on
+ * the page into a silent failure at once. Treating 401 as "you are signed out"
+ * sends someone back to the login screen instead of leaving them looking at an
+ * app that has quietly stopped loading anything.
+ *
+ * 403 is left alone: a viewer being refused a write is a working system
+ * telling them something true, not a broken session.
+ */
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
-  const session = inject(SessionStore).user();
+  const store = inject(SessionStore);
+  const router = inject(Router);
+  const session = store.user();
 
-  return next(
-    session
-      ? request.clone({ setHeaders: { Authorization: `Bearer ${session.token}` } })
-      : request,
+  const outgoing = session
+    ? request.clone({ setHeaders: { Authorization: `Bearer ${session.token}` } })
+    : request;
+
+  return next(outgoing).pipe(
+    catchError((error: unknown) => {
+      if (error instanceof HttpErrorResponse && error.status === 401 && session) {
+        store.signOut();
+        void router.navigate(['/login']);
+      }
+      return throwError(() => error);
+    }),
   );
 };
