@@ -27,7 +27,8 @@ import gsap from 'gsap';
     >
       <div
         #panel
-        class="card popover relative w-full max-w-[min(620px,100%)] px-7 py-6"
+        class="card popover relative w-full px-7 py-6"
+        [style.max-width]="'min(' + maxWidth() + 'px, 100%)'"
         role="dialog"
         aria-modal="true"
         [attr.aria-label]="title()"
@@ -57,6 +58,9 @@ import gsap from 'gsap';
 })
 export class Modal implements AfterViewInit, OnDestroy {
   readonly title = input.required<string>();
+
+  /** Wider than the default for content that needs two columns. */
+  readonly maxWidth = input(620);
   readonly subtitle = input<string>('');
   readonly dismiss = output<void>();
 

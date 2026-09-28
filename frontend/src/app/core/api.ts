@@ -162,6 +162,10 @@ export interface ApiUpgradeAction {
   assignee: { id: string; name: string } | null;
   team: { id: string; name: string } | null;
   jiraKey: string | null;
+  /** Mirrored from Jira, so the board needs no extra request per plan. */
+  jiraStatusCategory: JiraStatusCategory | null;
+  jiraSubtaskDone: number | null;
+  jiraSubtaskTotal: number | null;
   customerComm: 'NOT_REQUIRED' | 'PENDING' | 'SENT' | 'ACKNOWLEDGED';
   customerCommNotes: string | null;
   remarks: string | null;

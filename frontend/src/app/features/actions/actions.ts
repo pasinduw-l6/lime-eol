@@ -13,7 +13,9 @@ import { Api, ApiUpgradeAction } from '../../core/api';
 import { formatDate, formatDays, statusFill, SupportStatus } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
+import { PlanBoard } from '../../shared/plan-board';
 import { PlanCard } from '../../shared/plan-card';
+import { PlanDetail } from '../../shared/plan-detail';
 import { TechIcon } from '../../shared/tech-icon';
 
 const STATUSES = ['NOT_STARTED', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED'];
@@ -39,7 +41,7 @@ interface Draft {
  */
 @Component({
   selector: 'lime-actions',
-  imports: [FormsModule, Modal, TechIcon, PlanCard],
+  imports: [FormsModule, Modal, TechIcon, PlanCard, PlanBoard, PlanDetail],
   host: { class: 'block' },
   template: `
     <section class="card mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
@@ -89,25 +91,50 @@ interface Draft {
       </div>
     </section>
 
-    <div class="grid gap-4">
-      @for (action of filtered(); track action.id) {
-        <lime-plan-card
-          [action]="action"
-          (editing)="edit(action)"
-          (removing)="confirmDelete.set(action)"
-          (complete)="completeEnvironment(action, $event)"
-        />
-      } @empty {
-        <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
-          @if (api.actionsResource.isLoading()) {
-            Loading…
-          } @else {
-            No action matches.
-            <button type="button" class="text-accent-bright" (click)="create()">Create one</button>.
-          }
-        </p>
+    <!-- Two zoom levels on the same data: the board to work from, the list to
+         scan when there are more plans than fit in four columns. -->
+    <div class="mb-3 flex items-center gap-1">
+      @for (mode of views; track mode) {
+        <button
+          type="button"
+          class="glass rounded-full border border-rule px-3 py-1 text-[12px] capitalize"
+          [class.bg-ink]="view() === mode"
+          [style.color]="view() === mode ? 'var(--color-accent-bright)' : null"
+          [style.border-color]="view() === mode ? 'var(--color-accent-bright)' : null"
+          (click)="view.set(mode)"
+        >
+          {{ mode }}
+        </button>
       }
     </div>
+
+    @if (filtered().length === 0) {
+      <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
+        @if (api.actionsResource.isLoading()) {
+          Loading…
+        } @else {
+          No action matches.
+          <button type="button" class="text-accent-bright" (click)="create()">Create one</button>.
+        }
+      </p>
+    } @else if (view() === 'board') {
+      <lime-plan-board [actions]="filtered()" (open)="detail.set($event)" />
+    } @else {
+      <div class="grid gap-4">
+        @for (action of filtered(); track action.id) {
+          <lime-plan-card
+            [action]="action"
+            (editing)="edit(action)"
+            (removing)="confirmDelete.set(action)"
+            (complete)="completeEnvironment(action, $event)"
+          />
+        }
+      </div>
+    }
+
+    @if (detail(); as open) {
+      <lime-plan-detail [action]="open" (close)="detail.set(null)" />
+    }
 
     <!-- create / edit -->
     @if (draft(); as form) {
@@ -275,6 +302,10 @@ export class Actions {
   protected readonly filter = signal<(typeof this.filters)[number]>('ALL');
   protected readonly draft = signal<Draft | null>(null);
   protected readonly confirmDelete = signal<ApiUpgradeAction | null>(null);
+  protected readonly detail = signal<ApiUpgradeAction | null>(null);
+
+  protected readonly views = ['board', 'list'] as const;
+  protected readonly view = signal<(typeof this.views)[number]>('board');
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
 

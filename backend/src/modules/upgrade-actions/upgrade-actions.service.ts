@@ -251,6 +251,11 @@ export class UpgradeActionsService {
         : null,
       team: action.team ? { id: action.team.id, name: action.team.name } : null,
       jiraKey: action.jiraKey,
+      /// Mirrored from Jira by the issue-tracker sync. Carried here so a
+      /// board of twenty plans draws from one request rather than twenty.
+      jiraStatusCategory: action.jiraStatusCategory,
+      jiraSubtaskDone: action.jiraSubtaskDone,
+      jiraSubtaskTotal: action.jiraSubtaskTotal,
       customerComm: action.customerComm,
       customerCommNotes: action.customerCommNotes,
       remarks: action.remarks,
