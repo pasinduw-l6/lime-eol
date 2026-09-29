@@ -33,6 +33,15 @@ export class SessionStore {
   }
 
   /**
+   * Accepts a session the API issued after an identity provider vouched for the
+   * person - there is no password to post, so the single sign-on callback hands
+   * the finished session straight in.
+   */
+  adopt(session: Session): void {
+    this.keep(session);
+  }
+
+  /**
    * Checks the stored token against the server before the app trusts it.
    *
    * `restore` can only see whether the expiry date has passed; it cannot know

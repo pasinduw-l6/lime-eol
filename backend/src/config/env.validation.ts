@@ -22,7 +22,7 @@ export const envSchema = z
 
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
-    AUTH_MODE: z.enum(['dev', 'entra', 'oidc']).default('dev'),
+    AUTH_MODE: z.enum(['dev', 'entra', 'oidc', 'saml']).default('dev'),
     DEV_JWT_SECRET: z.string().optional(),
     ENTRA_TENANT_ID: blankable(z.string().optional()),
     ENTRA_API_CLIENT_ID: blankable(z.string().optional()),
@@ -30,6 +30,13 @@ export const envSchema = z
     OIDC_ISSUER: blankable(z.string().url().optional()),
     OIDC_JWKS_URI: blankable(z.string().url().optional()),
     OIDC_AUDIENCE: blankable(z.string().optional()),
+
+    SAML_ENTRY_POINT: blankable(z.string().url().optional()),
+    SAML_IDP_ISSUER: blankable(z.string().optional()),
+    SAML_CERT: blankable(z.string().optional()),
+    SAML_SP_ENTITY_ID: blankable(z.string().optional()),
+    SAML_CALLBACK_URL: blankable(z.string().url().optional()),
+    SAML_SESSION_SECRET: blankable(z.string().optional()),
 
     EOL_API_BASE: z.string().url().default('https://endoflife.date/api/v1'),
     SYNC_CRON: z.string().default('0 2 * * *'),
@@ -96,6 +103,15 @@ export const envSchema = z
       env.AUTH_MODE !== 'oidc' ||
       (!!env.OIDC_ISSUER && !!env.OIDC_JWKS_URI && !!env.OIDC_AUDIENCE),
     'OIDC_ISSUER, OIDC_JWKS_URI and OIDC_AUDIENCE are required when AUTH_MODE=oidc',
+  )
+  .refine(
+    (env) =>
+      env.AUTH_MODE !== 'saml' ||
+      (!!env.SAML_ENTRY_POINT &&
+        !!env.SAML_CERT &&
+        !!env.SAML_SP_ENTITY_ID &&
+        !!env.SAML_SESSION_SECRET),
+    'SAML_ENTRY_POINT, SAML_CERT, SAML_SP_ENTITY_ID and SAML_SESSION_SECRET are required when AUTH_MODE=saml',
   );
 
 export type AppEnv = z.infer<typeof envSchema>;

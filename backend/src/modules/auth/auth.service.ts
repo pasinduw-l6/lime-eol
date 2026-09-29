@@ -51,6 +51,68 @@ export class AuthService {
     };
   }
 
+  /**
+   * Issues a session for an identity an external provider has already proved,
+   * with no password involved.
+   *
+   * A first-time signer-in gets a VIEWER row created for them. The row matters:
+   * `me` reads the account straight from the database on every page load, so a
+   * token minted for an id that does not exist would be rejected a second
+   * later. Editors are the accounts the seed issues - being in the directory
+   * grants read access, nothing more.
+   */
+  async sessionForExternalIdentity(
+    email: string,
+    displayName?: string,
+  ): Promise<SessionDto> {
+    const address = email.trim().toLowerCase();
+
+    const existing = await this.prisma.appUser.findFirst({
+      where: { email: { equals: address, mode: 'insensitive' } },
+    });
+
+    const user =
+      existing ??
+      (await this.prisma.appUser.create({
+        data: {
+          email: address,
+          displayName: displayName ?? null,
+          role: Role.VIEWER,
+        },
+      }));
+
+    if (!user.isActive) {
+      throw new UnauthorizedException(
+        'That account is deactivated. Ask an administrator to restore it.',
+      );
+    }
+
+    await this.prisma.appUser.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+        // Keep the directory's name, but never overwrite one already recorded
+        // here - the seed's names are the ones people recognise in the UI.
+        displayName: user.displayName ?? displayName ?? null,
+      },
+    });
+
+    const name = user.displayName ?? displayName ?? user.email;
+
+    return {
+      token: this.jwt.sign(
+        { sub: user.id, email: user.email, role: user.role },
+        { expiresIn: TOKEN_TTL_SECONDS },
+      ),
+      id: user.id,
+      email: user.email,
+      displayName: name,
+      role: user.role,
+      initials: initialsOf(name),
+      expiresAt: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString(),
+    };
+  }
+
   async me(userId: string) {
     const user = await this.prisma.appUser.findUnique({ where: { id: userId } });
 

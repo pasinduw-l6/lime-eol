@@ -14,6 +14,14 @@ export const routes: Routes = [
     title: 'Create account · Lime Lifecycle',
     loadComponent: () => import('./features/auth/sign-up').then((m) => m.SignUp),
   },
+  {
+    // Where the identity provider returns to. No guard: the whole point of this
+    // route is that it runs before a session exists.
+    path: 'auth/callback',
+    title: 'Signing in · Lime Lifecycle',
+    loadComponent: () =>
+      import('./features/auth/sso-callback').then((m) => m.SsoCallback),
+  },
 
   {
     path: '',
