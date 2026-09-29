@@ -73,7 +73,9 @@ export class NotificationsService {
 
       const existing = byCycle.get(cycle.id);
       if (existing) {
-        existing.environments.push(component.deployment.environment);
+        existing.environments.push(
+          `${project.name} ${component.deployment.environment}`,
+        );
         existing.versions.add(component.techVersion.fullVersion);
         continue;
       }
@@ -89,7 +91,10 @@ export class NotificationsService {
         projectName: project.name,
         projectCode: project.code,
         projectId: project.id,
-        environments: [component.deployment.environment],
+        // Qualified by project, not the bare "PROD". Three customers running
+        // the same cycle in production are three environments, and storing the
+        // environment name alone collapsed them into one.
+        environments: [`${project.name} ${component.deployment.environment}`],
         versions: new Set([component.techVersion.fullVersion]),
         mention: null,
         audience: [],
