@@ -161,12 +161,12 @@ interface Draft {
           <div class="grid gap-3 sm:grid-cols-3">
             <label class="field">
               Target version
-              <input
-                class="input tabular"
-                [(ngModel)]="form.targetVersion"
-                name="target"
-                placeholder="28.5.2"
-              />
+              <select class="input tabular" [(ngModel)]="form.targetVersion" name="target">
+                <option value="">Choose…</option>
+                @for (t of targetsFor(form.technology, form.technologyCycleId); track t.value) {
+                  <option [value]="t.value">{{ t.label }}</option>
+                }
+              </select>
             </label>
             <label class="field">
               Status
@@ -338,6 +338,42 @@ export class Actions {
 
   protected cyclesFor(technology: string) {
     return this.store.cycles().filter((c) => c.technology === technology);
+  }
+
+  /**
+   * What you could sensibly upgrade to.
+   *
+   * Drawn from the same cycles as the field above, so the options are versions
+   * that actually exist for this technology. The field used to be free text
+   * with a fixed example in the placeholder, which is how a Kubernetes plan
+   * ended up targeting 28.5.2.
+   *
+   * Cycles already past end of life are still listed, marked as such - moving
+   * off something dead onto something merely old is a real plan, and refusing
+   * to offer it would only push people back to typing.
+   */
+  protected targetsFor(
+    technology: string,
+    excludeCycleId: string,
+  ): { value: string; label: string }[] {
+    const today = new Date().toISOString().slice(0, 10);
+
+    return this.cyclesFor(technology)
+      .filter((cycle) => cycle.id !== excludeCycleId)
+      .sort((a, b) => (b.eolDate ?? '').localeCompare(a.eolDate ?? ''))
+      .map((cycle) => {
+        const version = cycle.latestPatch ?? cycle.cycle;
+        const state = !cycle.eolDate
+          ? 'no date recorded'
+          : cycle.eolDate < today
+            ? `past end of life ${this.date(cycle.eolDate)}`
+            : `supported until ${this.date(cycle.eolDate)}`;
+
+        return {
+          value: version,
+          label: `${cycle.cycle} → ${version} · ${state}`,
+        };
+      });
   }
 
   protected create(): void {
