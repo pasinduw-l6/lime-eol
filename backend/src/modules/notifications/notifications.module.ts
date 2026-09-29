@@ -6,11 +6,13 @@ import { JiraDetector } from './events/jira.detector';
 import { NotificationEventsService } from './events/notification-events.service';
 import { PlanDetector } from './events/plan.detector';
 import { NotificationsController } from './notifications.controller';
+import { OpsNotificationsController } from './ops/ops-notifications.controller';
+import { OpsNotificationsService } from './ops/ops-notifications.service';
 import { NotificationsService } from './notifications.service';
 import { NOTIFICATION_CHANNEL } from './ports/notification-channel.port';
 
 @Module({
-  controllers: [NotificationsController],
+  controllers: [NotificationsController, OpsNotificationsController],
   providers: [
     TeamsAdapter,
     { provide: NOTIFICATION_CHANNEL, useExisting: TeamsAdapter },
@@ -22,6 +24,7 @@ import { NOTIFICATION_CHANNEL } from './ports/notification-channel.port';
     JiraDetector,
     EolChangeDetector,
     NotificationEventsService,
+    OpsNotificationsService,
   ],
   exports: [NotificationsService, NotificationEventsService],
 })

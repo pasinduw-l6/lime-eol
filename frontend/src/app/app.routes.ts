@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { signedIn, signedOut } from './core/auth.guard';
+import { isAdmin, signedIn, signedOut } from './core/auth.guard';
 import { Shell } from './shell';
 
 export const routes: Routes = [
@@ -58,6 +58,15 @@ export const routes: Routes = [
         title: 'Calendar · Lime Lifecycle',
         loadComponent: () =>
           import('./features/calendar/calendar').then((m) => m.Calendar),
+      },
+
+      {
+        // Deliberately absent from the navigation in shell.ts. Anyone can find
+        // the route in the bundle; the API is what restricts it.
+        path: 'ops',
+        title: 'Operations · Lime Lifecycle',
+        canActivate: [isAdmin],
+        loadComponent: () => import('./features/ops/ops').then((m) => m.Ops),
       },
 
       { path: 'environments', redirectTo: 'projects' },
