@@ -369,9 +369,13 @@ export class Actions {
             ? `past end of life ${this.date(cycle.eolDate)}`
             : `supported until ${this.date(cycle.eolDate)}`;
 
+        // The version you would install, not the cycle it belongs to. Showing
+        // both read as "upgrade from 1.35 to 1.35.1", which is not what it
+        // meant - they are the same support line, one being the newest release
+        // on it.
         return {
           value: version,
-          label: `${cycle.cycle} → ${version} · ${state}`,
+          label: `${version} · ${state}`,
         };
       });
   }
