@@ -10,14 +10,15 @@ export const authConfig = registerAs(AUTH_CONFIG_KEY, () => {
     mode: env.AUTH_MODE,
     devJwtSecret: env.DEV_JWT_SECRET,
 
-    // The secret this API signs its OWN session tokens with. In saml mode the
-    // identity provider proves who you are once, then the app issues the same
-    // bearer token it has always issued - so the signing key has to come from
-    // somewhere other than DEV_JWT_SECRET, which is refused in production.
-    sessionSecret:
-      env.AUTH_MODE === 'saml' ? env.SAML_SESSION_SECRET : env.DEV_JWT_SECRET,
+    // The secret this API signs its OWN session tokens with. In saml and
+    // oidc-web the identity provider proves who you are once, then the app
+    // issues the same bearer token it has always issued - so the signing key
+    // has to come from somewhere other than DEV_JWT_SECRET, which is refused
+    // in production.
+    sessionSecret: env.SESSION_SECRET ?? env.DEV_JWT_SECRET,
 
     saml: resolveSaml(env),
+    oidcWeb: resolveOidcWeb(env),
 
     entra: {
       tenantId: env.ENTRA_TENANT_ID,
@@ -34,6 +35,41 @@ export const authConfig = registerAs(AUTH_CONFIG_KEY, () => {
     oidc: resolveProvider(env),
   };
 });
+
+/**
+ * Microsoft sign-in through the authorization code flow, against an app
+ * registration rather than an enterprise application.
+ *
+ * Everything except the tenant id, client id and secret is derived: the v2.0
+ * endpoints all follow from the tenant, and the redirect must match what is
+ * registered in Entra, which is this API's own callback under APP_BASE_URL.
+ */
+function resolveOidcWeb(env: ReturnType<typeof getEnv>) {
+  if (
+    env.AUTH_MODE !== 'oidc-web' ||
+    !env.OIDC_WEB_TENANT_ID ||
+    !env.OIDC_WEB_CLIENT_ID ||
+    !env.OIDC_WEB_CLIENT_SECRET
+  ) {
+    return undefined;
+  }
+
+  const tenant = env.OIDC_WEB_TENANT_ID;
+  const base = `https://login.microsoftonline.com/${tenant}`;
+
+  return {
+    tenantId: tenant,
+    clientId: env.OIDC_WEB_CLIENT_ID,
+    clientSecret: env.OIDC_WEB_CLIENT_SECRET,
+    authorizeUrl: `${base}/oauth2/v2.0/authorize`,
+    tokenUrl: `${base}/oauth2/v2.0/token`,
+    jwksUri: `${base}/discovery/v2.0/keys`,
+    issuer: `${base}/v2.0`,
+    redirectUri:
+      env.OIDC_WEB_REDIRECT_URI ??
+      `${env.APP_BASE_URL.replace(/\/$/, '')}/api/v1/auth/oidc/callback`,
+  };
+}
 
 /**
  * The Entra values are copied by hand out of the enterprise application's

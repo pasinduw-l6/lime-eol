@@ -22,7 +22,9 @@ export const envSchema = z
 
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
-    AUTH_MODE: z.enum(['dev', 'entra', 'oidc', 'saml']).default('dev'),
+    AUTH_MODE: z
+      .enum(['dev', 'entra', 'oidc', 'saml', 'oidc-web'])
+      .default('dev'),
     DEV_JWT_SECRET: z.string().optional(),
     ENTRA_TENANT_ID: blankable(z.string().optional()),
     ENTRA_API_CLIENT_ID: blankable(z.string().optional()),
@@ -36,7 +38,17 @@ export const envSchema = z
     SAML_CERT: blankable(z.string().optional()),
     SAML_SP_ENTITY_ID: blankable(z.string().optional()),
     SAML_CALLBACK_URL: blankable(z.string().url().optional()),
-    SAML_SESSION_SECRET: blankable(z.string().optional()),
+
+    OIDC_WEB_TENANT_ID: blankable(z.string().optional()),
+    OIDC_WEB_CLIENT_ID: blankable(z.string().optional()),
+    OIDC_WEB_CLIENT_SECRET: blankable(z.string().optional()),
+    OIDC_WEB_REDIRECT_URI: blankable(z.string().url().optional()),
+
+    // Signs the session tokens this API issues once an identity provider has
+    // vouched for someone. Shared by every mode that does its own sign-in, so
+    // it is not named after any one of them - and unlike DEV_JWT_SECRET it is
+    // allowed in production.
+    SESSION_SECRET: blankable(z.string().optional()),
 
     EOL_API_BASE: z.string().url().default('https://endoflife.date/api/v1'),
     SYNC_CRON: z.string().default('0 2 * * *'),
@@ -110,8 +122,17 @@ export const envSchema = z
       (!!env.SAML_ENTRY_POINT &&
         !!env.SAML_CERT &&
         !!env.SAML_SP_ENTITY_ID &&
-        !!env.SAML_SESSION_SECRET),
-    'SAML_ENTRY_POINT, SAML_CERT, SAML_SP_ENTITY_ID and SAML_SESSION_SECRET are required when AUTH_MODE=saml',
+        !!env.SESSION_SECRET),
+    'SAML_ENTRY_POINT, SAML_CERT, SAML_SP_ENTITY_ID and SESSION_SECRET are required when AUTH_MODE=saml',
+  )
+  .refine(
+    (env) =>
+      env.AUTH_MODE !== 'oidc-web' ||
+      (!!env.OIDC_WEB_TENANT_ID &&
+        !!env.OIDC_WEB_CLIENT_ID &&
+        !!env.OIDC_WEB_CLIENT_SECRET &&
+        !!env.SESSION_SECRET),
+    'OIDC_WEB_TENANT_ID, OIDC_WEB_CLIENT_ID, OIDC_WEB_CLIENT_SECRET and SESSION_SECRET are required when AUTH_MODE=oidc-web',
   );
 
 export type AppEnv = z.infer<typeof envSchema>;
