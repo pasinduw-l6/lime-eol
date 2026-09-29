@@ -43,3 +43,8 @@ logs/
 
 # Database dumps: contain password hashes and customer data
 backups/
+
+# Scratch space for files staged to a server by hand: filled .env files,
+# deployment compose files and the like. Never committed - the point of it
+# is that real credentials can sit here while being copied across.
+temp/
