@@ -13,17 +13,11 @@ import { RegistryStore } from '../../core/registry.store';
 import { Cycle } from '../../core/models';
 import { TechnologyView } from './technology-view';
 
-const SLUGS: Record<string, string> = {
-  MongoDB: 'mongodb',
-  'Node.js': 'nodejs',
-  Angular: 'angular',
-  Kubernetes: 'kubernetes',
-  RHEL: 'rhel',
-  'Docker Engine': 'docker-engine',
-  'Apache Kafka': 'apache-kafka',
-  OpenSSL: 'openssl',
-  PostgreSQL: 'postgresql',
-};
+// The slug each technology carries is the one the registry stored when it was
+// added, so it is read from the data rather than kept in a list here. The list
+// this replaced was keyed on display names and said "RHEL", while the registry
+// calls it "Red Hat Enterprise Linux" - so it vanished from this page, along
+// with anything else anyone added from the catalogue.
 
 const MS_PER_DAY = 86_400_000;
 const CHART_WIDTH = 940;
@@ -337,8 +331,18 @@ export class Schedule {
   protected readonly technologies = computed(() => {
     const names = [...new Set(this.store.cycles().map((c) => c.technology))];
 
+    // Anything with a slug can have its published releases looked up. A
+    // technology without one is tracked by hand - Lime itself - and has no
+    // upstream schedule to show, so it is the only thing left out.
+    const slugs = new Map(
+      this.store
+        .technologies()
+        .filter((t) => t.eolSlug)
+        .map((t) => [t.name, t.eolSlug as string]),
+    );
+
     return names
-      .filter((name) => SLUGS[name])
+      .filter((name) => slugs.has(name))
       .map((name) => ({
         name,
         atRisk: this.store
@@ -353,7 +357,11 @@ export class Schedule {
   });
 
   protected slugFor(technology: string): string {
-    return SLUGS[technology] ?? technology.toLowerCase();
+    const known = this.store
+      .technologies()
+      .find((t) => t.name === technology)?.eolSlug;
+
+    return known ?? technology.toLowerCase();
   }
 
   private readonly windowStart = computed(() => {
