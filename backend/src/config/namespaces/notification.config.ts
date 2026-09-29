@@ -10,6 +10,8 @@ export const notificationConfig = registerAs(NOTIFICATION_CONFIG_KEY, () => {
     enabled: env.NOTIFY_ENABLED,
     dryRun: env.NOTIFY_DRY_RUN,
     cron: env.NOTIFY_CRON,
+    eventsCron: env.NOTIFY_EVENTS_CRON,
+    digestCron: env.NOTIFY_DIGEST_CRON,
     teamsWebhookUrl: env.TEAMS_WEBHOOK_URL,
     appBaseUrl: env.APP_BASE_URL,
     mailFrom: env.MAIL_FROM,

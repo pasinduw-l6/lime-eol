@@ -61,6 +61,11 @@ export const envSchema = z
     EOL_USER_AGENT: z.string().default('lime-eol-registry/0.1 (+internal)'),
 
     NOTIFY_CRON: z.string().default('0 8 * * *'),
+    // Jira transitions, overdue plans and end-of-life dates that moved.
+    NOTIFY_EVENTS_CRON: z.string().default('0 11 * * *'),
+    // The Monday summary. Sent whether or not anything changed, so that
+    // silence means the job is broken rather than the estate being healthy.
+    NOTIFY_DIGEST_CRON: z.string().default('0 9 * * 1'),
     NOTIFY_ENABLED: booleanish.default(false),
     NOTIFY_DRY_RUN: booleanish.default(true),
     TEAMS_WEBHOOK_URL: blankable(z.string().url().optional()),

@@ -548,3 +548,28 @@ model JiraSubtask {
   @@index([upgradeActionId, position])
   @@map("jira_subtask")
 }
+
+
+/// Anything announced that is not an end-of-life threshold.
+///
+/// NotificationLog carries those, keyed on a cycle and a threshold in days,
+/// which is the right shape for them and the wrong shape for everything else:
+/// a Jira transition has no threshold, and a weekly digest has no single cycle.
+/// Rather than write sentinel numbers into a column that means days, these get
+/// their own table and a key each announcement builds for itself.
+model NotificationEvent {
+  id       String   @id @default(uuid(7)) @db.Uuid
+  kind     String
+  /// What it is about - an upgrade action, a technology cycle, the estate.
+  subject  String?
+  /// Unique per announcement. Something that has already been said once has
+  /// the same key the second time, which is how it stays said once.
+  dedupKey String   @unique @map("dedup_key")
+  channel  Channel
+  success  Boolean
+  error    String?
+  sentAt   DateTime @default(now()) @map("sent_at") @db.Timestamptz(3)
+
+  @@index([kind, sentAt])
+  @@map("notification_event")
+}

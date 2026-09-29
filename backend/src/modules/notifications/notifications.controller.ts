@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { toAdaptiveCard } from './adapters/teams.adapter';
+import { toAdaptiveCard as eventCard } from './events/event-card';
+import { NotificationEventsService } from './events/notification-events.service';
 import { buildDeadlineCard, buildDigest } from './notifications.renderer';
 import { NotificationsService } from './notifications.service';
 import { notificationConfig, NotificationConfig } from '../../config';
@@ -11,8 +13,50 @@ import { Inject } from '@nestjs/common';
 export class NotificationsController {
   constructor(
     private readonly notifications: NotificationsService,
+    private readonly events: NotificationEventsService,
     @Inject(notificationConfig.KEY) private readonly config: NotificationConfig,
   ) {}
+
+  @Get('events/preview')
+  @ApiOperation({
+    summary: 'Everything the event passes would announce, rendered but not sent',
+    description:
+      'Jira transitions, overdue plans, end-of-life dates that moved, and the weekly digest - already filtered to what has not been announced before. Nothing is recorded, so previewing does not silence anything.',
+  })
+  @ApiOkResponse({ description: 'Events and their Adaptive Cards' })
+  async eventsPreview() {
+    const events = await this.events.preview();
+
+    return events.map((event) => ({
+      kind: event.kind,
+      dedupKey: event.dedupKey,
+      severity: event.severity,
+      title: event.title,
+      subtitle: event.subtitle ?? null,
+      mentions: event.mentions.map((m) => m.name),
+      payload: eventCard(event),
+    }));
+  }
+
+  @Post('events/run')
+  @ApiOperation({
+    summary: 'Run the daily event pass now',
+    description:
+      'Jira, plans and end-of-life changes. The weekly digest has its own endpoint, so running this does not consume it.',
+  })
+  runEvents() {
+    return this.events.daily();
+  }
+
+  @Post('events/digest')
+  @ApiOperation({
+    summary: 'Send the weekly estate summary now',
+    description:
+      'Keyed on the week number, so calling this twice in one week sends once.',
+  })
+  runDigest() {
+    return this.events.weekly();
+  }
 
   @Get('status')
   @ApiOperation({

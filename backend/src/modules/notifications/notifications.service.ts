@@ -92,6 +92,7 @@ export class NotificationsService {
         environments: [component.deployment.environment],
         versions: new Set([component.techVersion.fullVersion]),
         mention: null,
+        audience: [],
       });
     }
 
@@ -102,6 +103,23 @@ export class NotificationsService {
   }
 
   private async attachMentions(dues: Due[]): Promise<void> {
+    // End-of-life is estate-wide and nobody owns it individually, so every
+    // active editor is tagged rather than one project lead. The lead is still
+    // resolved below, but only to fill in the "Plan" fact.
+    const team = await this.prisma.appUser.findMany({
+      where: { isActive: true, role: { not: 'VIEWER' } },
+      orderBy: { displayName: 'asc' },
+    });
+
+    const audience = team.map((user) => ({
+      upn: user.email,
+      name: user.displayName ?? user.email,
+    }));
+
+    for (const due of dues) {
+      due.audience = audience;
+    }
+
     const projectIds = [...new Set(dues.map((d) => d.projectId))];
 
     const staffing = await this.prisma.projectEngineer.findMany({

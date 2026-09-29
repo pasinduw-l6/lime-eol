@@ -14,6 +14,8 @@ export interface Due {
   environments: string[];
   versions: Set<string>;
   mention: { upn: string; name: string; why: string } | null;
+  /** Everyone to tag. End-of-life is estate-wide, so this is the whole team. */
+  audience: { upn: string; name: string }[];
 }
 
 export function buildDeadlineCard(due: Due, appUrl: string): NotificationCard {
@@ -54,9 +56,7 @@ export function buildDeadlineCard(due: Due, appUrl: string): NotificationCard {
         : `Support ends in ${humanGap(due.days)}`,
     title: `${due.technology} ${due.cycle}`,
     facts,
-    mention: due.mention
-      ? { upn: due.mention.upn, name: due.mention.name }
-      : null,
+    mentions: due.audience,
     actions: [
       {
         title: 'Plan the upgrade',
@@ -99,7 +99,7 @@ export function buildDigest(dues: Due[], appUrl: string): NotificationCard {
       unowned === dues.length
         ? [{ title: 'Owned', value: 'None of them has a plan or an owner' }]
         : [{ title: 'Unowned', value: `${unowned} of ${dues.length}` }],
-    mention: null,
+    mentions: dues[0]?.audience ?? [],
     sections,
     actions: [{ title: 'Open the overview', url: `${appUrl}/overview` }],
   };

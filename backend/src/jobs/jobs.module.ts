@@ -2,11 +2,17 @@ import { Module } from '@nestjs/common';
 import { IssueTrackerModule } from '../modules/issue-tracker/issue-tracker.module';
 import { NotificationsModule } from '../modules/notifications/notifications.module';
 import { JiraSyncJob } from './jira-sync.job';
+import { NotificationEventsJob } from './notification-events.job';
 import { NotificationsJob } from './notifications.job';
 import { WorkerHeartbeatService } from './worker-heartbeat.service';
 
 @Module({
   imports: [NotificationsModule, IssueTrackerModule],
-  providers: [WorkerHeartbeatService, NotificationsJob, JiraSyncJob],
+  providers: [
+    WorkerHeartbeatService,
+    NotificationsJob,
+    NotificationEventsJob,
+    JiraSyncJob,
+  ],
 })
 export class JobsModule {}

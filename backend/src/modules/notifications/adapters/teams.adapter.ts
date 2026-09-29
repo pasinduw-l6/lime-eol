@@ -19,12 +19,30 @@ export class TeamsAdapter implements NotificationChannel {
     private readonly config: NotificationConfig,
   ) {}
 
-  async send(card: NotificationCard): Promise<void> {
-    const payload = toAdaptiveCard(card);
+  send(card: NotificationCard): Promise<void> {
+    return this.post(card.title, toAdaptiveCard(card));
+  }
 
+  sendRaw(label: string, card: Record<string, unknown>): Promise<void> {
+    return this.post(label, {
+      type: 'message',
+      attachments: [
+        {
+          contentType: 'application/vnd.microsoft.card.adaptive',
+          contentUrl: null,
+          content: card,
+        },
+      ],
+    });
+  }
+
+  private async post(
+    label: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
     if (this.config.dryRun) {
       this.logger.log(
-        `[dry run] would post "${card.title}" to ${this.name}\n${JSON.stringify(payload, null, 2)}`,
+        `[dry run] would post "${label}" to ${this.name}\n${JSON.stringify(payload, null, 2)}`,
       );
       return;
     }
@@ -91,10 +109,10 @@ export function toAdaptiveCard(card: NotificationCard): Record<string, unknown> 
     },
   ];
 
-  if (card.mention) {
+  if (card.mentions.length > 0) {
     body.push({
       type: 'TextBlock',
-      text: `<at>${card.mention.name}</at>`,
+      text: card.mentions.map((m) => `<at>${m.name}</at>`).join(' '),
       wrap: true,
       spacing: 'Small',
     });
@@ -129,15 +147,15 @@ export function toAdaptiveCard(card: NotificationCard): Record<string, unknown> 
     })),
   };
 
-  if (card.mention) {
+  if (card.mentions.length > 0) {
+    // One entity per <at> tag, in the same order. Teams refuses to render the
+    // whole card when they do not line up, rather than degrading to plain text.
     content['msteams'] = {
-      entities: [
-        {
-          type: 'mention',
-          text: `<at>${card.mention.name}</at>`,
-          mentioned: { id: card.mention.upn, name: card.mention.name },
-        },
-      ],
+      entities: card.mentions.map((m) => ({
+        type: 'mention',
+        text: `<at>${m.name}</at>`,
+        mentioned: { id: m.upn, name: m.name },
+      })),
     };
   }
 
