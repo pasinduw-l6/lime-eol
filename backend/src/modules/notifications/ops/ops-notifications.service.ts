@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Channel } from '@prisma/client';
 import { appConfig, AppConfig, notificationConfig, NotificationConfig } from '../../../config';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EolSyncService, SyncResult } from '../../eol-sync/eol-sync.service';
 import { toAdaptiveCard } from '../events/event-card';
 import {
   EventMention,
@@ -9,6 +10,7 @@ import {
   Severity,
 } from '../events/notification-event';
 import { NotificationEventsService } from '../events/notification-events.service';
+import { buildDeadlineCard } from '../notifications.renderer';
 import { NotificationsService } from '../notifications.service';
 import {
   NOTIFICATION_CHANNEL,
@@ -29,6 +31,19 @@ interface Sender {
   name: string;
 }
 
+/** One thing the page can send, as a row with a button next to it. */
+export interface Sendable {
+  key: string;
+  group: string;
+  title: string;
+  subtitle: string;
+  severity: Severity;
+}
+
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : 'the send failed';
+}
+
 /**
  * What the operations page can do that the schedule cannot.
  *
@@ -45,6 +60,7 @@ export class OpsNotificationsService {
     private readonly prisma: PrismaService,
     private readonly events: NotificationEventsService,
     private readonly deadlines: NotificationsService,
+    private readonly eolSync: EolSyncService,
     @Inject(NOTIFICATION_CHANNEL) private readonly channel: NotificationChannel,
     @Inject(appConfig.KEY) private readonly app: AppConfig,
     @Inject(notificationConfig.KEY) private readonly config: NotificationConfig,
@@ -173,6 +189,102 @@ export class OpsNotificationsService {
     });
 
     return { cleared: count };
+  }
+
+  /**
+   * Sends everything there is to say, and records none of it.
+   *
+   * For demonstrations. The scheduled passes are built to say each thing once,
+   * which is right in a channel people read every day and wrong in front of an
+   * audience - where the second run going quiet looks like a broken tool.
+   * Nothing is written to either log, so this neither silences a real
+   * announcement nor pretends one already happened.
+   */
+  async available(): Promise<Sendable[]> {
+    const items: Sendable[] = [];
+
+    // Every cycle past or near end of life, ignoring what has been announced.
+    for (const due of await this.deadlines.due()) {
+      items.push({
+        key: `eol:${due.cycleId}`,
+        group: due.days <= 0 ? 'Past end of life' : 'Ending soon',
+        title: `${due.technology} ${due.cycle}`,
+        subtitle: `${[...new Set(due.environments)].join(', ')}`,
+        severity: due.days <= 0 ? 'critical' : 'warning',
+      });
+    }
+
+    // Jira, plans, moved dates and the weekly digest, likewise unfiltered.
+    for (const event of await this.events.all()) {
+      items.push({
+        key: `event:${event.dedupKey}`,
+        group: event.kind.startsWith('jira')
+          ? 'Jira'
+          : event.kind === 'estate.weekly'
+            ? 'Digest'
+            : 'Plans and changes',
+        title: event.title,
+        subtitle: event.subtitle ?? '',
+        severity: event.severity,
+      });
+    }
+
+    return items;
+  }
+
+  /** Sends one of them, or all of them. Records neither. */
+  async sendAvailable(keys: string[] | 'all'): Promise<{
+    dryRun: boolean;
+    sent: number;
+    failed: number;
+    titles: string[];
+  }> {
+    const wanted = (key: string) => keys === 'all' || keys.includes(key);
+
+    const titles: string[] = [];
+    let sent = 0;
+    let failed = 0;
+
+    const record = (label: string, ok: boolean) => {
+      titles.push(label);
+      ok ? (sent += 1) : (failed += 1);
+    };
+
+    for (const due of await this.deadlines.due()) {
+      if (!wanted(`eol:${due.cycleId}`)) {
+        continue;
+      }
+
+      const card = buildDeadlineCard(due, this.app.baseUrl);
+      try {
+        await this.channel.send(card);
+        record(card.title, true);
+      } catch (error) {
+        record(card.title, false);
+        this.logger.warn(`Could not post "${card.title}": ${message(error)}`);
+      }
+    }
+
+    for (const event of await this.events.all()) {
+      if (!wanted(`event:${event.dedupKey}`)) {
+        continue;
+      }
+
+      try {
+        await this.channel.sendRaw(event.title, toAdaptiveCard(event));
+        record(event.title, true);
+      } catch (error) {
+        record(event.title, false);
+        this.logger.warn(`Could not post "${event.title}": ${message(error)}`);
+      }
+    }
+
+    return { dryRun: this.config.dryRun, sent, failed, titles };
+  }
+
+  /** Refreshes the end-of-life dates from endoflife.date. */
+  resync(): Promise<SyncResult> {
+    return this.eolSync.run();
   }
 
   /** Posts a card that says only that the connection works. */

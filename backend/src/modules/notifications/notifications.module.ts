@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EolSyncModule } from '../eol-sync/eol-sync.module';
 import { TeamsAdapter } from './adapters/teams.adapter';
 import { EolChangeDetector } from './events/eol-change.detector';
 import { EstateDetector } from './events/estate.detector';
@@ -12,6 +13,7 @@ import { NotificationsService } from './notifications.service';
 import { NOTIFICATION_CHANNEL } from './ports/notification-channel.port';
 
 @Module({
+  imports: [EolSyncModule],
   controllers: [NotificationsController, OpsNotificationsController],
   providers: [
     TeamsAdapter,

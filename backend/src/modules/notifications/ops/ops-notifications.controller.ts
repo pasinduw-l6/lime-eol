@@ -75,6 +75,38 @@ export class OpsNotificationsController {
     return this.ops.clearSuppression(pass);
   }
 
+  @Get('available')
+  @ApiOperation({
+    summary: 'Everything there is to say right now',
+    description:
+      'Unfiltered — including what has already been announced. Each row can be sent on its own, and sending records nothing, so a demonstration can be repeated.',
+  })
+  available() {
+    return this.ops.available();
+  }
+
+  @Post('send-available')
+  @ApiOperation({
+    summary: 'Send some or all of them',
+    description:
+      'Pass keys, or omit them for everything. Nothing is recorded: this neither silences a real announcement nor pretends one already happened.',
+  })
+  sendAvailable(@Body() body: { keys?: string[] }) {
+    return this.ops.sendAvailable(
+      body.keys && body.keys.length > 0 ? body.keys : 'all',
+    );
+  }
+
+  @Post('resync')
+  @ApiOperation({
+    summary: 'Refresh end-of-life dates from endoflife.date now',
+    description:
+      'Updates the cycles already in the registry and records what changed, which is what lets a vendor moving a date be noticed. Cycles nobody runs are left alone.',
+  })
+  resync() {
+    return this.ops.resync();
+  }
+
   @Get('history')
   @ApiOperation({ summary: 'What has been announced, newest first' })
   @ApiQuery({ name: 'limit', required: false, example: 50 })

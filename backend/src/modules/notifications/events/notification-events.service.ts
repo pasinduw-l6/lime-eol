@@ -61,15 +61,25 @@ export class NotificationEventsService {
 
   /** What the next pass would send, without sending or recording anything. */
   async preview(now = new Date()): Promise<NotificationEvent[]> {
-    const events = [
+    const events = await this.all(now);
+    const seen = await this.alreadySent(events);
+    return events.filter((event) => !seen.has(event.dedupKey));
+  }
+
+  /**
+   * Everything the detectors can find, whether or not it has been announced.
+   *
+   * Used for demonstrations, where the point is to show the full set rather
+   * than the new ones - and where announcing nothing because it was all said
+   * yesterday would be exactly the wrong outcome.
+   */
+  async all(now = new Date()): Promise<NotificationEvent[]> {
+    return [
       ...(await this.eolChanges.detect(now)),
       ...(await this.jira.detect(now)),
       ...(await this.plans.detect(now)),
       ...(await this.estate.detect(now)),
     ];
-
-    const seen = await this.alreadySent(events);
-    return events.filter((event) => !seen.has(event.dedupKey));
   }
 
   private async dispatch(
