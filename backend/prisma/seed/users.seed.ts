@@ -12,12 +12,9 @@ const ENGINEERS: { email: string; displayName: string }[] = [
 
 const ENGINEER_PASSWORD = 'yl123';
 
-const VIEWER = {
-  email: 'lime@linearsix.com',
-  displayName: 'Lime Viewer',
-  password: 'lime',
-};
-
+// No viewer account is seeded. Signing in with Microsoft creates one for any
+// address in the directory that is not listed above, so a standing shared
+// account would be a second way in that nobody owns.
 export async function seedUsers(prisma: PrismaClient): Promise<void> {
   const engineerHash = await hashPassword(ENGINEER_PASSWORD);
 
@@ -39,25 +36,5 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
     });
   }
 
-  const viewerHash = await hashPassword(VIEWER.password);
-
-  await prisma.appUser.upsert({
-    where: { email: VIEWER.email },
-    update: {
-      displayName: VIEWER.displayName,
-      passwordHash: viewerHash,
-      role: Role.VIEWER,
-      isActive: true,
-    },
-    create: {
-      email: VIEWER.email,
-      displayName: VIEWER.displayName,
-      passwordHash: viewerHash,
-      role: Role.VIEWER,
-    },
-  });
-
-  console.log(
-    `  users: ${ENGINEERS.length} engineers (EDITOR), 1 viewer (VIEWER)`,
-  );
+  console.log(`  users: ${ENGINEERS.length} engineers (EDITOR)`);
 }
