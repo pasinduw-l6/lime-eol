@@ -36,8 +36,6 @@ interface Row {
   fill: string;
   deployments: number;
   customers: number;
-  /** "HNB PROD", "Sampath PROD" — what the hover box lists. */
-  environments: string[];
 }
 
 @Component({
@@ -160,30 +158,7 @@ interface Row {
       </div>
 
       @if (!showTable()) {
-        <div class="relative overflow-x-auto">
-          @if (hovered(); as row) {
-            <div
-              class="glass pointer-events-none absolute z-10 rounded-lg border px-3 py-2 text-[12px] shadow-lg"
-              [style.top.px]="row.y + 26"
-              [style.left.px]="200"
-              role="tooltip"
-            >
-              <p class="m-0 font-semibold">
-                {{ row.cycle.technology }} {{ row.cycle.cycle }}
-              </p>
-              @if (row.environments.length === 0) {
-                <p class="m-0 mt-1 text-ink-soft">Not running anywhere</p>
-              } @else {
-                <p class="m-0 mt-1 text-ink-soft">
-                  Running in {{ row.environments.length }}
-                </p>
-                @for (env of row.environments; track env) {
-                  <p class="m-0">{{ env }}</p>
-                }
-              }
-            </div>
-          }
-
+        <div class="overflow-x-auto">
           <svg
             [attr.width]="width"
             [attr.height]="height()"
@@ -228,10 +203,6 @@ interface Row {
                 (click)="select(row.cycle)"
                 (keydown.enter)="select(row.cycle)"
                 (keydown.space)="select(row.cycle)"
-                (mouseenter)="hovered.set(row)"
-                (mouseleave)="hovered.set(null)"
-                (focus)="hovered.set(row)"
-                (blur)="hovered.set(null)"
                 class="cursor-pointer"
               >
                 <rect
@@ -436,19 +407,9 @@ export class Schedule {
         fill: statusFill(status),
         deployments: deployments.length,
         customers: new Set(deployments.map((d) => d.customer)).size,
-        // Named, not counted. "3 environments" sends you looking; "HNB PROD,
-        // Sampath PROD" usually answers the question where you are standing.
-        environments: [
-          ...new Set(
-            deployments.map((d) => `${d.customer} ${d.environment}`),
-          ),
-        ].sort(),
       };
     }),
   );
-
-  /** The row under the pointer, or focused by keyboard. */
-  protected readonly hovered = signal<Row | null>(null);
 
   protected readonly height = computed(() => 60 + this.rows().length * ROW_HEIGHT);
   protected readonly todayX = computed(() => this.x(today().getTime()));
