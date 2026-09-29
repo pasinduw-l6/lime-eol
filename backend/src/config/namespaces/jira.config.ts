@@ -14,6 +14,7 @@ export const jiraConfig = registerAs(JIRA_CONFIG_KEY, () => {
     cron: env.JIRA_SYNC_CRON,
     timeoutMs: env.JIRA_HTTP_TIMEOUT_MS,
     demo: env.JIRA_DEMO,
+    createOnPlan: env.JIRA_CREATE_ON_PLAN,
     scopedToken: env.JIRA_TOKEN_TYPE === 'scoped',
 
     missing: (

@@ -28,6 +28,17 @@ export class IssueTrackerController {
     return this.tracker.read(id);
   }
 
+  @Post('upgrade-actions/:id/jira/create')
+  @ApiOperation({
+    summary: 'Raise the issue for this plan, with a step per environment',
+    description:
+      'Creates a new issue on the configured board and links it. Refused if the plan already has one — two tickets for one upgrade both drift, and neither is obviously the real one. Use this to retry after a failure, or for plans made before automatic creation was switched on.',
+  })
+  @ApiOkResponse({ description: 'The mirror, freshly synced' })
+  create(@Param('id') id: string) {
+    return this.tracker.createFor(id);
+  }
+
   @Post('upgrade-actions/:id/jira/link')
   @ApiOperation({
     summary: 'Point a plan at an issue that already exists',

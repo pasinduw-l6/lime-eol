@@ -77,6 +77,124 @@ export class IssueTrackerService {
     return this.sync(actionId);
   }
 
+  /**
+   * Creates the Jira issue for a plan, with one sub-task per environment it
+   * affects, and links it.
+   *
+   * Refuses when a plan is already linked. Creating a second ticket for the
+   * same upgrade is worse than creating none: both drift, and neither is
+   * obviously the real one.
+   */
+  async createFor(actionId: string) {
+    const action = await this.prisma.upgradeAction.findUnique({
+      where: { id: actionId },
+      include: {
+        cycle: { include: { technology: true } },
+        deployments: {
+          include: {
+            deployment: {
+              include: { project: { include: { customer: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    if (!action) {
+      throw new NotFoundException('No such plan.');
+    }
+
+    if (action.jiraKey) {
+      throw new BadRequestException(
+        `That plan is already linked to ${action.jiraKey}.`,
+      );
+    }
+
+    if (!this.tracker.configured) {
+      throw new BadRequestException(
+        'No issue tracker is configured, so there is nowhere to create it.',
+      );
+    }
+
+    const technology = action.cycle.technology.name;
+    const cycle = action.cycle.cycle;
+    const eol = action.cycle.eolDate;
+
+    const environments = action.deployments.map(
+      (link) =>
+        `${link.deployment.project.customer.name} ${link.deployment.environment}`,
+    );
+
+    const summary = `Upgrade ${technology} ${cycle}` +
+      (action.targetVersion ? ` to ${action.targetVersion}` : '');
+
+    const description = [
+      `${technology} ${cycle} is running in ${environments.length} environment(s).`,
+      eol
+        ? `Support ended ${eol.toISOString().slice(0, 10)}.`
+        : 'No end-of-life date is recorded for this cycle.',
+      action.targetVersion ? `Target version: ${action.targetVersion}.` : '',
+      action.plannedDate
+        ? `Planned for ${action.plannedDate.toISOString().slice(0, 10)}.`
+        : '',
+      '',
+      'Affected:',
+      ...environments.map((name) => `- ${name}`),
+      '',
+      'Raised from the Lime Technology Lifecycle & EOL Registry.',
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
+
+    let issue: TrackedIssue;
+    try {
+      issue = await this.tracker.createIssue({
+        summary,
+        description,
+        dueDate: action.plannedDate?.toISOString().slice(0, 10) ?? null,
+        assigneeId: null,
+      });
+    } catch (error) {
+      // Recorded rather than thrown away, so the plan carries the reason it has
+      // no ticket and the next attempt is an informed one.
+      await this.prisma.upgradeAction.update({
+        where: { id: actionId },
+        data: { jiraSyncError: `Could not create the issue: ${message(error)}` },
+      });
+      throw new BadRequestException(`Jira refused that: ${message(error)}`);
+    }
+
+    await this.prisma.upgradeAction.update({
+      where: { id: actionId },
+      data: {
+        jiraKey: issue.key,
+        jiraIssueId: issue.id,
+        jiraUrl: issue.url,
+        jiraSyncError: null,
+      },
+    });
+
+    // One step per environment. A sub-task that fails is logged and skipped:
+    // the parent exists and is linked, and losing the whole ticket because the
+    // fourth of five steps was refused would be the wrong trade.
+    for (const environment of environments) {
+      try {
+        await this.tracker.createSubtask(issue.key, {
+          summary: `${environment} — upgrade ${technology} ${cycle}`,
+          description: null,
+          dueDate: null,
+          assigneeId: null,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Created ${issue.key} but not its step for ${environment}: ${message(error)}`,
+        );
+      }
+    }
+
+    return this.sync(actionId);
+  }
+
   async unlink(actionId: string) {
     await this.mustExist(actionId);
 

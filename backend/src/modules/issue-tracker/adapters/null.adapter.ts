@@ -27,6 +27,10 @@ export class NullIssueTracker implements IssueTracker {
     return Promise.reject(new Error('No issue tracker is configured.'));
   }
 
+  createIssue(): Promise<TrackedIssue> {
+    return Promise.reject(new Error('No issue tracker is configured.'));
+  }
+
   createSubtask(): Promise<TrackedIssue> {
     return Promise.reject(new Error('No issue tracker is configured.'));
   }

@@ -63,6 +63,21 @@ export class DemoIssueTracker implements IssueTracker {
     );
   }
 
+  createIssue(input: NewSubtask): Promise<TrackedIssue> {
+    const key = `DEMO-${100 + Math.floor(Math.random() * 799)}`;
+
+    return Promise.resolve({
+      id: `demo-${key}`,
+      key,
+      summary: input.summary,
+      status: 'To Do',
+      statusCategory: 'to-do' as IssueStatusCategory,
+      assignee: null,
+      url: `https://example.invalid/browse/${key}`,
+      parentKey: null,
+    });
+  }
+
   createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue> {
     const key = `DEMO-${900 + Math.floor(Math.random() * 99)}`;
 

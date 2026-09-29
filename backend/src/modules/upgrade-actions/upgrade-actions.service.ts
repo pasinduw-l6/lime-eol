@@ -1,9 +1,13 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ActionStatus, CommStatus } from '@prisma/client';
+import { jiraConfig, JiraConfig } from '../../config';
+import { IssueTrackerService } from '../issue-tracker/issue-tracker.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CompleteEnvironmentDto,
@@ -15,7 +19,13 @@ const MS_PER_DAY = 86_400_000;
 
 @Injectable()
 export class UpgradeActionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(UpgradeActionsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tracker: IssueTrackerService,
+    @Inject(jiraConfig.KEY) private readonly jira: JiraConfig,
+  ) {}
 
   async findAll(filters: { projectId?: string; assigneeId?: string } = {}) {
     const actions = await this.prisma.upgradeAction.findMany({
@@ -71,7 +81,33 @@ export class UpgradeActionsService {
       include: ACTION_INCLUDE,
     });
 
+    await this.raiseIssueFor(action.id);
+
     return this.toDto(action);
+  }
+
+  /**
+   * Raises the Jira ticket for a new plan, and never lets Jira's problems
+   * become the plan's.
+   *
+   * End-of-life tracking does not depend on Jira being reachable, so a failure
+   * here is recorded against the plan and logged, not thrown: the upgrade is
+   * still planned, and the ticket can be raised later from the plan itself.
+   */
+  private async raiseIssueFor(actionId: string): Promise<void> {
+    if (!this.jira.createOnPlan) {
+      return;
+    }
+
+    try {
+      await this.tracker.createFor(actionId);
+    } catch (error) {
+      this.logger.warn(
+        `Planned the upgrade but could not raise its Jira issue: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
   }
 
   async update(id: string, input: UpdateUpgradeActionDto) {

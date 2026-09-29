@@ -4,6 +4,7 @@ import {
   Assignee,
   IssueStatusCategory,
   IssueTracker,
+  NewIssue,
   NewSubtask,
   TrackedIssue,
 } from '../ports/issue-tracker.port';
@@ -19,6 +20,8 @@ export class JiraAdapter implements IssueTracker {
   private cachedCloudId: string | null = null;
 
   private readonly subtaskTypes = new Map<string, string>();
+
+  private readonly taskTypes = new Map<string, string>();
 
   readonly name = 'Jira';
 
@@ -100,16 +103,36 @@ export class JiraAdapter implements IssueTracker {
       .map((user) => ({ id: user.accountId, name: user.displayName }));
   }
 
+  async createIssue(input: NewIssue): Promise<TrackedIssue> {
+    const projectKey = this.config.projectKey;
+
+    if (!projectKey) {
+      throw new Error('JIRA_PROJECT_KEY is not set, so there is no board to create in.');
+    }
+
+    const issueTypeId = await this.taskTypeId(projectKey);
+
+    return this.post({
+      project: { key: projectKey },
+      issuetype: { id: issueTypeId },
+      ...this.commonFields(input),
+    });
+  }
+
   async createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue> {
     const projectKey = parentKey.split('-')[0];
     const issueTypeId = await this.subtaskTypeId(projectKey);
 
-    const fields: Record<string, unknown> = {
+    return this.post({
       project: { key: projectKey },
       parent: { key: parentKey },
       issuetype: { id: issueTypeId },
-      summary: input.summary,
-    };
+      ...this.commonFields(input),
+    });
+  }
+
+  private commonFields(input: NewSubtask): Record<string, unknown> {
+    const fields: Record<string, unknown> = { summary: input.summary };
 
     if (input.description) {
       fields['description'] = toAdf(input.description);
@@ -121,11 +144,50 @@ export class JiraAdapter implements IssueTracker {
       fields['assignee'] = { accountId: input.assigneeId };
     }
 
+    return fields;
+  }
+
+  private async post(fields: Record<string, unknown>): Promise<TrackedIssue> {
     const created = await this.send<{ key: string }>('/rest/api/3/issue', 'POST', {
       fields,
     });
 
     return this.getIssue(created.key);
+  }
+
+  /**
+   * The issue type a plan becomes.
+   *
+   * Prefers a type literally called Task, because that is what a board like KAN
+   * has by default and what people expect to see. Failing that, any type that
+   * is not a sub-task will do - an epic is a poor fit but a working one, and a
+   * sub-task is not a fit at all: it cannot exist without a parent.
+   */
+  private async taskTypeId(projectKey: string): Promise<string> {
+    const cached = this.taskTypes.get(projectKey);
+    if (cached) {
+      return cached;
+    }
+
+    const meta = await this.request<{ issueTypes?: RawIssueType[] }>(
+      `/rest/api/3/issue/createmeta/${encodeURIComponent(projectKey)}/issuetypes`,
+    );
+
+    const types = (meta.issueTypes ?? []).filter((t) => !t.subtask);
+    const type =
+      types.find((t) => t.name.toLowerCase() === 'task') ??
+      types.find((t) => t.name.toLowerCase() === 'story') ??
+      types[0];
+
+    if (!type) {
+      throw new Error(
+        `Project ${projectKey} has no issue type that can be created on its own. ` +
+          'Check Project settings, Issue types.',
+      );
+    }
+
+    this.taskTypes.set(projectKey, type.id);
+    return type.id;
   }
 
   private async subtaskTypeId(projectKey: string): Promise<string> {

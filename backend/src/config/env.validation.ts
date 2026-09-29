@@ -78,6 +78,9 @@ export const envSchema = z
     JIRA_SYNC_CRON: z.string().default('*/15 * * * *'),
     JIRA_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
     JIRA_DEMO: booleanish.default(false),
+    // Off by default: planning an upgrade should not reach out to a real board
+    // until someone has decided it should.
+    JIRA_CREATE_ON_PLAN: booleanish.default(false),
   })
   .refine(
     (env) => !(env.NODE_ENV === 'production' && env.JIRA_DEMO),
