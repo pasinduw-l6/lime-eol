@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { DeploymentsService } from '../deployments/deployments.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 import {
   ComponentDto,
   EnvironmentDto,
@@ -212,6 +213,35 @@ export class ProjectsService {
         notes: 'Our own product. Versions are tracked to know what each customer runs.',
       },
     });
+  }
+
+  /**
+   * Changes the details of a project that already exists.
+   *
+   * An empty limeVersion clears it rather than being ignored - "this customer
+   * is not on a tracked Lime release" is a real answer, and the only way to
+   * say it is to be able to erase what is there.
+   */
+  async update(id: string, input: UpdateProjectDto): Promise<ProjectDto> {
+    await this.findOne(id);
+
+    await this.prisma.project.update({
+      where: { id },
+      data: {
+        name: input.name,
+        limeVersion:
+          input.limeVersion === undefined
+            ? undefined
+            : input.limeVersion.trim() || null,
+        status: input.status,
+        startedAt: input.startedAt
+          ? new Date(`${input.startedAt}T00:00:00.000Z`)
+          : undefined,
+        notes: input.notes,
+      },
+    });
+
+    return this.findOne(id);
   }
 
   async setEngineers(

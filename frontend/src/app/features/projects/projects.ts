@@ -7,7 +7,10 @@ import { Modal } from '../../shared/modal';
 import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
 import { Environments } from '../environments/environments';
 
-const LIME_VERSIONS = ['2026.2', '2026.1', '2025.4'];
+// No fixed list. The versions offered are the ones projects are actually on,
+// read from the data, plus whatever is typed in - a new Lime release is not in
+// the registry until the first customer is put on it. The list this replaced
+// was invented and matched nothing in use.
 
 const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
@@ -73,15 +76,13 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             <div class="grid grid-cols-2 gap-3">
               <label class="block text-[12px] text-ink-soft">
                 Lime version
-                <select
+                <input
                   name="limeVersion"
+                  list="lime-versions"
                   [(ngModel)]="form.limeVersion"
-                  class="mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
-                >
-                  @for (v of limeVersions; track v) {
-                    <option [value]="v">{{ v }}</option>
-                  }
-                </select>
+                  placeholder="none"
+                  class="tabular mt-1 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[14px] text-ink"
+                />
               </label>
               <label class="block text-[12px] text-ink-soft">
                 Status
@@ -356,11 +357,22 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             </label>
             <label class="field">
               Lime version
-              <select class="input" [(ngModel)]="editForm.limeVersion" name="elime">
-                @for (v of limeVersions; track v) {
-                  <option [value]="v">{{ v }}</option>
+              <!-- An input with suggestions rather than a select: a release
+                   nobody is on yet will not be in the list, and leaving it
+                   empty is a valid answer for a customer not on a tracked
+                   Lime version at all. -->
+              <input
+                class="input tabular"
+                list="lime-versions"
+                [(ngModel)]="editForm.limeVersion"
+                name="elime"
+                placeholder="none"
+              />
+              <datalist id="lime-versions">
+                @for (v of limeVersions(); track v) {
+                  <option [value]="v"></option>
                 }
-              </select>
+              </datalist>
             </label>
           </div>
 
@@ -476,7 +488,16 @@ export class Projects {
 
   protected readonly projects = this.store.projects;
   protected readonly engineers = this.store.engineers;
-  protected readonly limeVersions = LIME_VERSIONS;
+  protected readonly limeVersions = computed(() =>
+    [
+      ...new Set(
+        this.store
+          .projects()
+          .map((p) => p.limeVersion)
+          .filter((v): v is string => !!v),
+      ),
+    ].sort((a, b) => b.localeCompare(a, undefined, { numeric: true })),
+  );
   protected readonly allEnvironments = ALL_ENVIRONMENTS;
   protected readonly statuses: ProjectStatus[] = ['ACTIVE', 'ONBOARDING', 'PAUSED'];
   protected readonly statusFilters = ['ALL', 'ACTIVE', 'ONBOARDING', 'PAUSED'] as const;
@@ -490,7 +511,7 @@ export class Projects {
     name: '',
     customer: '',
     code: '',
-    limeVersion: LIME_VERSIONS[0],
+    limeVersion: '',
     status: 'ONBOARDING' as ProjectStatus,
     engineerIds: [] as string[],
     environments: ['PROD'] as EnvironmentName[],
@@ -561,7 +582,7 @@ export class Projects {
 
   protected editForm = {
     name: '',
-    limeVersion: LIME_VERSIONS[0],
+    limeVersion: '',
     status: 'ACTIVE' as ProjectStatus,
     engineerIds: [] as string[],
   };
@@ -604,18 +625,33 @@ export class Projects {
   }
 
   protected saveProject(id: string): void {
-    const { engineerIds } = this.editForm;
+    const { engineerIds, name, limeVersion, status } = this.editForm;
+
+    // Shown immediately, then confirmed by the server. Previously only the
+    // engineer list was ever sent - everything else was kept in this browser
+    // and lost on the next reload.
     this.store.updateProject(id, { ...this.editForm });
-
-    this.api.setEngineers(id, engineerIds).subscribe({
-      next: () => this.api.reload(),
-      error: () =>
-        this.manageError.set(
-          'Those details were kept in this browser, but the engineer list could not be saved.',
-        ),
-    });
-
     this.managed.set(null);
+
+    this.api.updateProject(id, { name, limeVersion, status }).subscribe({
+      next: () =>
+        this.api.setEngineers(id, engineerIds).subscribe({
+          next: () => this.api.reload(),
+          error: () => {
+            this.api.reload();
+            this.manageError.set('The engineer list could not be saved.');
+          },
+        }),
+      error: (error: { error?: { message?: string | string[] } }) => {
+        this.api.reload();
+        const detail = error.error?.message;
+        this.manageError.set(
+          Array.isArray(detail)
+            ? detail.join('. ')
+            : (detail ?? 'Those changes could not be saved.'),
+        );
+      },
+    });
   }
 
   protected deleteProject(id: string): void {

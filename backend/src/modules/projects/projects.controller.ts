@@ -14,6 +14,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 import { SetEngineersDto } from './dto/set-engineers.dto';
 import { ProjectDto } from './dto/project-response.dto';
 import { ProjectsService } from './projects.service';
@@ -50,6 +51,16 @@ export class ProjectsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ProjectDto> {
     return this.projects.create(body, user.id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Change the details of a project',
+    description:
+      'The code is not editable: it is the natural key, quoted in Jira issues and used by the importer, so changing it would break those links.',
+  })
+  update(@Param('id') id: string, @Body() body: UpdateProjectDto) {
+    return this.projects.update(id, body);
   }
 
   @Patch(':id/engineers')

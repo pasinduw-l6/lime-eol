@@ -330,6 +330,22 @@ export class Api {
       `/api/v1/deployments/versions/available?technology=${encodeURIComponent(technology)}${current}`,
     );
   }
+  updateProject(
+    projectId: string,
+    input: {
+      name?: string;
+      limeVersion?: string;
+      status?: string;
+      startedAt?: string;
+      notes?: string;
+    },
+  ) {
+    return this.http.patch<ApiProject>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}`,
+      input,
+    );
+  }
+
   setEngineers(projectId: string, engineerIds: string[], leadId?: string) {
     return this.http.patch<ApiProject>(
       `/api/v1/projects/${encodeURIComponent(projectId)}/engineers`,
