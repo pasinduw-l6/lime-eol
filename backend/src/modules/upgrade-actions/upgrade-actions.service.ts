@@ -86,14 +86,6 @@ export class UpgradeActionsService {
     return this.toDto(action);
   }
 
-  /**
-   * Raises the Jira ticket for a new plan, and never lets Jira's problems
-   * become the plan's.
-   *
-   * End-of-life tracking does not depend on Jira being reachable, so a failure
-   * here is recorded against the plan and logged, not thrown: the upgrade is
-   * still planned, and the ticket can be raised later from the plan itself.
-   */
   private async raiseIssueFor(actionId: string): Promise<void> {
     if (!this.jira.createOnPlan) {
       return;

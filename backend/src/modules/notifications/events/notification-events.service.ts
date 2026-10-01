@@ -22,14 +22,6 @@ export interface DispatchResult {
   events: NotificationEvent[];
 }
 
-/**
- * Turns everything the detectors notice into messages, once each.
- *
- * The detectors know nothing about sending and the channel knows nothing about
- * what it is sending - all the deduplication lives here, keyed on whatever the
- * event decided identifies it. That is what lets a tenth kind of message be a
- * new detector rather than a new branch through the sender.
- */
 @Injectable()
 export class NotificationEventsService {
   private readonly logger = new Logger(NotificationEventsService.name);
@@ -44,7 +36,6 @@ export class NotificationEventsService {
     @Inject(notificationConfig.KEY) private readonly config: NotificationConfig,
   ) {}
 
-  /** Everything except the weekly digest, which has its own schedule. */
   async daily(now = new Date()): Promise<DispatchResult> {
     const events = [
       ...(await this.eolChanges.detect(now)),
@@ -59,20 +50,12 @@ export class NotificationEventsService {
     return this.dispatch(await this.estate.detect(now));
   }
 
-  /** What the next pass would send, without sending or recording anything. */
   async preview(now = new Date()): Promise<NotificationEvent[]> {
     const events = await this.all(now);
     const seen = await this.alreadySent(events);
     return events.filter((event) => !seen.has(event.dedupKey));
   }
 
-  /**
-   * Everything the detectors can find, whether or not it has been announced.
-   *
-   * Used for demonstrations, where the point is to show the full set rather
-   * than the new ones - and where announcing nothing because it was all said
-   * yesterday would be exactly the wrong outcome.
-   */
   async all(now = new Date()): Promise<NotificationEvent[]> {
     return [
       ...(await this.eolChanges.detect(now)),
@@ -109,8 +92,6 @@ export class NotificationEventsService {
         this.logger.warn(`Could not post "${event.title}": ${error}`);
       }
 
-      // A dry run records nothing. Writing the key would silence the message
-      // for good, and the rehearsal would be the only time it was ever seen.
       if (this.config.dryRun) {
         continue;
       }
@@ -132,13 +113,6 @@ export class NotificationEventsService {
     return result;
   }
 
-  /**
-   * Keys already announced successfully.
-   *
-   * A failed send is deliberately not suppressed: it is recorded so the failure
-   * is visible, but the next pass tries again rather than treating an outage as
-   * having said the thing.
-   */
   private async alreadySent(
     events: NotificationEvent[],
   ): Promise<Set<string>> {

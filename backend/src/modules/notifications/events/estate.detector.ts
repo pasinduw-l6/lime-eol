@@ -17,13 +17,6 @@ interface CycleRow {
   customers: Set<string>;
 }
 
-/**
- * The Monday summary.
- *
- * This is the one message that goes out whether or not anything happened, which
- * is what stops silence being ambiguous: no digest means the job is broken, not
- * that the estate is healthy.
- */
 @Injectable()
 export class EstateDetector {
   constructor(
@@ -146,8 +139,6 @@ export class EstateDetector {
     return [
       {
         kind: 'estate.weekly',
-        // The week number, so Monday's digest is sent once however often the
-        // job runs, and next Monday's is a different announcement.
         dedupKey: `estate.weekly|${isoWeek(now)}`,
         subject: 'estate',
         severity: past.length > 0 ? 'critical' : 'good',

@@ -33,14 +33,6 @@ const ICONS: Record<Severity, string> = {
   good: '🟢',
 };
 
-/**
- * Operations. Restricted to ADMIN, and left out of the navigation.
- *
- * Built for showing the tool to people: everything that could be announced is
- * listed with a button beside it, and sending records nothing - so the same
- * demonstration works twice. The scheduled passes say each thing once, which is
- * right in a channel people read daily and wrong in front of an audience.
- */
 @Component({
   selector: 'lime-ops',
   host: { class: 'block' },
@@ -196,8 +188,6 @@ export class Ops {
       next: (result) => {
         this.busy.set(null);
         this.sync.set(result);
-        // The list is built from the dates the sync just changed, so it would
-        // otherwise show what was true a moment ago.
         this.load();
       },
       error: (error: { error?: { message?: string } }) => {

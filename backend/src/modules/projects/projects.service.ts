@@ -215,13 +215,6 @@ export class ProjectsService {
     });
   }
 
-  /**
-   * Changes the details of a project that already exists.
-   *
-   * An empty limeVersion clears it rather than being ignored - "this customer
-   * is not on a tracked Lime release" is a real answer, and the only way to
-   * say it is to be able to erase what is there.
-   */
   async update(id: string, input: UpdateProjectDto): Promise<ProjectDto> {
     await this.findOne(id);
 

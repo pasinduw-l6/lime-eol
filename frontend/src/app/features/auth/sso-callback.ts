@@ -3,14 +3,6 @@ import { Router, RouterLink } from '@angular/router';
 import { Session, SessionStore } from '../../core/session';
 import { AuthLayout } from './auth-layout';
 
-/**
- * Where Microsoft's sign-in lands.
- *
- * The API has already verified the assertion and issued a session; this only
- * has to read it, keep it, and get out of the way. The session arrives in the
- * URL fragment rather than a query string because a fragment is never sent to a
- * server - it stays out of the nginx access log and out of any Referer header.
- */
 @Component({
   selector: 'lime-sso-callback',
   imports: [RouterLink, AuthLayout],
@@ -69,8 +61,6 @@ export class SsoCallback {
 
     this.session.adopt(session);
 
-    // Drop the token out of the address bar, and out of the back button, before
-    // navigating on.
     window.history.replaceState({}, '', window.location.pathname);
     void this.router.navigateByUrl(next || '/overview');
   }

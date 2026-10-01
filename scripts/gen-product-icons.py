@@ -14,10 +14,8 @@ products = json.load(io.open("prod.json", encoding="utf-8"))["result"]
 raw = json.load(io.open("si.json", encoding="utf-8"))
 icons = raw["icons"] if isinstance(raw, dict) and "icons" in raw else raw
 
-
 def norm(value):
     return re.sub(r"[^a-z0-9]", "", value.lower())
-
 
 lookup = {}
 for icon in icons:
@@ -34,7 +32,6 @@ for icon in icons:
             elif isinstance(alias, dict) and "title" in alias:
                 lookup.setdefault(norm(alias["title"]), icon)
 
-
 def match(product):
     """Exact name/label/alias first, then vendor prefixes, then trailing words."""
     for candidate in [product["name"], product.get("label") or ""] + (
@@ -46,20 +43,17 @@ def match(product):
 
     segments = product["name"].split("-")
 
-    # amazon-rds-postgresql is PostgreSQL; the vendor prefix is noise.
     for i in range(1, len(segments)):
         key = norm("".join(segments[i:]))
         if len(key) > 2 and key in lookup:
             return lookup[key]
 
-    # ansible-core is Ansible; apache-apisix at least carries the Apache mark.
     for i in range(len(segments) - 1, 0, -1):
         key = norm("".join(segments[:i]))
         if len(key) > 2 and key in lookup:
             return lookup[key]
 
     return None
-
 
 rows = []
 for product in sorted(products, key=lambda p: p["name"]):

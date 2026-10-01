@@ -13,20 +13,12 @@ import { Roles } from '../../auth/roles.decorator';
 import { CustomMessageDto } from './custom-message.dto';
 import { OpsNotificationsService, Pass } from './ops-notifications.service';
 
-/** What the token carries. The display name is looked up in the service. */
 interface Actor {
   id: string;
   email: string;
   role: string;
 }
 
-/**
- * The operations view.
- *
- * Restricted to ADMIN, which is what the SREs hold. The page is kept out of the
- * navigation, but that is tidiness rather than a control - the route name is in
- * the JavaScript bundle for anyone who cares to look. @Roles is the control.
- */
 @ApiTags('ops')
 @Controller('ops/notifications')
 @Roles('ADMIN')

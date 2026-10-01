@@ -1,28 +1,22 @@
-# ---- Node ----
 node_modules/
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# ---- Build output ----
 dist/
 build/
 *.tsbuildinfo
 
-# ---- Environment ----
 .env
 .env.*
 !.env.example
 
-# ---- Tests / coverage ----
 coverage/
 .nyc_output/
 
-# ---- Prisma ----
 backend/prisma/*.db
 backend/prisma/*.db-journal
 
-# ---- Editors / OS ----
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -30,21 +24,14 @@ backend/prisma/*.db-journal
 .DS_Store
 Thumbs.db
 
-# ---- Docker / local data ----
 pgdata/
 docker-compose.override.yml
 
-# ---- Logs ----
 logs/
 *.log
 
-# Angular build cache, created by a local ng build
 .angular/
 
-# Database dumps: contain password hashes and customer data
 backups/
 
-# Scratch space for files staged to a server by hand: filled .env files, i
-# deployment compose files and the like. Never committed - the point of it
-# is that real credentials can sit here while being copied across.
 temp/

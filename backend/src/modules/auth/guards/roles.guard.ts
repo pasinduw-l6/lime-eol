@@ -8,15 +8,6 @@ import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC } from '../public.decorator';
 import { ROLES } from '../roles.decorator';
 
-/**
- * Enforces @Roles.
- *
- * Registered globally, and a no-op on the routes that do not use the decorator
- * - which is nearly all of them. Being global is what matters: the operations
- * page is kept out of the navigation for tidiness, but the route name is in the
- * JavaScript bundle for anyone who looks, so hiding it protects nothing. This
- * does.
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

@@ -15,13 +15,6 @@ export const signedIn: CanActivateFn = (_route, state) => {
   });
 };
 
-/**
- * Operations accounts only.
- *
- * Sends anyone else to the overview rather than to the login page - they are
- * signed in, the page simply is not theirs. This hides the page; the API is
- * what protects it, since the route name is in the bundle either way.
- */
 export const isAdmin: CanActivateFn = () => {
   const session = inject(SessionStore);
   const router = inject(Router);

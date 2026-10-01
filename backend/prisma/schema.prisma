@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,7 +6,6 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 
 enum ComponentType {
   DATABASE
@@ -56,7 +54,6 @@ enum ActionStatus {
   DEFERRED
 }
 
-
 enum CommStatus {
   NOT_REQUIRED
   PENDING
@@ -96,7 +93,6 @@ enum ChangeReason {
   DRIFT_CORRECTION
   DECOMMISSION
 }
-
 
 model Technology {
   id            String        @id @default(uuid(7)) @db.Uuid
@@ -190,7 +186,6 @@ model TechnologyCycleHistory {
   @@map("technology_cycle_history")
 }
 
-
 model LimeVersion {
   id            String    @id @default(uuid(7)) @db.Uuid
   versionNumber String    @unique @map("version_number")
@@ -217,7 +212,6 @@ model LimeVersionComponent {
   @@index([techVersionId])
   @@map("lime_version_component")
 }
-
 
 model Customer {
   id         String    @id @default(uuid(7)) @db.Uuid
@@ -359,7 +353,6 @@ model ComponentChange {
   @@map("component_change")
 }
 
-
 model Team {
   id              String    @id @default(uuid(7)) @db.Uuid
   name            String    @unique
@@ -381,7 +374,6 @@ model AppUser {
   entraOid    String?   @unique @map("entra_oid")
   email       String    @unique
   displayName String?   @map("display_name")
-  passwordHash String?  @map("password_hash")
   role        Role      @default(VIEWER)
   isActive    Boolean   @default(true) @map("is_active")
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
@@ -408,7 +400,6 @@ model TeamMember {
   @@index([userId])
   @@map("team_member")
 }
-
 
 model UpgradeAction {
   id                String       @id @default(uuid(7)) @db.Uuid
@@ -448,7 +439,6 @@ model UpgradeAction {
   @@map("upgrade_action")
 }
 
-
 model UpgradeActionDeployment {
   upgradeActionId String @map("upgrade_action_id") @db.Uuid
   deploymentId    String @map("deployment_id") @db.Uuid
@@ -461,7 +451,6 @@ model UpgradeActionDeployment {
   @@index([deploymentId])
   @@map("upgrade_action_deployment")
 }
-
 
 model NotificationRule {
   id            String   @id @default(uuid(7)) @db.Uuid
@@ -494,7 +483,6 @@ model NotificationLog {
   @@index([sentAt])
   @@map("notification_log")
 }
-
 
 model EolSyncLog {
   id           String    @id @default(uuid(7)) @db.Uuid
@@ -549,21 +537,10 @@ model JiraSubtask {
   @@map("jira_subtask")
 }
 
-
-/// Anything announced that is not an end-of-life threshold.
-///
-/// NotificationLog carries those, keyed on a cycle and a threshold in days,
-/// which is the right shape for them and the wrong shape for everything else:
-/// a Jira transition has no threshold, and a weekly digest has no single cycle.
-/// Rather than write sentinel numbers into a column that means days, these get
-/// their own table and a key each announcement builds for itself.
 model NotificationEvent {
   id       String   @id @default(uuid(7)) @db.Uuid
   kind     String
-  /// What it is about - an upgrade action, a technology cycle, the estate.
   subject  String?
-  /// Unique per announcement. Something that has already been said once has
-  /// the same key the second time, which is how it stays said once.
   dedupKey String   @unique @map("dedup_key")
   channel  Channel
   success  Boolean

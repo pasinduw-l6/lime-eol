@@ -1,6 +1,6 @@
 import { HttpClient, HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { catchError, firstValueFrom, tap, throwError } from 'rxjs';
+import { catchError, firstValueFrom, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 
@@ -26,33 +26,10 @@ export class SessionStore {
   readonly isSignedIn = computed(() => this.session() !== null);
   readonly canEdit = computed(() => this.session()?.role !== 'VIEWER');
 
-  signIn(email: string, password: string) {
-    return this.http
-      .post<Session>('/api/v1/auth/login', { email, password })
-      .pipe(tap((session) => this.keep(session)));
-  }
-
-  /**
-   * Accepts a session the API issued after an identity provider vouched for the
-   * person - there is no password to post, so the single sign-on callback hands
-   * the finished session straight in.
-   */
   adopt(session: Session): void {
     this.keep(session);
   }
 
-  /**
-   * Checks the stored token against the server before the app trusts it.
-   *
-   * `restore` can only see whether the expiry date has passed; it cannot know
-   * the server has stopped accepting the token. Rotating the signing secret
-   * does exactly that, and left the app believing it was signed in with a
-   * credential every request would be refused for. Worse, the signed-out guard
-   * then bounced people away from the login page, so there was no way back in
-   * short of clearing browser storage.
-   *
-   * One request at startup removes that whole class of problem.
-   */
   async verify(): Promise<void> {
     if (!this.session()) {
       return;

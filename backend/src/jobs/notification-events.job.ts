@@ -3,14 +3,6 @@ import { Cron } from '@nestjs/schedule';
 import { notificationConfig, NotificationConfig } from '../config';
 import { NotificationEventsService } from '../modules/notifications/events/notification-events.service';
 
-/**
- * Two passes, because they answer different questions.
- *
- * The daily one reports what changed - a date moved, an issue progressed, a
- * plan slipped. The weekly one reports where things stand whether or not
- * anything changed, which is what makes a quiet week distinguishable from a
- * broken job.
- */
 @Injectable()
 export class NotificationEventsJob {
   private readonly logger = new Logger(NotificationEventsJob.name);

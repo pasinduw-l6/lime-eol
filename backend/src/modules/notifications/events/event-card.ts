@@ -4,14 +4,6 @@ import {
   NotificationEvent,
 } from './notification-event';
 
-/**
- * One Adaptive Card, from any event.
- *
- * Pinned to schema 1.4 deliberately. Teams renders 1.5 inconsistently - the
- * desktop client copes and mobile does not - and a card that looks right on the
- * machine it was tested on and broken on everyone's phone is worse than one
- * that is plainer everywhere.
- */
 export function toAdaptiveCard(event: NotificationEvent): Record<string, unknown> {
   const body: Record<string, unknown>[] = [
     {
@@ -59,8 +51,6 @@ export function toAdaptiveCard(event: NotificationEvent): Record<string, unknown
     });
   }
 
-  // Every <at> tag needs a matching entity, in the same order. A mismatch does
-  // not degrade to plain text - Teams refuses to render the card at all.
   if (event.mentions.length > 0) {
     body.push({
       type: 'TextBlock',

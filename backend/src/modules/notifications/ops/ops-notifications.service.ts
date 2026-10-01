@@ -20,7 +20,6 @@ import { CustomMessageDto } from './custom-message.dto';
 
 export type Pass = 'eol' | 'events' | 'digest';
 
-/** What the bearer token carries - the display name is not in it. */
 export interface Actor {
   id: string;
   email: string;
@@ -31,7 +30,6 @@ interface Sender {
   name: string;
 }
 
-/** One thing the page can send, as a row with a button next to it. */
 export interface Sendable {
   key: string;
   group: string;
@@ -44,14 +42,6 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : 'the send failed';
 }
 
-/**
- * What the operations page can do that the schedule cannot.
- *
- * Two things, both deliberate exceptions to how the automatic messages behave:
- * a message typed by a person is never deduplicated, because saying it twice is
- * a decision rather than a fault; and any scheduled pass can be forced, which
- * clears what has already been announced so it is announced again.
- */
 @Injectable()
 export class OpsNotificationsService {
   private readonly logger = new Logger(OpsNotificationsService.name);
@@ -66,7 +56,6 @@ export class OpsNotificationsService {
     @Inject(notificationConfig.KEY) private readonly config: NotificationConfig,
   ) {}
 
-  /** Renders the card without sending or recording anything. */
   async preview(
     input: CustomMessageDto,
     actor: Actor,
@@ -90,9 +79,6 @@ export class OpsNotificationsService {
       this.logger.warn(`Could not post "${event.title}": ${error}`);
     }
 
-    // Recorded even on a dry run, unlike the automatic messages. The key is
-    // unique per send, so writing it silences nothing - it is an audit trail of
-    // who posted what to the channel, which a broadcast tool needs.
     await this.prisma.notificationEvent.create({
       data: {
         kind: 'manual.custom',
@@ -107,13 +93,6 @@ export class OpsNotificationsService {
     return { sent: error === null, error, dryRun: this.config.dryRun };
   }
 
-  /**
-   * Runs a scheduled pass now.
-   *
-   * With `force`, whatever that pass has already announced is forgotten first,
-   * so it says it again. That is the point of the button: the team missed it,
-   * or something has made an old warning relevant again.
-   */
   async run(pass: Pass, force: boolean): Promise<unknown> {
     if (force) {
       await this.clearSuppression(pass);
@@ -129,7 +108,6 @@ export class OpsNotificationsService {
     }
   }
 
-  /** What has been announced, newest first, across both records. */
   async history(limit = 50) {
     const [events, deadlines] = await Promise.all([
       this.prisma.notificationEvent.findMany({
@@ -164,7 +142,6 @@ export class OpsNotificationsService {
     };
   }
 
-  /** Lets a pass announce something it has already announced. */
   async clearSuppression(pass: Pass): Promise<{ cleared: number }> {
     if (pass === 'eol') {
       const { count } = await this.prisma.notificationLog.deleteMany({});
@@ -191,19 +168,9 @@ export class OpsNotificationsService {
     return { cleared: count };
   }
 
-  /**
-   * Sends everything there is to say, and records none of it.
-   *
-   * For demonstrations. The scheduled passes are built to say each thing once,
-   * which is right in a channel people read every day and wrong in front of an
-   * audience - where the second run going quiet looks like a broken tool.
-   * Nothing is written to either log, so this neither silences a real
-   * announcement nor pretends one already happened.
-   */
   async available(): Promise<Sendable[]> {
     const items: Sendable[] = [];
 
-    // Every cycle past or near end of life, ignoring what has been announced.
     for (const due of await this.deadlines.due()) {
       items.push({
         key: `eol:${due.cycleId}`,
@@ -214,7 +181,6 @@ export class OpsNotificationsService {
       });
     }
 
-    // Jira, plans, moved dates and the weekly digest, likewise unfiltered.
     for (const event of await this.events.all()) {
       items.push({
         key: `event:${event.dedupKey}`,
@@ -232,7 +198,6 @@ export class OpsNotificationsService {
     return items;
   }
 
-  /** Sends one of them, or all of them. Records neither. */
   async sendAvailable(keys: string[] | 'all'): Promise<{
     dryRun: boolean;
     sent: number;
@@ -282,12 +247,10 @@ export class OpsNotificationsService {
     return { dryRun: this.config.dryRun, sent, failed, titles };
   }
 
-  /** Refreshes the end-of-life dates from endoflife.date. */
   resync(): Promise<SyncResult> {
     return this.eolSync.run();
   }
 
-  /** Posts a card that says only that the connection works. */
   async test(actor: Actor): Promise<{ ok: boolean; detail: string }> {
     const sender = await this.senderOf(actor);
 
@@ -326,7 +289,6 @@ export class OpsNotificationsService {
     }
   }
 
-  /** The token has no display name, so the account is read for one. */
   private async senderOf(actor: Actor): Promise<Sender> {
     const user = await this.prisma.appUser.findUnique({
       where: { id: actor.id },
@@ -344,8 +306,7 @@ export class OpsNotificationsService {
     sender: Sender,
   ): Promise<NotificationEvent> {
     return {
-      kind: 'estate.weekly', // only shapes the card; the stored kind is manual.custom
-      // Unique per send. A person who sends the same message twice meant to.
+      kind: 'estate.weekly',
       dedupKey: `manual.custom|${Date.now()}|${sender.email}`,
       subject: sender.email,
       severity: (input.severity ?? 'info') as Severity,

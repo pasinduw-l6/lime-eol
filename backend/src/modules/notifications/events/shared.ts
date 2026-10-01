@@ -1,13 +1,6 @@
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EventMention } from './notification-event';
 
-/**
- * Everyone who can act on an end-of-life warning.
- *
- * End-of-life is estate-wide and nobody owns it individually, so these go to
- * every active editor rather than to a project lead. Jira announcements do the
- * opposite: they name the person the work is actually sitting with.
- */
 export async function everyEngineer(
   prisma: PrismaService,
 ): Promise<EventMention[]> {
@@ -22,19 +15,11 @@ export async function everyEngineer(
   }));
 }
 
-/**
- * The year and week, e.g. 2026-W40.
- *
- * Used as the changing part of a weekly announcement's key, so the digest is
- * sent once a week however often the job runs.
- */
 export function isoWeek(date: Date): string {
   const target = new Date(
     Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
   );
 
-  // Thursday decides the year a week belongs to, which is what stops the last
-  // days of December landing in week 1 of the wrong year.
   const day = target.getUTCDay() || 7;
   target.setUTCDate(target.getUTCDate() + 4 - day);
 

@@ -10,10 +10,8 @@ from PIL import Image
 im = Image.open('nav-logo.png').convert('RGBA')
 width, height = im.size
 
-# The symbol occupies the leftmost square-ish region; the wordmark follows.
 mark = im.crop((0, 0, int(height * 1.02), height))
 
-# Trim transparent padding so the symbol fills its square edge to edge.
 bbox = mark.getbbox()
 if bbox:
     mark = mark.crop(bbox)

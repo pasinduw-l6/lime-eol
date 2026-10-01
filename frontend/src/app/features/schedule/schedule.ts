@@ -13,12 +13,6 @@ import { RegistryStore } from '../../core/registry.store';
 import { Cycle } from '../../core/models';
 import { TechnologyView } from './technology-view';
 
-// The slug each technology carries is the one the registry stored when it was
-// added, so it is read from the data rather than kept in a list here. The list
-// this replaced was keyed on display names and said "RHEL", while the registry
-// calls it "Red Hat Enterprise Linux" - so it vanished from this page, along
-// with anything else anyone added from the catalogue.
-
 const MS_PER_DAY = 86_400_000;
 const CHART_WIDTH = 940;
 const ROW_HEIGHT = 30;
@@ -117,7 +111,6 @@ interface Row {
         <lime-technology-view [slug]="slugFor(picked())" [technology]="picked()" />
       </section>
     } @else {
-
     @if (inbox().length > 0) {
       <section class="card mb-5 px-7 py-5" aria-labelledby="needs-you">
         <h2 id="needs-you" class="m-0 mb-2 text-[13px] font-semibold">
@@ -331,9 +324,6 @@ export class Schedule {
   protected readonly technologies = computed(() => {
     const names = [...new Set(this.store.cycles().map((c) => c.technology))];
 
-    // Anything with a slug can have its published releases looked up. A
-    // technology without one is tracked by hand - Lime itself - and has no
-    // upstream schedule to show, so it is the only thing left out.
     const slugs = new Map(
       this.store
         .technologies()

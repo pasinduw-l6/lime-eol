@@ -6,18 +6,8 @@ import { everyEngineer, isoDate, longDate, plural } from './shared';
 
 const MS_PER_DAY = 86_400_000;
 
-/** Silence before a persistent sync failure is worth repeating. */
 const FAILURE_REPEAT_DAYS = 7;
 
-/**
- * What the linked Jira issues are doing.
- *
- * Works from the mirror the sync already keeps on each plan rather than from
- * Jira directly: the sync stores status, category and sub-task counts, and the
- * dedup key carries whichever of those the announcement is about. So a plan
- * that reaches "In Progress" is announced once, and again only if it leaves and
- * returns.
- */
 @Injectable()
 export class JiraDetector {
   constructor(
@@ -61,8 +51,6 @@ export class JiraDetector {
       const total = plan.jiraSubtaskTotal ?? plan.deployments.length;
       const done = plan.jiraSubtaskDone ?? 0;
 
-      // Raised: announced once per issue key, so relinking a plan to a
-      // different issue announces the new one.
       events.push({
         kind: 'jira.raised',
         dedupKey: `jira.raised|${plan.id}|${key}`,
@@ -79,8 +67,6 @@ export class JiraDetector {
             value: plan.jiraAssignee ?? 'unassigned',
           },
         ],
-        // An acknowledgement, not a request - nobody is being asked to act, so
-        // nobody is tagged.
         mentions: [],
         actions,
       });
@@ -141,7 +127,6 @@ export class JiraDetector {
 
       events.push({
         kind: 'jira.sync-failing',
-        // Whole weeks, so a long outage is announced weekly, not daily.
         dedupKey: `jira.sync-failing|${isoDate(now).slice(0, 7)}|${Math.floor(now.getTime() / (FAILURE_REPEAT_DAYS * MS_PER_DAY))}`,
         subject: 'jira',
         severity: 'warning',

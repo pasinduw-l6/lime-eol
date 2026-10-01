@@ -14,7 +14,6 @@ export interface Due {
   environments: string[];
   versions: Set<string>;
   mention: { upn: string; name: string; why: string } | null;
-  /** Everyone to tag. End-of-life is estate-wide, so this is the whole team. */
   audience: { upn: string; name: string }[];
 }
 
@@ -69,9 +68,6 @@ export function buildDeadlineCard(due: Due, appUrl: string): NotificationCard {
 export function buildDigest(dues: Due[], appUrl: string): NotificationCard {
   const past = dues.filter((d) => d.days <= 0);
   const soon = dues.filter((d) => d.days > 0);
-  // Named after a project only when it is genuinely about one. A digest
-  // covering eight customers, titled with whichever happened to come first,
-  // reads as a report about that one customer.
   const projects = new Set(dues.map((d) => d.projectName));
   const project = projects.size === 1 ? [...projects][0] : 'the estate';
 
@@ -114,8 +110,6 @@ function line(due: Due): string {
   const when =
     due.days <= 0 ? `${humanGap(due.days)} unsupported` : `${humanGap(due.days)} left`;
 
-  // Named rather than counted: "3 env" tells you to go and look it up, where
-  // "NTB PROD, UB PROD, Siyapatha PROD" usually answers the question outright.
   return `${due.technology} ${due.cycle} — ${when} · ${where.join(', ')}`;
 }
 

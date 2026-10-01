@@ -23,8 +23,6 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([authInterceptor]),
     ),
     provideRouter(routes, withComponentInputBinding()),
-    // Runs before the first route resolves, so the guards decide against
-    // what the server accepts rather than what localStorage remembers.
     provideAppInitializer(() => inject(SessionStore).verify()),
   ],
 };

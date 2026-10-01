@@ -77,14 +77,6 @@ export class IssueTrackerService {
     return this.sync(actionId);
   }
 
-  /**
-   * Creates the Jira issue for a plan, with one sub-task per environment it
-   * affects, and links it.
-   *
-   * Refuses when a plan is already linked. Creating a second ticket for the
-   * same upgrade is worse than creating none: both drift, and neither is
-   * obviously the real one.
-   */
   async createFor(actionId: string) {
     const action = await this.prisma.upgradeAction.findUnique({
       where: { id: actionId },
@@ -155,8 +147,6 @@ export class IssueTrackerService {
         assigneeId: null,
       });
     } catch (error) {
-      // Recorded rather than thrown away, so the plan carries the reason it has
-      // no ticket and the next attempt is an informed one.
       await this.prisma.upgradeAction.update({
         where: { id: actionId },
         data: { jiraSyncError: `Could not create the issue: ${message(error)}` },
@@ -174,9 +164,6 @@ export class IssueTrackerService {
       },
     });
 
-    // One step per environment. A sub-task that fails is logged and skipped:
-    // the parent exists and is linked, and losing the whole ticket because the
-    // fourth of five steps was refused would be the wrong trade.
     for (const environment of environments) {
       try {
         await this.tracker.createSubtask(issue.key, {

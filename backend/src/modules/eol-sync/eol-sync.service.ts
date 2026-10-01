@@ -11,20 +11,6 @@ export interface SyncResult {
   failures: { technology: string; reason: string }[];
 }
 
-/**
- * Refreshes end-of-life dates from endoflife.date.
- *
- * importCycles already writes dates, but only once, when a technology is first
- * registered, and with skipDuplicates - so a cycle that already exists is
- * skipped forever. Recording a deployment creates exactly such a cycle: adding
- * Kubernetes 1.31 to a project makes the row, and nothing ever goes back to say
- * when 1.31 loses support. This updates rather than inserts, which is the whole
- * difference.
- *
- * It also writes technology_cycle_history, which is what lets anyone notice
- * that a vendor moved a date - a warning no schedule can produce, because
- * nothing about the passage of time predicts it.
- */
 @Injectable()
 export class EolSyncService {
   private readonly logger = new Logger(EolSyncService.name);
@@ -53,8 +39,6 @@ export class EolSyncService {
 
       let releases;
       try {
-        // Prisma spells the enum EOL/EOAS/EOES; the lookup service uses the
-        // lowercase names endoflife.date itself uses.
         const product = await this.lookup.getProduct(
           slug,
           technology.eolField.toLowerCase() as 'eol' | 'eoas' | 'eoes',
@@ -67,9 +51,6 @@ export class EolSyncService {
         continue;
       }
 
-      // Only cycles already in the registry are touched. Importing every cycle
-      // the vendor publishes would add RHEL 4 through 10 for a customer on 8,
-      // and bury the estate in rows nobody runs.
       const existing = await this.prisma.technologyCycle.findMany({
         where: { technologyId: technology.id },
       });
@@ -84,9 +65,6 @@ export class EolSyncService {
         const eolDate = toDate(release.eolDate);
         const previousEol = cycle.eolDate;
 
-        // Written before the update, so the detector that announces a moved
-        // date has something to read. Only real changes are recorded - an
-        // unchanged sync would otherwise fill the history with noise.
         if (!sameDay(previousEol, eolDate)) {
           await this.prisma.technologyCycleHistory.create({
             data: {
@@ -145,9 +123,6 @@ export class EolSyncService {
         result.cyclesUpdated += 1;
       }
 
-      // A cycle we hold that upstream has never heard of is worth naming: it
-      // is usually a mistyped version, or one written 18.9 where the vendor
-      // calls it 18.09 - and it will silently never have a date.
       const unmatched = existing
         .filter((cycle) => !releases.some((r) => r.cycle === cycle.cycle))
         .map((cycle) => cycle.cycle);

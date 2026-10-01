@@ -2,8 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { LoginDto, SessionDto } from './dto/auth.dto';
-import { verifyPassword } from './password.util';
+import { SessionDto } from './dto/auth.dto';
 
 const TOKEN_TTL_SECONDS = 12 * 60 * 60;
 
@@ -14,53 +13,6 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  async login(input: LoginDto): Promise<SessionDto> {
-    const email = input.email.trim().toLowerCase();
-    const user = await this.prisma.appUser.findUnique({ where: { email } });
-
-    const matches = await verifyPassword(input.password, user?.passwordHash ?? null);
-
-    if (!user || !matches) {
-      throw new UnauthorizedException('That email and password do not match.');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException(
-        'That account is deactivated. Ask an administrator to restore it.',
-      );
-    }
-
-    await this.prisma.appUser.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
-    const displayName = user.displayName ?? user.email;
-
-    return {
-      token: this.jwt.sign(
-        { sub: user.id, email: user.email, role: user.role },
-        { expiresIn: TOKEN_TTL_SECONDS },
-      ),
-      id: user.id,
-      email: user.email,
-      displayName,
-      role: user.role,
-      initials: initialsOf(displayName),
-      expiresAt: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString(),
-    };
-  }
-
-  /**
-   * Issues a session for an identity an external provider has already proved,
-   * with no password involved.
-   *
-   * A first-time signer-in gets a VIEWER row created for them. The row matters:
-   * `me` reads the account straight from the database on every page load, so a
-   * token minted for an id that does not exist would be rejected a second
-   * later. Editors are the accounts the seed issues - being in the directory
-   * grants read access, nothing more.
-   */
   async sessionForExternalIdentity(
     email: string,
     displayName?: string,
@@ -91,8 +43,6 @@ export class AuthService {
       where: { id: user.id },
       data: {
         lastLoginAt: new Date(),
-        // Keep the directory's name, but never overwrite one already recorded
-        // here - the seed's names are the ones people recognise in the UI.
         displayName: user.displayName ?? displayName ?? null,
       },
     });

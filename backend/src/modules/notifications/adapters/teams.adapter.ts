@@ -148,8 +148,6 @@ export function toAdaptiveCard(card: NotificationCard): Record<string, unknown> 
   };
 
   if (card.mentions.length > 0) {
-    // One entity per <at> tag, in the same order. Teams refuses to render the
-    // whole card when they do not line up, rather than degrading to plain text.
     content['msteams'] = {
       entities: card.mentions.map((m) => ({
         type: 'mention',

@@ -10,13 +10,6 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },
   {
-    path: 'signup',
-    title: 'Create account · Lime Lifecycle',
-    loadComponent: () => import('./features/auth/sign-up').then((m) => m.SignUp),
-  },
-  {
-    // Where the identity provider returns to. No guard: the whole point of this
-    // route is that it runs before a session exists.
     path: 'auth/callback',
     title: 'Signing in · Lime Lifecycle',
     loadComponent: () =>
@@ -61,8 +54,6 @@ export const routes: Routes = [
       },
 
       {
-        // Deliberately absent from the navigation in shell.ts. Anyone can find
-        // the route in the bundle; the API is what restricts it.
         path: 'ops',
         title: 'Operations · Lime Lifecycle',
         canActivate: [isAdmin],

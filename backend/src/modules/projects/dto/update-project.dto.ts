@@ -1,13 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsISO8601, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-/**
- * Editing a project after it exists.
- *
- * The code is deliberately absent. It is the natural key - referenced by the
- * importer and quoted in Jira issues - so changing it silently breaks those
- * links. A project with the wrong code is better deleted and re-made.
- */
 export class UpdateProjectDto {
   @ApiPropertyOptional({ example: 'DFCC' })
   @IsOptional()

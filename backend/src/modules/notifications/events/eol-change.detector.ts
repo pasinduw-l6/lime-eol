@@ -6,20 +6,8 @@ import { everyEngineer, isoDate, longDate, plural } from './shared';
 
 const MS_PER_DAY = 86_400_000;
 
-/** How far back to look for changes on each pass. */
 const WINDOW_DAYS = 2;
 
-/**
- * Cycles whose support window moved, or that stopped being maintained.
- *
- * These are the warnings nothing else gives you. A threshold alert fires when
- * time passes, which you can predict; this fires when the vendor changes their
- * mind, which you cannot - and a date pulled forward by two years turns a
- * comfortable plan into an urgent one overnight.
- *
- * Reads technology_cycle_history, so it depends on whatever writes the cycles
- * recording what it changed.
- */
 @Injectable()
 export class EolChangeDetector {
   constructor(
@@ -49,9 +37,6 @@ export class EolChangeDetector {
     for (const change of changes) {
       const where = await this.environmentsRunning(change.technologyCycleId);
 
-      // A cycle nobody runs is not news. The catalogue holds every cycle the
-      // vendor publishes, and announcing changes to versions we have never
-      // deployed would bury the ones we have.
       if (where.length === 0) {
         continue;
       }
@@ -94,8 +79,6 @@ export class EolChangeDetector {
 
       events.push({
         kind: 'eol.date-moved',
-        // The new date is in the key, so a second change to the same cycle is
-        // a new announcement rather than a silenced one.
         dedupKey: `eol.date-moved|${change.technologyCycleId}|${isoDate(after)}`,
         subject: change.technologyCycleId,
         severity: sooner ? 'warning' : 'info',

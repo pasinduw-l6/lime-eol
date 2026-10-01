@@ -2,20 +2,17 @@ FROM node:24-alpine AS base
 WORKDIR /app
 COPY package*.json ./
 
-# ---- development (hot reload) ----
 FROM base AS dev
 RUN npm ci
 COPY . .
 RUN npx prisma generate
 CMD ["npm", "run", "start:dev"]
 
-# ---- build ----
 FROM base AS build
 RUN npm ci
 COPY . .
 RUN npx prisma generate && npm run build
 
-# ---- production ----
 FROM node:24-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production

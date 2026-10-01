@@ -26,21 +26,13 @@ interface IdTokenClaims {
 
 const STATE_TTL = '10m';
 
-/**
- * Microsoft sign-in by the authorization code flow.
- *
- * The browser is sent to Microsoft, comes back to this API with a code, and the
- * API exchanges that code for tokens over a back channel using the client
- * secret. The user's browser never sees a Microsoft token - it only ever
- * receives this app's own session, the same one the password login issues.
- */
 @Injectable()
 export class OidcWebService {
   private readonly logger = new Logger(OidcWebService.name);
   private readonly jwks: JwksClient;
 
   constructor(
-    private readonly config: NonNullable<AuthConfig['oidcWeb']>,
+    private readonly config: AuthConfig['oidcWeb'],
     private readonly jwt: JwtService,
   ) {
     this.jwks = new JwksClient({
@@ -52,14 +44,6 @@ export class OidcWebService {
     });
   }
 
-  /**
-   * Where to send the browser to sign in.
-   *
-   * `state` is a short-lived signed token rather than a random string kept in a
-   * server-side session. It carries the page the person was heading for and the
-   * nonce the id_token must echo back, which means the API stays stateless and
-   * survives a restart mid-sign-in.
-   */
   loginUrl(next = ''): string {
     const nonce = randomBytes(16).toString('base64url');
 
@@ -81,15 +65,6 @@ export class OidcWebService {
     return `${this.config.authorizeUrl}?${params.toString()}`;
   }
 
-  /**
-   * Turns the code Microsoft sent back into an identity.
-   *
-   * Three things are checked, and a failure of any one of them is a refusal:
-   * the state is one we issued and has not expired, the id_token is genuinely
-   * signed by the tenant and meant for this client, and the nonce inside it
-   * matches the one that went out with the request. The last of those is what
-   * stops a token obtained elsewhere being replayed here.
-   */
   async identify(
     code: string,
     state: string,
@@ -134,8 +109,6 @@ export class OidcWebService {
       );
     }
 
-    // Without this, any session token this API has issued would also pass as
-    // state - they are signed with the same key.
     if (claims.typ !== 'oidc-state') {
       throw new UnauthorizedException('That sign-in could not be verified.');
     }
@@ -166,8 +139,6 @@ export class OidcWebService {
     };
 
     if (!response.ok || !payload.id_token) {
-      // error_description is where Entra explains a redirect_uri mismatch or an
-      // expired secret, and those are the two things that actually go wrong.
       this.logger.warn(
         `Token exchange refused: ${payload.error ?? response.status} ${payload.error_description ?? ''}`.trim(),
       );

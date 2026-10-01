@@ -7,11 +7,6 @@ import { Modal } from '../../shared/modal';
 import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
 import { Environments } from '../environments/environments';
 
-// No fixed list. The versions offered are the ones projects are actually on,
-// read from the data, plus whatever is typed in - a new Lime release is not in
-// the registry until the first customer is put on it. The list this replaced
-// was invented and matched nothing in use.
-
 const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
 @Component({
@@ -357,10 +352,6 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             </label>
             <label class="field">
               Lime version
-              <!-- An input with suggestions rather than a select: a release
-                   nobody is on yet will not be in the list, and leaving it
-                   empty is a valid answer for a customer not on a tracked
-                   Lime version at all. -->
               <input
                 class="input tabular"
                 list="lime-versions"
@@ -573,7 +564,6 @@ export class Projects {
     () => this.rows().filter((r) => r.risk.eol > 0 || r.risk.near > 0).length,
   );
 
-
   protected readonly managed = signal<Project | null>(null);
   protected readonly confirmDelete = signal<Project | null>(null);
   protected readonly manageError = signal<string | null>(null);
@@ -627,9 +617,6 @@ export class Projects {
   protected saveProject(id: string): void {
     const { engineerIds, name, limeVersion, status } = this.editForm;
 
-    // Shown immediately, then confirmed by the server. Previously only the
-    // engineer list was ever sent - everything else was kept in this browser
-    // and lost on the next reload.
     this.store.updateProject(id, { ...this.editForm });
     this.managed.set(null);
 

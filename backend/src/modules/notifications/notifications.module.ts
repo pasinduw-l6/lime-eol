@@ -19,8 +19,6 @@ import { NOTIFICATION_CHANNEL } from './ports/notification-channel.port';
     TeamsAdapter,
     { provide: NOTIFICATION_CHANNEL, useExisting: TeamsAdapter },
     NotificationsService,
-    // One detector per kind of thing worth announcing. Adding another is a new
-    // provider here and a line in the dispatcher, and nothing else moves.
     EstateDetector,
     PlanDetector,
     JiraDetector,

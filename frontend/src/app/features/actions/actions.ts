@@ -340,18 +340,6 @@ export class Actions {
     return this.store.cycles().filter((c) => c.technology === technology);
   }
 
-  /**
-   * What you could sensibly upgrade to.
-   *
-   * Drawn from the same cycles as the field above, so the options are versions
-   * that actually exist for this technology. The field used to be free text
-   * with a fixed example in the placeholder, which is how a Kubernetes plan
-   * ended up targeting 28.5.2.
-   *
-   * Cycles already past end of life are still listed, marked as such - moving
-   * off something dead onto something merely old is a real plan, and refusing
-   * to offer it would only push people back to typing.
-   */
   protected targetsFor(
     technology: string,
     excludeCycleId: string,
@@ -369,10 +357,6 @@ export class Actions {
             ? `past end of life ${this.date(cycle.eolDate)}`
             : `supported until ${this.date(cycle.eolDate)}`;
 
-        // The version you would install, not the cycle it belongs to. Showing
-        // both read as "upgrade from 1.35 to 1.35.1", which is not what it
-        // meant - they are the same support line, one being the newest release
-        // on it.
         return {
           value: version,
           label: `${version} · ${state}`,

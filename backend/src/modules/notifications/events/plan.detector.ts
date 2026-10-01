@@ -6,16 +6,8 @@ import { everyEngineer, isoDate, longDate, plural } from './shared';
 
 const MS_PER_DAY = 86_400_000;
 
-/** How long a plan may sit past its date before it is worth saying again. */
 const REPEAT_DAYS = 7;
 
-/**
- * Plans whose date has passed with work outstanding.
- *
- * Deliberately not "plans that are late by one day": the key rounds the overdue
- * age down to whole weeks, so a plan that stays late is announced weekly rather
- * than every single morning.
- */
 @Injectable()
 export class PlanDetector {
   constructor(
@@ -57,9 +49,6 @@ export class PlanDetector {
       const outstanding = plan.deployments.filter((d) => !d.completedAt);
       const done = plan.deployments.length - outstanding.length;
 
-      // An unassigned plan needs picking up, so it goes to everyone. An
-      // assigned one is a nudge to one person, and tagging the team would make
-      // it an audience rather than a request.
       const mentions: EventMention[] = plan.assignee
         ? [
             {
@@ -82,7 +71,6 @@ export class PlanDetector {
 
       events.push({
         kind: 'plan.overdue',
-        // Whole weeks late, so this repeats weekly rather than daily.
         dedupKey: `plan.overdue|${plan.id}|${isoDate(plan.plannedDate)}|${Math.floor(late / REPEAT_DAYS)}`,
         subject: plan.id,
         severity: 'critical',

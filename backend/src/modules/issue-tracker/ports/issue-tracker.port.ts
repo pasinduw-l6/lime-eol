@@ -20,13 +20,6 @@ export interface NewSubtask {
   assigneeId: string | null;
 }
 
-/**
- * A top-level issue, as opposed to a step beneath one.
- *
- * Same shape as NewSubtask with no parent, but kept separate because the two
- * take different issue types in Jira and conflating them is how you end up
- * trying to create a sub-task with nothing above it.
- */
 export type NewIssue = NewSubtask;
 
 export interface Assignee {

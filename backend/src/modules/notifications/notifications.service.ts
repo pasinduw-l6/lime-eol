@@ -91,9 +91,6 @@ export class NotificationsService {
         projectName: project.name,
         projectCode: project.code,
         projectId: project.id,
-        // Qualified by project, not the bare "PROD". Three customers running
-        // the same cycle in production are three environments, and storing the
-        // environment name alone collapsed them into one.
         environments: [`${project.name} ${component.deployment.environment}`],
         versions: new Set([component.techVersion.fullVersion]),
         mention: null,
@@ -108,9 +105,6 @@ export class NotificationsService {
   }
 
   private async attachMentions(dues: Due[]): Promise<void> {
-    // End-of-life is estate-wide and nobody owns it individually, so every
-    // active editor is tagged rather than one project lead. The lead is still
-    // resolved below, but only to fill in the "Plan" fact.
     const team = await this.prisma.appUser.findMany({
       where: { isActive: true, role: { not: 'VIEWER' } },
       orderBy: { displayName: 'asc' },

@@ -155,14 +155,6 @@ export class JiraAdapter implements IssueTracker {
     return this.getIssue(created.key);
   }
 
-  /**
-   * The issue type a plan becomes.
-   *
-   * Prefers a type literally called Task, because that is what a board like KAN
-   * has by default and what people expect to see. Failing that, any type that
-   * is not a sub-task will do - an epic is a poor fit but a working one, and a
-   * sub-task is not a fit at all: it cannot exist without a parent.
-   */
   private async taskTypeId(projectKey: string): Promise<string> {
     const cached = this.taskTypes.get(projectKey);
     if (cached) {

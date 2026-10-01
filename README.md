@@ -21,7 +21,7 @@ All documentation: [docs/](docs/) — start at [docs/README.md](docs/README.md).
 | API | NestJS 11 (TypeScript, strict) on Node.js 24 |
 | Worker | Same image, `dist/worker.js` entry point, cron jobs |
 | Database | PostgreSQL 16 + Prisma |
-| Auth | Entra ID (OIDC/JWT); `AUTH_MODE=dev` for local development |
+| Auth | Microsoft Entra ID sign-in (OIDC authorization code flow) |
 | EOL data | endoflife.date API v1 |
 | Runtime | Docker Desktop + Docker Compose |
 
