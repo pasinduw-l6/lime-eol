@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { isAdmin, signedIn, signedOut } from './core/auth.guard';
+import { canOpenSettings, isAdmin, signedIn, signedOut } from './core/auth.guard';
 import { Shell } from './shell';
 
 export const routes: Routes = [
@@ -27,6 +27,11 @@ export const routes: Routes = [
         title: 'Overview · Lime Lifecycle',
         loadComponent: () =>
           import('./features/overview/overview').then((m) => m.Overview),
+      },
+      {
+        path: 'customers',
+        title: 'Customers · Lime Lifecycle',
+        loadComponent: () => import('./features/customers/customers').then((m) => m.Customers),
       },
       {
         path: 'projects',
@@ -63,7 +68,7 @@ export const routes: Routes = [
       {
         path: 'settings',
         title: 'Settings · Lime Lifecycle',
-        canActivate: [isAdmin],
+        canActivate: [canOpenSettings],
         loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
       },
 

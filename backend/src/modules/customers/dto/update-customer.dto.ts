@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   IsIn,
   IsISO8601,
@@ -18,6 +18,13 @@ export class UpdateCustomerDto {
   @MinLength(1)
   @MaxLength(120)
   name?: string;
+
+  @ApiPropertyOptional({ nullable: true, example: 'DBANK' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(20)
+  code?: string | null;
 
   @ApiPropertyOptional({ nullable: true, example: 'it-ops@demobank.lk' })
   @IsOptional()
@@ -55,4 +62,12 @@ export class UpdateCustomerDto {
   @ValidateIf((_, value) => value !== null)
   @IsISO8601()
   contractEnd?: string | null;
+}
+
+export class CreateCustomerDto extends OmitType(UpdateCustomerDto, ['name'] as const) {
+  @ApiProperty({ example: 'Demo Bank' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  name!: string;
 }

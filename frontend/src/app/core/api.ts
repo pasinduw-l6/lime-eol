@@ -101,6 +101,48 @@ export interface ApiTeam {
   environments: { id: string; name: string; isPrimary: boolean }[];
 }
 
+export interface ApiLimeRelease {
+  id: string;
+  version: string;
+  releaseDate: string | null;
+  supportEnd: string | null;
+  notes: string | null;
+  environments: number;
+  projects: string[];
+  compatibility: { techVersionId: string; technology: string; version: string }[];
+}
+
+export interface ApiCompatibilityOption {
+  technology: string;
+  versions: { id: string; version: string; cycle: string }[];
+}
+
+export interface ApiAuditRow {
+  id: string;
+  at: string;
+  user: { id: string; name: string } | null;
+  entity: string;
+  entityId: string | null;
+  action: string;
+  data: unknown;
+}
+
+export interface ApiAuditPage {
+  total: number;
+  entities: string[];
+  rows: ApiAuditRow[];
+}
+
+export interface CustomerInput {
+  name?: string;
+  code?: string | null;
+  contact?: string | null;
+  notes?: string | null;
+  commercialModel?: CommercialModel | null;
+  contractStart?: string | null;
+  contractEnd?: string | null;
+}
+
 export interface ApiArchived {
   id: string;
   name: string;
@@ -467,6 +509,61 @@ export class Api {
     },
   ) {
     return this.http.patch<ApiCustomer>(`/api/v1/customers/${id}`, body);
+  }
+
+  createCustomer(body: CustomerInput & { name: string }) {
+    return this.http.post<ApiCustomer>('/api/v1/customers', body);
+  }
+
+  editCustomer(id: string, body: CustomerInput) {
+    return this.http.patch<ApiCustomer>(`/api/v1/customers/${id}`, body);
+  }
+
+  archiveCustomer(id: string) {
+    return this.http.delete<void>(`/api/v1/customers/${id}`);
+  }
+
+  restoreCustomer(id: string) {
+    return this.http.post<ApiCustomer>(`/api/v1/customers/${id}/restore`, {});
+  }
+
+  archivedCustomers() {
+    return this.http.get<ApiCustomer[]>('/api/v1/customers/archived');
+  }
+
+  limeReleases() {
+    return this.http.get<ApiLimeRelease[]>('/api/v1/lime-releases');
+  }
+
+  compatibilityOptions() {
+    return this.http.get<ApiCompatibilityOption[]>('/api/v1/lime-releases/options');
+  }
+
+  createLimeRelease(body: { version: string; releaseDate?: string | null; supportEnd?: string | null; notes?: string | null }) {
+    return this.http.post<ApiLimeRelease>('/api/v1/lime-releases', body);
+  }
+
+  updateLimeRelease(
+    id: string,
+    body: { version?: string; releaseDate?: string | null; supportEnd?: string | null; notes?: string | null },
+  ) {
+    return this.http.patch<ApiLimeRelease>(`/api/v1/lime-releases/${id}`, body);
+  }
+
+  setLimeCompatibility(id: string, techVersionIds: string[]) {
+    return this.http.put<ApiLimeRelease>(`/api/v1/lime-releases/${id}/compatibility`, { techVersionIds });
+  }
+
+  deleteLimeRelease(id: string) {
+    return this.http.delete<void>(`/api/v1/lime-releases/${id}`);
+  }
+
+  audit(filters: { entity?: string; userId?: string; from?: string; to?: string; limit?: number; offset?: number }) {
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== '') params[key] = String(value);
+    }
+    return this.http.get<ApiAuditPage>('/api/v1/audit', { params });
   }
 
   allUsers() {

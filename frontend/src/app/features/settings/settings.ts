@@ -11,8 +11,10 @@ import { Feedback } from '../../core/feedback';
 import { ROLES, ROLE_INFO, RoleName } from '../../core/permissions';
 import { SessionStore } from '../../core/session';
 import { Modal } from '../../shared/modal';
+import { AuditLog } from './audit-log';
+import { LimeReleases } from './lime-releases';
 
-type Tab = 'users' | 'teams';
+type Tab = 'users' | 'teams' | 'lime' | 'audit';
 
 interface TeamDraft {
   id?: string;
@@ -32,16 +34,18 @@ interface TeamDraft {
     HlmLabel,
     HlmTableImports,
     Modal,
+    LimeReleases,
+    AuditLog,
   ],
   host: { class: 'block' },
   template: `
     <header class="mb-6">
       <h1 class="m-0 text-3xl font-semibold tracking-tight">Settings</h1>
-      <p class="m-0 mt-1 text-sm text-muted-foreground">Who can do what, and the teams that own environments.</p>
+      <p class="m-0 mt-1 text-sm text-muted-foreground">People, teams, Lime releases and the record of every change.</p>
     </header>
 
     <nav class="segmented mb-6" aria-label="Settings sections">
-      @for (t of tabs; track t.key) {
+      @for (t of tabs(); track t.key) {
         <button
           type="button"
           class="px-4 py-1 text-sm"
@@ -183,7 +187,7 @@ interface TeamDraft {
           </dl>
         </div>
       </section>
-    } @else {
+    } @else if (tab() === 'teams') {
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <button type="button" hlmBtn (click)="newTeam()">New team</button>
         <label class="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
@@ -250,6 +254,10 @@ interface TeamDraft {
           </div>
         </section>
       }
+    } @else if (tab() === 'lime') {
+      <lime-lime-releases />
+    } @else {
+      <lime-audit-log />
     }
 
     @if (teamDraft(); as draft) {
@@ -296,11 +304,16 @@ export class Settings {
   private readonly feedback = inject(Feedback);
   private readonly session = inject(SessionStore);
 
-  protected readonly tabs: { key: Tab; label: string }[] = [
-    { key: 'users', label: 'Users & roles' },
-    { key: 'teams', label: 'Teams' },
-  ];
-  protected readonly tab = signal<Tab>('users');
+  protected readonly tabs = computed(() => {
+    const all: { key: Tab; label: string; allowed: boolean }[] = [
+      { key: 'users', label: 'Users & roles', allowed: this.session.isAdmin() },
+      { key: 'teams', label: 'Teams', allowed: this.session.isAdmin() },
+      { key: 'lime', label: 'Lime releases', allowed: this.session.isAdmin() || this.session.can('lime:write') },
+      { key: 'audit', label: 'Audit log', allowed: this.session.isAdmin() },
+    ];
+    return all.filter((t) => t.allowed);
+  });
+  protected readonly tab = signal<Tab>(this.session.isAdmin() ? 'users' : 'lime');
   protected readonly roles = ROLES;
   protected readonly roleInfo = ROLE_INFO;
   protected readonly busy = signal(false);
@@ -323,7 +336,7 @@ export class Settings {
   protected readonly archivedTeams = signal<ApiTeam[]>([]);
 
   constructor() {
-    this.loadUsers();
+    if (this.session.isAdmin()) this.loadUsers();
   }
 
   private loadUsers(): void {

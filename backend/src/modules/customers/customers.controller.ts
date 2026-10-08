@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CustomersService } from './customers.service';
-import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { Can } from '../auth/can.decorator';
+import { CustomersService } from './customers.service';
+import { CreateCustomerDto, UpdateCustomerDto } from './dto/update-customer.dto';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -15,6 +15,19 @@ export class CustomersController {
     return this.customers.findAll();
   }
 
+  @Get('archived')
+  @ApiOperation({ summary: 'Archived customers' })
+  archived() {
+    return this.customers.findArchived();
+  }
+
+  @Post()
+  @Can('customer:write')
+  @ApiOperation({ summary: 'Add a customer' })
+  create(@Body() body: CreateCustomerDto) {
+    return this.customers.create(body);
+  }
+
   @Patch(':id')
   @Can('customer:write')
   @ApiOperation({
@@ -23,5 +36,23 @@ export class CustomersController {
   })
   update(@Param('id') id: string, @Body() body: UpdateCustomerDto) {
     return this.customers.update(id, body);
+  }
+
+  @Delete(':id')
+  @Can('customer:write')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Archive a customer',
+    description: 'Refused while the customer still has active projects.',
+  })
+  archive(@Param('id') id: string): Promise<void> {
+    return this.customers.archive(id);
+  }
+
+  @Post(':id/restore')
+  @Can('customer:write')
+  @ApiOperation({ summary: 'Restore an archived customer' })
+  restore(@Param('id') id: string) {
+    return this.customers.restore(id);
   }
 }

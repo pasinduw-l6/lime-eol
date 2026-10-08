@@ -24,6 +24,15 @@ export const isAdmin: CanActivateFn = () => {
     : router.createUrlTree(['/overview']);
 };
 
+export const canOpenSettings: CanActivateFn = () => {
+  const session = inject(SessionStore);
+  const router = inject(Router);
+
+  return session.isAdmin() || session.can('lime:write')
+    ? true
+    : router.createUrlTree(['/overview']);
+};
+
 export const signedOut: CanActivateFn = () => {
   const session = inject(SessionStore);
   const router = inject(Router);

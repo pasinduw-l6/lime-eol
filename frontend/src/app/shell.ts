@@ -120,7 +120,7 @@ import { NotificationMenu } from './shared/notification-menu';
 
         <lime-notification-menu />
 
-        @if (session.isAdmin()) {
+        @if (session.isAdmin() || session.can('lime:write')) {
           <a
             routerLink="/settings"
             routerLinkActive="bg-muted"
@@ -200,6 +200,7 @@ export class Shell {
   protected readonly nav = [
     { path: '/overview', label: 'Overview', badge: false },
     { path: '/projects', label: 'Projects', badge: false },
+    { path: '/customers', label: 'Customers', badge: false },
     { path: '/lifecycle', label: 'Lifecycle', badge: true },
     { path: '/plan', label: 'Plan', badge: false },
     { path: '/calendar', label: 'Calendar', badge: false },
