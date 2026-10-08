@@ -30,6 +30,7 @@ export const envSchema = z
     OIDC_WEB_REDIRECT_URI: blankable(z.string().url().optional()),
     SESSION_SECRET: z.string().min(1, 'SESSION_SECRET is required'),
     BOOTSTRAP_ADMINS: blankable(z.string().optional()),
+    PREVIEW_LOGIN: booleanish.default(false),
 
     EOL_API_BASE: z.string().url().default('https://endoflife.date/api/v1'),
     SYNC_CRON: z.string().default('0 2 * * *'),
@@ -79,6 +80,10 @@ export const envSchema = z
   .refine(
     (env) => !env.NOTIFY_ENABLED || env.NOTIFY_DRY_RUN || !!env.TEAMS_WEBHOOK_URL,
     'TEAMS_WEBHOOK_URL is required when NOTIFY_ENABLED=true and NOTIFY_DRY_RUN=false',
+  )
+  .refine(
+    (env) => !(env.NODE_ENV === 'production' && env.PREVIEW_LOGIN),
+    'PREVIEW_LOGIN=true is not allowed when NODE_ENV=production',
   );
 
 export type AppEnv = z.infer<typeof envSchema>;

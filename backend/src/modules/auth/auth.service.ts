@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
 import { authConfig, AuthConfig } from '../../config';
@@ -64,6 +64,52 @@ export class AuthService {
       email: user.email,
       displayName: name,
       role: promote ? Role.ADMIN : user.role,
+      initials: initialsOf(name),
+      expiresAt: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString(),
+    };
+  }
+
+  async previewAccounts() {
+    if (!this.config.previewLogin) {
+      return { enabled: false, users: [] };
+    }
+
+    const users = await this.prisma.appUser.findMany({
+      where: { isActive: true },
+      orderBy: [{ role: 'asc' }, { displayName: 'asc' }],
+    });
+
+    return {
+      enabled: true,
+      users: users.map((u) => ({
+        id: u.id,
+        name: u.displayName ?? u.email,
+        email: u.email,
+        role: u.role,
+      })),
+    };
+  }
+
+  async previewSession(userId: string): Promise<SessionDto> {
+    if (!this.config.previewLogin) {
+      throw new NotFoundException();
+    }
+
+    const user = await this.prisma.appUser.findFirst({ where: { id: userId, isActive: true } });
+    if (!user) {
+      throw new UnauthorizedException('That account is not active.');
+    }
+
+    const name = user.displayName ?? user.email;
+    return {
+      token: this.jwt.sign(
+        { sub: user.id, email: user.email, role: user.role },
+        { expiresIn: TOKEN_TTL_SECONDS },
+      ),
+      id: user.id,
+      email: user.email,
+      displayName: name,
+      role: user.role,
       initials: initialsOf(name),
       expiresAt: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString(),
     };

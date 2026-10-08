@@ -8,6 +8,7 @@ export const authConfig = registerAs(AUTH_CONFIG_KEY, () => {
 
   return {
     sessionSecret: env.SESSION_SECRET,
+    previewLogin: env.PREVIEW_LOGIN && env.NODE_ENV !== 'production',
     bootstrapAdmins: (env.BOOTSTRAP_ADMINS ?? '')
       .split(',')
       .map((email) => email.trim().toLowerCase())

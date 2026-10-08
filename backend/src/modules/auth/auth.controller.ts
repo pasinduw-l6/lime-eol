@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, Inject, Param, Post, Query, Req, Res } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiExcludeEndpoint,
@@ -76,6 +76,20 @@ export class AuthController {
           : 'sso_failed',
       );
     }
+  }
+
+  @Get('preview')
+  @Public()
+  @ApiExcludeEndpoint()
+  previewAccounts() {
+    return this.auth.previewAccounts();
+  }
+
+  @Post('preview/:userId')
+  @Public()
+  @ApiExcludeEndpoint()
+  previewSession(@Param('userId') userId: string) {
+    return this.auth.previewSession(userId);
   }
 
   @Get('me')

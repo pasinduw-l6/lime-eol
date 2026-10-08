@@ -1,8 +1,19 @@
-import { Component, computed, input } from '@angular/core';
-import { AuthLayout } from './auth-layout';
+import { HttpClient } from '@angular/common/http';
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { HlmButton } from '@spartan-ng/helm/button';
+import { ROLE_INFO, RoleName } from '../../core/permissions';
+import { Session, SessionStore } from '../../core/session';
+import { AuthLayout } from './auth-layout';
 
 const SSO_LOGIN_PATH = '/api/v1/auth/oidc/login';
+
+interface PreviewAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: RoleName;
+}
 
 @Component({
   selector: 'lime-login',
@@ -47,24 +58,82 @@ const SSO_LOGIN_PATH = '/api/v1/auth/oidc/login';
           Use your {{ '@' }}linearsix.com account. Access is granted by an
           administrator — there is no self-service registration.
         </p>
+
+        @if (preview().length > 0) {
+          <section class="mt-2 rounded-lg border border-dashed p-3" aria-labelledby="preview-title">
+            <p id="preview-title" class="m-0 mb-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+              Local preview · sign in as
+            </p>
+            <ul class="m-0 grid max-h-64 list-none gap-1 overflow-y-auto p-0">
+              @for (a of preview(); track a.id) {
+                <li>
+                  <button
+                    type="button"
+                    class="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    [disabled]="busy()"
+                    (click)="signInAs(a)"
+                  >
+                    <span class="min-w-0">
+                      <span class="block truncate font-medium">{{ a.name }}</span>
+                      <span class="block truncate text-xs text-muted-foreground">{{ a.email }}</span>
+                    </span>
+                    <span class="shrink-0 rounded-md border px-1.5 text-xs text-muted-foreground">{{ roleLabel(a.role) }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          </section>
+        }
       </div>
     </lime-auth-layout>
   `,
 })
 export class Login {
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly session = inject(SessionStore);
+
   readonly next = input<string>('');
 
   readonly failure = input<string>('', { alias: 'error' });
 
-  protected readonly shownError = computed(() =>
-    failureMessage(this.failure()),
+  protected readonly preview = signal<PreviewAccount[]>([]);
+  protected readonly busy = signal(false);
+  private readonly previewError = signal<string | null>(null);
+
+  protected readonly shownError = computed(
+    () => this.previewError() ?? failureMessage(this.failure()),
   );
+
+  constructor() {
+    this.http
+      .get<{ enabled: boolean; users: PreviewAccount[] }>('/api/v1/auth/preview')
+      .subscribe({ next: (res) => this.preview.set(res.enabled ? res.users : []) });
+  }
 
   protected startSso(): void {
     const next = this.next();
     window.location.href = next
       ? `${SSO_LOGIN_PATH}?next=${encodeURIComponent(next)}`
       : SSO_LOGIN_PATH;
+  }
+
+  protected signInAs(account: PreviewAccount): void {
+    this.busy.set(true);
+    this.http.post<Session>(`/api/v1/auth/preview/${account.id}`, {}).subscribe({
+      next: (session) => {
+        this.session.adopt(session);
+        void this.router.navigateByUrl(this.next() || '/overview');
+      },
+      error: () => {
+        this.busy.set(false);
+        this.previewError.set('That preview sign-in did not work.');
+      },
+    });
+  }
+
+  protected roleLabel(role: RoleName): string {
+    return ROLE_INFO[role]?.label ?? role;
   }
 }
 
