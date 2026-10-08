@@ -12,6 +12,7 @@ import {
   stageOf,
 } from '../core/process';
 import { formatDate, formatDays, statusFill, statusOf } from '../core/lifecycle';
+import { SessionStore } from '../core/session';
 import { JiraPanel } from './jira-panel';
 import { TechIcon } from './tech-icon';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -174,12 +175,16 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
         </p>
 
         <span class="flex items-center gap-4 text-[12px]">
-          <button type="button" class="text-primary" (click)="editing.emit()">
-            Edit
-          </button>
-          <button type="button" class="text-overdue" (click)="removing.emit()">
-            Delete
-          </button>
+          @if (canEdit()) {
+            <button type="button" class="text-primary" (click)="editing.emit()">
+              Edit
+            </button>
+          }
+          @if (session.can('estate:write')) {
+            <button type="button" class="text-overdue" (click)="removing.emit()">
+              Delete
+            </button>
+          }
         </span>
       </div>
     </article>
@@ -187,6 +192,14 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 })
 export class PlanCard {
   private readonly api = inject(Api);
+  protected readonly session = inject(SessionStore);
+  protected readonly canEdit = computed(
+    () =>
+      this.session.can('estate:write') ||
+      this.session.can('plan:notice') ||
+      this.session.can('plan:decision') ||
+      this.session.can('plan:assess'),
+  );
 
   readonly action = input.required<ApiUpgradeAction>();
 

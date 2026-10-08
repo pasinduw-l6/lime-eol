@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, ApiCatalogueProduct } from '../../core/api';
+import { Api, ApiArchived, ApiCatalogueProduct } from '../../core/api';
+import { Feedback } from '../../core/feedback';
+import { SessionStore } from '../../core/session';
 import { formatDate, formatDays, statusFill } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { ComponentType, Cycle, CycleRule, Technology } from '../../core/models';
@@ -55,10 +57,41 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
           {{ engineers().length }} engineers
         </p>
       </div>
-      <button type="button" hlmBtn (click)="openCatalogue()">
-        Add technology
-      </button>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" [checked]="showArchived()" (change)="toggleArchived()" />
+          Show archived
+        </label>
+        @if (canWrite()) {
+          <button type="button" hlmBtn (click)="openCatalogue()">
+            Add technology
+          </button>
+        }
+      </div>
     </header>
+
+    @if (showArchived()) {
+      <section hlmCard class="mb-5" aria-labelledby="archived-tech">
+        <div hlmCardHeader>
+          <h2 hlmCardTitle id="archived-tech">Archived technologies</h2>
+          <p hlmCardDescription>Hidden from the registry and pickers. Their history is kept.</p>
+        </div>
+        <div hlmCardContent>
+          <ul class="m-0 grid list-none gap-2 p-0">
+            @for (t of archived(); track t.id) {
+              <li class="flex items-center justify-between gap-3 rounded-md border px-4 py-2 text-sm">
+                <span>{{ t.name }} <span class="text-muted-foreground">· archived {{ when(t.archivedAt) }}</span></span>
+                @if (canWrite()) {
+                  <button type="button" hlmBtn variant="outline" size="sm" (click)="restoreTechnology(t.id, t.name)">Restore</button>
+                }
+              </li>
+            } @empty {
+              <li class="text-sm text-muted-foreground">Nothing archived.</li>
+            }
+          </ul>
+        </div>
+      </section>
+    }
 
     @if (error(); as message) {
       <p hlmAlert variant="destructive" class="mb-5">{{ message }}</p>
@@ -95,23 +128,27 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
               @if (row.atRisk > 0) {
                 <span class="tabular text-[12px] text-overdue">{{ row.atRisk }} at risk</span>
               }
-              <span class="flex gap-2 text-[12px]">
-                <button type="button" class="text-primary" (click)="editTechnology(row.technology)">Edit</button>
-                <button type="button" class="text-overdue" (click)="removeTechnology(row.technology)">Delete</button>
-              </span>
+              @if (canWrite()) {
+                <span class="flex gap-2 text-[12px]">
+                  <button type="button" class="text-primary" (click)="editTechnology(row.technology)">Edit</button>
+                  <button type="button" class="text-overdue" (click)="removeTechnology(row.technology)">Archive</button>
+                </span>
+              }
             </div>
 
             @if (expanded() === row.technology.id) {
               <div class="border-t border-rule bg-elevated/40 px-6 py-4">
                 <div class="mb-3 flex items-center justify-between">
                   <h3 class="m-0 text-[13px] font-semibold">Cycles</h3>
-                  <button
-                    type="button"
-                    class="text-[12px] text-primary"
-                    (click)="cycleDraft.set(newCycle(row.technology))"
-                  >
-                    Add cycle by hand
-                  </button>
+                  @if (canWrite()) {
+                    <button
+                      type="button"
+                      class="text-[12px] text-primary"
+                      (click)="cycleDraft.set(newCycle(row.technology))"
+                    >
+                      Add cycle by hand
+                    </button>
+                  }
                 </div>
                 <table hlmTable class="w-full border-collapse text-[13px]">
                   <thead hlmTHead>
@@ -138,10 +175,12 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
                           {{ c.cycle.eolSource === 'API' ? 'endoflife.date' : 'entered by hand' }}
                         </td>
                         <td hlmTd class="whitespace-normal py-1.5 text-right">
-                          <span class="flex justify-end gap-2 text-[12px]">
-                            <button type="button" class="text-primary" (click)="editCycle(c.cycle)">Edit</button>
-                            <button type="button" class="text-overdue" (click)="removeCycle(c.cycle)">Delete</button>
-                          </span>
+                          @if (canWrite()) {
+                            <span class="flex justify-end gap-2 text-[12px]">
+                              <button type="button" class="text-primary" (click)="editCycle(c.cycle)">Edit</button>
+                              <button type="button" class="text-overdue" (click)="removeCycle(c.cycle)">Delete</button>
+                            </span>
+                          }
                         </td>
                       </tr>
                     } @empty {
@@ -511,6 +550,17 @@ export class Registry {
   protected readonly draftName = signal('');
   protected readonly draftType = signal<ComponentType>('OTHER');
   protected readonly saving = signal(false);
+  private readonly feedback = inject(Feedback);
+  private readonly session = inject(SessionStore);
+  protected readonly canWrite = computed(() => this.session.can('estate:write'));
+  protected readonly showArchived = signal(false);
+  protected readonly archived = signal<ApiArchived[]>([]);
+
+  protected when(value: string | null): string {
+    return value
+      ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : '';
+  }
 
   protected readonly categories = computed(() =>
     [...new Set(this.api.catalogue().map((p) => p.category))].sort(),
@@ -644,22 +694,65 @@ export class Registry {
     request.subscribe(this.done(() => this.cycleDraft.set(null), 'That cycle could not be saved.'));
   }
 
-  protected removeTechnology(technology: Technology): void {
-    if (!confirm(`Archive ${technology.name}? It disappears from the registry but its history is kept.`)) {
-      return;
-    }
-    this.api
-      .archiveTechnology(technology.id)
-      .subscribe(this.done(() => undefined, `${technology.name} could not be archived.`));
+  protected async removeTechnology(technology: Technology): Promise<void> {
+    const ok = await this.feedback.confirm({
+      title: `Archive ${technology.name}?`,
+      message: 'It disappears from the registry. Its history is kept and it can be restored.',
+      confirmLabel: 'Archive',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    this.api.archiveTechnology(technology.id).subscribe(
+      this.done(() => {
+        this.feedback.success(`${technology.name} archived.`, {
+          label: 'Undo',
+          run: () => this.restoreTechnology(technology.id, technology.name),
+        });
+        this.loadArchived();
+      }, `${technology.name} could not be archived.`),
+    );
   }
 
-  protected removeCycle(cycle: Cycle): void {
-    if (!confirm(`Delete cycle ${cycle.technology} ${cycle.cycle}?`)) {
-      return;
-    }
+  protected restoreTechnology(id: string, name: string): void {
+    this.api.restoreTechnology(id).subscribe(
+      this.done(() => {
+        this.feedback.success(`${name} restored.`);
+        this.loadArchived();
+      }, `${name} could not be restored.`),
+    );
+  }
+
+  protected toggleArchived(): void {
+    this.showArchived.update((v) => !v);
+    if (this.showArchived()) this.loadArchived();
+  }
+
+  private loadArchived(): void {
+    if (!this.showArchived()) return;
+    this.api.archivedTechnologies().subscribe({
+      next: (rows) => this.archived.set(rows),
+      error: (err) => this.feedback.failed(err, 'Could not load archived technologies.'),
+    });
+  }
+
+  protected async removeCycle(cycle: Cycle): Promise<void> {
+    const ok = await this.feedback.confirm({
+      title: `Delete ${cycle.technology} ${cycle.cycle}?`,
+      message: 'Only possible when no environment, plan or history entry uses it.',
+      confirmLabel: 'Delete cycle',
+      destructive: true,
+    });
+    if (!ok) return;
+
     this.api
       .deleteCycle(cycle.id)
-      .subscribe(this.done(() => undefined, `${cycle.technology} ${cycle.cycle} could not be deleted.`));
+      .subscribe(
+        this.done(
+          () => this.feedback.success(`${cycle.technology} ${cycle.cycle} deleted.`),
+          `${cycle.technology} ${cycle.cycle} could not be deleted.`,
+        ),
+      );
   }
 
   private done(after: () => void, fallback: string) {

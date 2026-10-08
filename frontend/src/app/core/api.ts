@@ -1,5 +1,6 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, computed, inject } from '@angular/core';
+import { RoleName } from './permissions';
 
 
 export interface ApiComponent {
@@ -91,6 +92,24 @@ export interface ApiCustomer {
   projectCount: number;
 }
 
+export interface ApiTeam {
+  id: string;
+  name: string;
+  email: string | null;
+  archivedAt: string | null;
+  members: { id: string; name: string }[];
+  environments: { id: string; name: string; isPrimary: boolean }[];
+}
+
+export interface ApiArchived {
+  id: string;
+  name: string;
+  code?: string;
+  customer?: string;
+  componentType?: string;
+  archivedAt: string | null;
+}
+
 export interface CycleInput {
   cycle: string;
   label?: string | null;
@@ -119,7 +138,9 @@ export interface ApiUser {
   email: string;
   name: string;
   initials: string;
-  role: 'ADMIN' | 'EDITOR' | 'VIEWER';
+  role: RoleName;
+  isActive: boolean;
+  teams: { id: string; name: string }[];
   canEdit: boolean;
   projectCount: number;
   lastLoginAt: string | null;
@@ -448,6 +469,64 @@ export class Api {
     return this.http.patch<ApiCustomer>(`/api/v1/customers/${id}`, body);
   }
 
+  allUsers() {
+    return this.http.get<ApiUser[]>('/api/v1/users?all=true');
+  }
+
+  inviteUser(body: { email: string; displayName?: string; role: RoleName }) {
+    return this.http.post<ApiUser>('/api/v1/users', body);
+  }
+
+  updateUser(id: string, body: { displayName?: string; role?: RoleName; isActive?: boolean }) {
+    return this.http.patch<ApiUser>(`/api/v1/users/${id}`, body);
+  }
+
+  readonly teamsResource = httpResource<ApiTeam[]>(() => '/api/v1/teams');
+  readonly teams = computed(() => this.teamsResource.value() ?? []);
+
+  archivedTeams() {
+    return this.http.get<ApiTeam[]>('/api/v1/teams/archived');
+  }
+
+  createTeam(body: { name: string; email?: string | null; memberIds?: string[] }) {
+    return this.http.post<ApiTeam>('/api/v1/teams', body);
+  }
+
+  updateTeam(id: string, body: { name?: string; email?: string | null; memberIds?: string[] }) {
+    return this.http.patch<ApiTeam>(`/api/v1/teams/${id}`, body);
+  }
+
+  archiveTeam(id: string) {
+    return this.http.delete<void>(`/api/v1/teams/${id}`);
+  }
+
+  restoreTeam(id: string) {
+    return this.http.post<ApiTeam>(`/api/v1/teams/${id}/restore`, {});
+  }
+
+  setOwners(deploymentId: string, teamIds: string[]) {
+    return this.http.patch<{ id: string; owners: string[] }>(
+      `/api/v1/deployments/${deploymentId}/owners`,
+      { teamIds },
+    );
+  }
+
+  archivedProjects() {
+    return this.http.get<ApiArchived[]>('/api/v1/projects/archived');
+  }
+
+  restoreProject(id: string) {
+    return this.http.post<ApiProject>(`/api/v1/projects/${id}/restore`, {});
+  }
+
+  archivedTechnologies() {
+    return this.http.get<ApiArchived[]>('/api/v1/technologies/archived');
+  }
+
+  restoreTechnology(id: string) {
+    return this.http.post<ApiTechnology>(`/api/v1/technologies/${id}/restore`, {});
+  }
+
   readonly customersResource = httpResource<ApiCustomer[]>(() => '/api/v1/customers');
   readonly customers = computed(() => this.customersResource.value() ?? []);
 
@@ -557,6 +636,7 @@ export class Api {
   reload(): void {
     this.projectsResource.reload();
     this.customersResource.reload();
+    this.teamsResource.reload();
     this.technologiesResource.reload();
     this.usersResource.reload();
     this.actionsResource.reload();

@@ -1,7 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Api, CommercialModel } from '../../core/api';
+import { Api, ApiArchived, CommercialModel } from '../../core/api';
+import { Feedback } from '../../core/feedback';
+import { SessionStore } from '../../core/session';
 import { COMMERCIAL_MODELS } from '../../core/process';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
@@ -28,10 +30,44 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
           {{ atRiskProjects() }} with something out of support
         </p>
       </div>
-      <button type="button" hlmBtn [variant]="showForm() ? 'outline' : 'default'" (click)="toggleForm()">
-        {{ showForm() ? 'Cancel' : 'New project' }}
-      </button>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="flex items-center gap-2 text-sm text-muted-foreground">
+          <input type="checkbox" [checked]="showArchived()" (change)="toggleArchived()" />
+          Show archived
+        </label>
+        @if (canWrite()) {
+          <button type="button" hlmBtn [variant]="showForm() ? 'outline' : 'default'" (click)="toggleForm()">
+            {{ showForm() ? 'Cancel' : 'New project' }}
+          </button>
+        }
+      </div>
     </header>
+
+    @if (showArchived()) {
+      <section hlmCard class="mb-5" aria-labelledby="archived-projects">
+        <div hlmCardHeader>
+          <h2 hlmCardTitle id="archived-projects">Archived projects</h2>
+          <p hlmCardDescription>Restoring a project brings back the environments archived with it.</p>
+        </div>
+        <div hlmCardContent>
+          <ul class="m-0 grid list-none gap-2 p-0">
+            @for (p of archived(); track p.id) {
+              <li class="flex items-center justify-between gap-3 rounded-md border px-4 py-2 text-sm">
+                <span>
+                  {{ p.name }}
+                  <span class="text-muted-foreground">· {{ p.customer }} · {{ p.code }}</span>
+                </span>
+                @if (canWrite()) {
+                  <button type="button" hlmBtn variant="outline" size="sm" (click)="restoreProject(p.id, p.name)">Restore</button>
+                }
+              </li>
+            } @empty {
+              <li class="text-sm text-muted-foreground">Nothing archived.</li>
+            }
+          </ul>
+        </div>
+      </section>
+    }
 
     @if (showForm()) {
       <section hlmCard class="mb-5" aria-labelledby="new-project">
@@ -331,9 +367,11 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                   >
                     {{ row.project.status.toLowerCase() }}
                   </span>
-                  <button type="button" class="text-[12px] text-primary" (click)="manage(row.project)">
-                    Manage
-                  </button>
+                  @if (canManage()) {
+                    <button type="button" class="text-[12px] text-primary" (click)="manage(row.project)">
+                      Manage
+                    </button>
+                  }
                 </span>
               </td>
             </tr>
@@ -438,16 +476,31 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             <h3 class="m-0 mb-2 text-[13px] font-semibold">Environments</h3>
             <ul class="m-0 mb-3 flex list-none flex-col gap-2 p-0">
               @for (d of environmentsOf(project.id); track d.id) {
-                <li class="flex items-center justify-between gap-3 rounded-lg border border-rule px-3 py-2">
+                <li class="grid gap-2 rounded-lg border border-rule px-3 py-2 sm:grid-cols-[1fr_200px_auto] sm:items-center">
                   <span class="min-w-0">
                     <span class="block text-[13px]">{{ d.environment }} · {{ d.locationDetail }}</span>
                     <span class="tabular block text-[11px] text-ink-soft">
                       {{ d.components.length }} components
                     </span>
                   </span>
-                  <button type="button" class="text-[12px] text-overdue" [disabled]="busy()" (click)="removeEnvironment(d)">
-                    Archive
-                  </button>
+                  <select
+                    hlmInput
+                    class="h-8"
+                    [value]="ownerOf(d)"
+                    [disabled]="busy() || !canWrite()"
+                    [attr.aria-label]="'Owning team for ' + d.environment"
+                    (change)="setOwner(d, $any($event.target).value)"
+                  >
+                    <option value="">No owning team</option>
+                    @for (t of api.teams(); track t.id) {
+                      <option [value]="t.id">{{ t.name }}</option>
+                    }
+                  </select>
+                  @if (canWrite()) {
+                    <button type="button" class="text-[12px] text-overdue" [disabled]="busy()" (click)="removeEnvironment(d)">
+                      Archive
+                    </button>
+                  }
                 </li>
               } @empty {
                 <li class="text-[13px] text-ink-soft">No environments yet.</li>
@@ -526,7 +579,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 })
 export class Projects {
   private readonly store = inject(RegistryStore);
-  private readonly api = inject(Api);
+  protected readonly api = inject(Api);
   protected readonly saving = signal(false);
   private readonly router = inject(Router);
 
@@ -624,6 +677,12 @@ export class Projects {
   protected readonly newEnvDetail = signal('');
   protected readonly copyFrom = signal('');
   protected readonly busy = signal(false);
+  private readonly feedback = inject(Feedback);
+  private readonly session = inject(SessionStore);
+  protected readonly canWrite = computed(() => this.session.can('estate:write'));
+  protected readonly canManage = this.canWrite;
+  protected readonly showArchived = signal(false);
+  protected readonly archived = signal<ApiArchived[]>([]);
 
   protected editForm = {
     name: '',
@@ -683,14 +742,65 @@ export class Projects {
       );
   }
 
-  protected removeEnvironment(environment: Deployment): void {
-    if (!confirm(`Archive ${environment.environment}? Its change history is kept, and adding it again restores it.`)) {
-      return;
-    }
+  protected async removeEnvironment(environment: Deployment): Promise<void> {
+    const ok = await this.feedback.confirm({
+      title: `Archive ${environment.environment}?`,
+      message: 'Its change history is kept. Adding the environment again restores it.',
+      confirmLabel: 'Archive',
+      destructive: true,
+    });
+    if (!ok) return;
+
     this.busy.set(true);
     this.api
       .archiveEnvironment(environment.id)
-      .subscribe(this.done(() => undefined, 'That environment could not be archived.'));
+      .subscribe(
+        this.done(
+          () => this.feedback.success(`${environment.environment} archived.`),
+          'That environment could not be archived.',
+        ),
+      );
+  }
+
+  protected ownerOf(environment: Deployment): string {
+    const name = environment.owners[0];
+    return this.api.teams().find((t) => t.name === name)?.id ?? '';
+  }
+
+  protected setOwner(environment: Deployment, teamId: string): void {
+    this.busy.set(true);
+    this.api
+      .setOwners(environment.id, teamId ? [teamId] : [])
+      .subscribe(
+        this.done(
+          () => this.feedback.success(`Owner of ${environment.environment} saved.`),
+          'Could not set the owning team.',
+        ),
+      );
+  }
+
+  protected toggleArchived(): void {
+    this.showArchived.update((v) => !v);
+    this.loadArchived();
+  }
+
+  private loadArchived(): void {
+    if (!this.showArchived()) return;
+    this.api.archivedProjects().subscribe({
+      next: (rows) => this.archived.set(rows),
+      error: (err) => this.feedback.failed(err, 'Could not load archived projects.'),
+    });
+  }
+
+  protected restoreProject(id: string, name: string): void {
+    this.api.restoreProject(id).subscribe({
+      next: () => {
+        this.feedback.success(`${name} restored.`);
+        this.api.reload();
+        this.loadArchived();
+      },
+      error: (err) => this.feedback.failed(err, `${name} could not be restored.`),
+    });
   }
 
   private done(after: () => void, fallback: string) {
@@ -760,11 +870,17 @@ export class Projects {
   }
 
   protected deleteProject(id: string): void {
+    const name = this.confirmDelete()?.name ?? 'Project';
     this.busy.set(true);
     this.api.archiveProject(id).subscribe(
       this.done(() => {
         this.confirmDelete.set(null);
         this.managed.set(null);
+        this.feedback.success(`${name} archived.`, {
+          label: 'Undo',
+          run: () => this.restoreProject(id, name),
+        });
+        this.loadArchived();
       }, 'That project could not be archived.'),
     );
   }

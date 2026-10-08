@@ -3,13 +3,14 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { catchError, firstValueFrom, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
+import { Permission, RoleName, can } from './permissions';
 
 export interface Session {
   token: string;
   id: string;
   email: string;
   displayName: string;
-  role: 'ADMIN' | 'EDITOR' | 'VIEWER';
+  role: RoleName;
   initials: string;
   expiresAt: string;
 }
@@ -25,6 +26,11 @@ export class SessionStore {
   readonly user = this.session.asReadonly();
   readonly isSignedIn = computed(() => this.session() !== null);
   readonly canEdit = computed(() => this.session()?.role !== 'VIEWER');
+  readonly isAdmin = computed(() => this.session()?.role === 'ADMIN');
+
+  can(permission: Permission): boolean {
+    return can(this.session()?.role, permission);
+  }
 
   adopt(session: Session): void {
     this.keep(session);
@@ -36,7 +42,13 @@ export class SessionStore {
     }
 
     try {
-      await firstValueFrom(this.http.get('/api/v1/auth/me'));
+      const me = await firstValueFrom(
+        this.http.get<{ role: RoleName; displayName: string; initials: string }>('/api/v1/auth/me'),
+      );
+      const current = this.session();
+      if (current && (current.role !== me.role || current.displayName !== me.displayName)) {
+        this.keep({ ...current, role: me.role, displayName: me.displayName, initials: me.initials });
+      }
     } catch {
       this.signOut();
     }

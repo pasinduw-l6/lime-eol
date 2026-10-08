@@ -6,8 +6,10 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { RegistryStore } from './core/registry.store';
 import { SessionStore } from './core/session';
+import { ROLE_INFO, RoleName } from './core/permissions';
 import { Theme } from './core/theme';
 import { Celebrate } from './shared/celebrate';
+import { FeedbackHost } from './shared/feedback-host';
 import { NotificationMenu } from './shared/notification-menu';
 
 @Component({
@@ -21,6 +23,7 @@ import { NotificationMenu } from './shared/notification-menu';
     HlmButton,
     HlmInput,
     Celebrate,
+    FeedbackHost,
     NotificationMenu,
   ],
   host: { class: 'block min-h-screen bg-background' },
@@ -117,6 +120,23 @@ import { NotificationMenu } from './shared/notification-menu';
 
         <lime-notification-menu />
 
+        @if (session.isAdmin()) {
+          <a
+            routerLink="/settings"
+            routerLinkActive="bg-muted"
+            hlmBtn
+            variant="ghost"
+            size="icon"
+            aria-label="Settings"
+            title="Settings"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke-linejoin="round" />
+            </svg>
+          </a>
+        }
+
         <button
           type="button"
           hlmBtn
@@ -146,9 +166,7 @@ import { NotificationMenu } from './shared/notification-menu';
               <span hlmAvatarFallback class="bg-primary text-[10px] font-semibold text-primary-foreground">{{ me.initials }}</span>
             </hlm-avatar>
             <span class="hidden text-sm font-medium xl:inline">{{ me.displayName }}</span>
-            @if (me.role === 'VIEWER') {
-              <span class="rounded-md border px-1.5 text-xs text-muted-foreground">read only</span>
-            }
+            <span class="hidden rounded-md border px-1.5 text-xs text-muted-foreground lg:inline">{{ roleLabel(me.role) }}</span>
           </span>
         }
 
@@ -161,6 +179,7 @@ import { NotificationMenu } from './shared/notification-menu';
     </main>
 
     <lime-celebrate />
+    <lime-feedback-host />
   `,
 })
 export class Shell {
@@ -168,6 +187,10 @@ export class Shell {
   private readonly router = inject(Router);
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(Theme);
+
+  protected roleLabel(role: RoleName): string {
+    return ROLE_INFO[role]?.label ?? role;
+  }
 
   protected signOut(): void {
     this.session.signOut();

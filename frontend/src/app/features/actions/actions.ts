@@ -11,6 +11,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Api, ApiUpgradeAction, Decision } from '../../core/api';
 import { DECISIONS } from '../../core/process';
+import { Permission } from '../../core/permissions';
+import { SessionStore } from '../../core/session';
 import { formatDate, formatDays, statusFill, SupportStatus } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
@@ -62,7 +64,9 @@ interface Draft {
           }
         </p>
       </div>
-      <button type="button" hlmBtn (click)="create()">New action</button>
+      @if (session.can('estate:write')) {
+        <button type="button" hlmBtn (click)="create()">New action</button>
+      }
     </header>
 
     @if (api.actionsResource.error()) {
@@ -316,6 +320,7 @@ interface Draft {
 })
 export class Actions {
   protected readonly api = inject(Api);
+  protected readonly session = inject(SessionStore);
   private readonly store = inject(RegistryStore);
   private readonly router = inject(Router);
 
@@ -510,7 +515,23 @@ export class Actions {
       customerComm: form.customerComm,
       customerNotifiedAt: form.customerNotifiedAt || null,
       customerCommNotes: form.customerCommNotes.trim() || null,
-    };
+    } as Record<string, unknown>;
+
+    if (form.id && !this.session.can('estate:write')) {
+      const allowed: [string, Permission][] = [
+        ['customerComm', 'plan:notice'],
+        ['customerNotifiedAt', 'plan:notice'],
+        ['customerCommNotes', 'plan:notice'],
+        ['decision', 'plan:decision'],
+        ['riskApprover', 'plan:decision'],
+        ['riskExpiresAt', 'plan:decision'],
+        ['assessment', 'plan:assess'],
+      ];
+      for (const key of Object.keys(body)) {
+        const rule = allowed.find(([field]) => field === key);
+        if (!rule || !this.session.can(rule[1])) delete body[key];
+      }
+    }
 
     this.saving.set(true);
 

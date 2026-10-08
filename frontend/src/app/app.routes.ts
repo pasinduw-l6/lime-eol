@@ -60,6 +60,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/ops/ops').then((m) => m.Ops),
       },
 
+      {
+        path: 'settings',
+        title: 'Settings · Lime Lifecycle',
+        canActivate: [isAdmin],
+        loadComponent: () => import('./features/settings/settings').then((m) => m.Settings),
+      },
+
       { path: 'environments', redirectTo: 'projects' },
       { path: 'schedule', redirectTo: 'lifecycle' },
       { path: 'registry', redirectTo: 'lifecycle' },
