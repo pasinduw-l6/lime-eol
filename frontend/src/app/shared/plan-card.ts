@@ -1,13 +1,25 @@
-import { Component, computed, input, output } from '@angular/core';
-import { ApiActionEnvironment, ApiUpgradeAction } from '../core/api';
+import { Component, computed, inject, input, output } from '@angular/core';
+import { Api, ApiActionEnvironment, ApiUpgradeAction } from '../core/api';
+import {
+  SEVERITY,
+  STAGES,
+  TONE_CLASS,
+  Tone,
+  coverOf,
+  decisionLabel,
+  severityOf,
+  stageIndex,
+  stageOf,
+} from '../core/process';
 import { formatDate, formatDays, statusFill, statusOf } from '../core/lifecycle';
 import { JiraPanel } from './jira-panel';
 import { TechIcon } from './tech-icon';
+import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 
 @Component({
   selector: 'lime-plan-card',
-  imports: [HlmCardImports, TechIcon, JiraPanel],
+  imports: [HlmBadgeImports, HlmCardImports, TechIcon, JiraPanel],
   host: { class: 'block' },
   template: `
     <article hlmCard class="block relative overflow-hidden pl-6 pr-6 py-5">
@@ -44,6 +56,54 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
             {{ deadlineNote() }}
           </p>
         </div>
+      </div>
+
+      <div class="mt-4 grid gap-3 border-t pt-3.5">
+        <div class="flex flex-wrap items-center gap-2">
+          @if (severity(); as sev) {
+            <span
+              class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+              [style.border-color]="sev.colour"
+              [style.color]="sev.colour"
+              [title]="sev.rule"
+            >{{ sev.label }}</span>
+          }
+          <span hlmBadge variant="outline" [class.text-muted-foreground]="!action().decision">{{ decision() }}</span>
+          @for (c of covers(); track c.customer) {
+            <span hlmBadge variant="outline" [class]="tone(c.tone)" [title]="c.detail">{{ c.customer }}: {{ c.label }}</span>
+          }
+          @if (action().decision === 'ACCEPT_RISK') {
+            <span class="text-[12px] text-muted-foreground">
+              {{ action().riskApprover ? 'Accepted by ' + action().riskApprover : 'Awaiting sign-off' }}
+              @if (action().riskExpiresAt) {
+                · until {{ date(action().riskExpiresAt) }}
+              }
+            </span>
+          }
+        </div>
+
+        <ol class="m-0 flex list-none flex-wrap gap-x-1 gap-y-2 p-0" aria-label="Process stage">
+          @for (step of stages; track step.key; let i = $index) {
+            <li class="flex items-center gap-1.5 text-[11px]" [attr.aria-current]="i === stage() ? 'step' : null">
+              <span
+                class="grid size-4 place-items-center rounded-full border text-[9px]"
+                [class.border-primary]="i <= stage()"
+                [class.bg-primary]="i < stage()"
+                [class.text-primary-foreground]="i < stage()"
+                [class.text-primary]="i === stage()"
+                aria-hidden="true"
+              >{{ i < stage() ? '✓' : i + 1 }}</span>
+              <span [class.font-semibold]="i === stage()" [class.text-muted-foreground]="i > stage()">{{ step.label }}</span>
+              @if (i < stages.length - 1) {
+                <span class="mx-1 h-px w-3 bg-border" aria-hidden="true"></span>
+              }
+            </li>
+          }
+        </ol>
+
+        @if (action().assessment) {
+          <p class="m-0 text-[12.5px] text-muted-foreground">{{ action().assessment }}</p>
+        }
       </div>
 
       @if (action().planTooLate) {
@@ -126,7 +186,45 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
   `,
 })
 export class PlanCard {
+  private readonly api = inject(Api);
+
   readonly action = input.required<ApiUpgradeAction>();
+
+  protected readonly stages = STAGES;
+  protected readonly stage = computed(() => stageIndex(stageOf(this.action())));
+  protected readonly decision = computed(() => decisionLabel(this.action().decision));
+
+  protected readonly severity = computed(() => {
+    const action = this.action();
+    const cycle = this.api
+      .technologies()
+      .flatMap((t) => t.cycles)
+      .find((c) => c.id === action.technologyCycleId);
+    const level = severityOf(action.daysToEol, cycle?.activeSupportEnd);
+    return level ? SEVERITY[level] : null;
+  });
+
+  protected readonly covers = computed(() => {
+    const action = this.action();
+    const scope = this.api.technologies().find((t) => t.name === action.technology)?.scope;
+    const projects = this.api.projects();
+    const customers = this.api.customers();
+    const seen = new Set<string>();
+    const out: { customer: string; label: string; tone: Tone; detail: string }[] = [];
+
+    for (const env of action.environments) {
+      const project = projects.find((p) => p.id === env.projectId);
+      if (!project || seen.has(project.customerId)) continue;
+      seen.add(project.customerId);
+      const customer = customers.find((c) => c.id === project.customerId);
+      out.push({ customer: project.customer, ...coverOf(customer, scope) });
+    }
+    return out;
+  });
+
+  protected tone(tone: Tone): string {
+    return TONE_CLASS[tone];
+  }
 
   readonly editing = output<void>();
   readonly removing = output<void>();

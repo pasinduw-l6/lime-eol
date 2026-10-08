@@ -81,6 +81,7 @@ export class TechnologiesService {
       data: {
         name: input.name,
         componentType: input.componentType,
+        scope: input.scope,
         vendor: input.vendor === undefined ? undefined : input.vendor.trim() || null,
         cycleRule: input.cycleRule,
         notes: input.notes === undefined ? undefined : input.notes.trim() || null,
@@ -314,16 +315,19 @@ export class TechnologiesService {
 
     const icon = iconFor(product.slug);
 
+    const componentType =
+      input.componentType ??
+      suggestComponentType({
+        slug: product.slug,
+        category: product.category,
+        tags: product.tags,
+      });
+
     const technology = await this.prisma.technology.create({
       data: {
         name,
-        componentType:
-          input.componentType ??
-          suggestComponentType({
-            slug: product.slug,
-            category: product.category,
-            tags: product.tags,
-          }),
+        componentType,
+        scope: scopeFor(componentType),
         vendor: input.vendor ?? null,
         eolSlug: product.slug,
         cycleRule:
@@ -367,6 +371,7 @@ export class TechnologiesService {
       data: {
         name,
         componentType: input.componentType ?? 'OTHER',
+        scope: scopeFor(input.componentType ?? 'OTHER'),
         vendor: input.vendor ?? null,
         eolSlug: null,
         cycleRule: input.cycleRule ?? 'MAJOR_MINOR',
@@ -449,6 +454,7 @@ export class TechnologiesService {
     id: string;
     name: string;
     componentType: string;
+    scope: string;
     vendor: string | null;
     eolSlug: string | null;
     cycleRule: string;
@@ -481,6 +487,7 @@ export class TechnologiesService {
       id: technology.id,
       name: technology.name,
       componentType: technology.componentType,
+      scope: technology.scope,
       vendor: technology.vendor,
       eolSlug: technology.eolSlug,
       cycleRule: technology.cycleRule,
@@ -507,6 +514,10 @@ export class TechnologiesService {
       })),
     };
   }
+}
+
+function scopeFor(componentType: string): 'INFRASTRUCTURE' | 'APPLICATION' {
+  return ['RUNTIME', 'FRAMEWORK', 'LIBRARY'].includes(componentType) ? 'APPLICATION' : 'INFRASTRUCTURE';
 }
 
 function iconOf(slug: string | null) {

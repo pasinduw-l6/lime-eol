@@ -35,6 +35,7 @@ export interface ApiProject {
   id: string;
   name: string;
   customer: string;
+  customerId: string;
   code: string;
   limeVersion: string | null;
   status: 'ACTIVE' | 'ONBOARDING' | 'PAUSED';
@@ -64,6 +65,7 @@ export interface ApiTechnology {
   id: string;
   name: string;
   componentType: string;
+  scope: ComponentScope;
   vendor: string | null;
   eolSlug: string | null;
   cycleRule: string;
@@ -71,6 +73,22 @@ export interface ApiTechnology {
   iconColour: string | null;
   notes: string | null;
   cycles: ApiCycle[];
+}
+
+export type ComponentScope = 'INFRASTRUCTURE' | 'APPLICATION';
+export type CommercialModel = 'SUBSCRIPTION' | 'LICENSE';
+export type Decision = 'UPGRADE' | 'EXTENDED_SUPPORT' | 'ACCEPT_RISK' | 'COMMERCIAL_QUOTE';
+
+export interface ApiCustomer {
+  id: string;
+  name: string;
+  code: string | null;
+  contact: string | null;
+  notes: string | null;
+  commercialModel: CommercialModel | null;
+  contractStart: string | null;
+  contractEnd: string | null;
+  projectCount: number;
 }
 
 export interface CycleInput {
@@ -156,7 +174,12 @@ export interface ApiUpgradeAction {
   jiraSubtaskTotal: number | null;
   customerComm: 'NOT_REQUIRED' | 'PENDING' | 'SENT' | 'ACKNOWLEDGED';
   customerCommNotes: string | null;
+  customerNotifiedAt: string | null;
   remarks: string | null;
+  decision: Decision | null;
+  assessment: string | null;
+  riskApprover: string | null;
+  riskExpiresAt: string | null;
   environments: ApiActionEnvironment[];
   progress: { done: number; total: number };
   unverifiedCompletion: boolean;
@@ -384,7 +407,14 @@ export class Api {
 
   updateTechnology(
     id: string,
-    body: { name?: string; componentType?: string; vendor?: string; cycleRule?: string; notes?: string },
+    body: {
+      name?: string;
+      componentType?: string;
+      scope?: ComponentScope;
+      vendor?: string;
+      cycleRule?: string;
+      notes?: string;
+    },
   ) {
     return this.http.patch<ApiTechnology>(`/api/v1/technologies/${id}`, body);
   }
@@ -404,6 +434,22 @@ export class Api {
   deleteCycle(cycleId: string) {
     return this.http.delete<void>(`/api/v1/technologies/cycles/${cycleId}`);
   }
+
+  updateCustomer(
+    id: string,
+    body: {
+      contact?: string | null;
+      notes?: string | null;
+      commercialModel?: CommercialModel | null;
+      contractStart?: string | null;
+      contractEnd?: string | null;
+    },
+  ) {
+    return this.http.patch<ApiCustomer>(`/api/v1/customers/${id}`, body);
+  }
+
+  readonly customersResource = httpResource<ApiCustomer[]>(() => '/api/v1/customers');
+  readonly customers = computed(() => this.customersResource.value() ?? []);
 
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
   readonly usersResource = httpResource<ApiUser[]>(() => '/api/v1/users');
@@ -510,6 +556,7 @@ export class Api {
 
   reload(): void {
     this.projectsResource.reload();
+    this.customersResource.reload();
     this.technologiesResource.reload();
     this.usersResource.reload();
     this.actionsResource.reload();

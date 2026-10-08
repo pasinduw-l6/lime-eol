@@ -9,6 +9,7 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 export const ACTION_STATUSES = [
@@ -26,7 +27,43 @@ export const COMM_STATUSES = [
   'ACKNOWLEDGED',
 ] as const;
 
-export class CreateUpgradeActionDto {
+export const DECISIONS = ['UPGRADE', 'EXTENDED_SUPPORT', 'ACCEPT_RISK', 'COMMERCIAL_QUOTE'] as const;
+
+export class ProcessFieldsDto {
+  @ApiPropertyOptional({ enum: DECISIONS, nullable: true })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn(DECISIONS)
+  decision?: (typeof DECISIONS)[number] | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Impact, compatibility and effort' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(4000)
+  assessment?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Who signed off an accepted risk' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(200)
+  riskApprover?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: '2027-03-31' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsISO8601()
+  riskExpiresAt?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: '2026-10-08' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsISO8601()
+  customerNotifiedAt?: string | null;
+}
+
+export class CreateUpgradeActionDto extends ProcessFieldsDto {
   @ApiProperty({ description: 'The cycle running out of support' })
   @IsUUID()
   technologyCycleId!: string;

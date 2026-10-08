@@ -73,6 +73,23 @@ enum ProjectStatus {
   PAUSED
 }
 
+enum CommercialModel {
+  SUBSCRIPTION
+  LICENSE
+}
+
+enum ComponentScope {
+  INFRASTRUCTURE
+  APPLICATION
+}
+
+enum Decision {
+  UPGRADE
+  EXTENDED_SUPPORT
+  ACCEPT_RISK
+  COMMERCIAL_QUOTE
+}
+
 enum Channel {
   EMAIL
   TEAMS
@@ -98,6 +115,7 @@ model Technology {
   id            String        @id @default(uuid(7)) @db.Uuid
   name          String        @unique
   componentType ComponentType @map("component_type")
+  scope         ComponentScope @default(INFRASTRUCTURE)
   vendor        String?
   eolSlug       String?       @unique @map("eol_slug")
   cycleRule     CycleRule     @default(MAJOR) @map("cycle_rule")
@@ -218,6 +236,9 @@ model Customer {
   name       String    @unique
   code       String?   @unique
   contact    String?
+  commercialModel CommercialModel? @map("commercial_model")
+  contractStart   DateTime?        @map("contract_start") @db.Date
+  contractEnd     DateTime?        @map("contract_end") @db.Date
   notes      String?
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -422,6 +443,11 @@ model UpgradeAction {
   jiraSyncError     String?      @map("jira_sync_error")
   customerComm      CommStatus   @default(NOT_REQUIRED) @map("customer_comm")
   customerCommNotes String?      @map("customer_comm_notes")
+  customerNotifiedAt DateTime?   @map("customer_notified_at") @db.Date
+  decision          Decision?
+  assessment        String?
+  riskApprover      String?      @map("risk_approver")
+  riskExpiresAt     DateTime?    @map("risk_expires_at") @db.Date
   remarks           String?
   createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)

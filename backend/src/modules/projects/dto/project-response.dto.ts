@@ -83,6 +83,9 @@ export class ProjectDto {
   @ApiProperty({ example: 'Siyapatha' })
   customer!: string;
 
+  @ApiProperty()
+  customerId!: string;
+
   @ApiProperty({ example: 'SYP' })
   code!: string;
 

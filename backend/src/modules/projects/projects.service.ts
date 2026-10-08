@@ -60,6 +60,7 @@ export class ProjectsService {
         id: project.id,
         name: project.name,
         customer: project.customer.name,
+        customerId: project.customerId,
         code: project.code,
         limeVersion: project.limeVersion,
         status: project.status,
@@ -208,6 +209,7 @@ export class ProjectsService {
       create: {
         name: LIME_TECHNOLOGY,
         componentType: 'FRAMEWORK',
+        scope: 'APPLICATION',
         vendor: 'LinearSix',
         eolSlug: null,
         cycleRule: 'MAJOR_MINOR',

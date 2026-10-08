@@ -59,6 +59,7 @@ export class RegistryStore {
       id: t.id,
       name: t.name,
       componentType: t.componentType as Technology['componentType'],
+      scope: t.scope,
       vendor: t.vendor,
       eolSlug: t.eolSlug,
       cycleRule: t.cycleRule as Technology['cycleRule'],

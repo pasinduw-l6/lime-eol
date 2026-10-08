@@ -74,6 +74,11 @@ export class UpgradeActionsService {
         customerComm: (input.customerComm ?? 'NOT_REQUIRED') as CommStatus,
         customerCommNotes: input.customerCommNotes ?? null,
         remarks: input.remarks ?? null,
+        decision: input.decision ?? null,
+        assessment: input.assessment?.trim() || null,
+        riskApprover: input.riskApprover?.trim() || null,
+        riskExpiresAt: toDate(input.riskExpiresAt ?? undefined),
+        customerNotifiedAt: toDate(input.customerNotifiedAt ?? undefined),
         deployments: {
           create: input.deploymentIds.map((deploymentId) => ({ deploymentId })),
         },
@@ -137,6 +142,16 @@ export class UpgradeActionsService {
         customerComm: input.customerComm as CommStatus | undefined,
         customerCommNotes: input.customerCommNotes,
         remarks: input.remarks,
+        decision: input.decision,
+        assessment: input.assessment === undefined ? undefined : input.assessment?.trim() || null,
+        riskApprover:
+          input.riskApprover === undefined ? undefined : input.riskApprover?.trim() || null,
+        riskExpiresAt:
+          input.riskExpiresAt === undefined ? undefined : toDate(input.riskExpiresAt ?? undefined),
+        customerNotifiedAt:
+          input.customerNotifiedAt === undefined
+            ? undefined
+            : toDate(input.customerNotifiedAt ?? undefined),
       },
       include: ACTION_INCLUDE,
     });
@@ -256,7 +271,12 @@ export class UpgradeActionsService {
       jiraSubtaskTotal: action.jiraSubtaskTotal,
       customerComm: action.customerComm,
       customerCommNotes: action.customerCommNotes,
+      customerNotifiedAt: isoDate(action.customerNotifiedAt),
       remarks: action.remarks,
+      decision: action.decision,
+      assessment: action.assessment,
+      riskApprover: action.riskApprover,
+      riskExpiresAt: isoDate(action.riskExpiresAt),
       environments,
       progress: { done, total: environments.length },
       unverifiedCompletion:

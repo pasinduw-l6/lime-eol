@@ -9,7 +9,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Api, ApiUpgradeAction } from '../../core/api';
+import { Api, ApiUpgradeAction, Decision } from '../../core/api';
+import { DECISIONS } from '../../core/process';
 import { formatDate, formatDays, statusFill, SupportStatus } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
@@ -32,6 +33,13 @@ interface Draft {
   plannedDate: string;
   assigneeId: string;
   deploymentIds: string[];
+  decision: Decision | '';
+  assessment: string;
+  riskApprover: string;
+  riskExpiresAt: string;
+  customerComm: ApiUpgradeAction['customerComm'];
+  customerNotifiedAt: string;
+  customerCommNotes: string;
 }
 
 @Component({
@@ -198,6 +206,65 @@ interface Draft {
             </label>
           </div>
 
+          <fieldset class="m-0 grid gap-3 rounded-lg border p-4">
+            <legend class="px-1 text-sm font-medium">Process</legend>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                Decision
+                <select hlmInput [(ngModel)]="form.decision" name="decision">
+                  <option value="">Not decided yet</option>
+                  @for (d of decisions; track d.key) {
+                    <option [value]="d.key">{{ d.label }} — {{ d.hint }}</option>
+                  }
+                </select>
+              </label>
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                Customer notice
+                <select hlmInput [(ngModel)]="form.customerComm" name="comm">
+                  <option value="NOT_REQUIRED">Not required</option>
+                  <option value="PENDING">To send</option>
+                  <option value="SENT">Sent</option>
+                  <option value="ACKNOWLEDGED">Acknowledged</option>
+                </select>
+              </label>
+            </div>
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+              Assessment
+              <textarea
+                hlmInput
+                rows="2"
+                class="h-auto py-2"
+                [(ngModel)]="form.assessment"
+                name="assessment"
+                placeholder="Impact, compatibility with Lime, effort"
+              ></textarea>
+            </label>
+            @if (form.decision === 'ACCEPT_RISK') {
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                  Risk approved by
+                  <input hlmInput [(ngModel)]="form.riskApprover" name="approver" placeholder="Name and role" />
+                </label>
+                <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                  Acceptance expires
+                  <input type="date" hlmInput [(ngModel)]="form.riskExpiresAt" name="expires" />
+                </label>
+              </div>
+            }
+            @if (form.customerComm === 'SENT' || form.customerComm === 'ACKNOWLEDGED') {
+              <div class="grid gap-3 sm:grid-cols-2">
+                <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                  Customer notified on
+                  <input type="date" hlmInput [(ngModel)]="form.customerNotifiedAt" name="notified" />
+                </label>
+                <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                  Notice notes
+                  <input hlmInput [(ngModel)]="form.customerCommNotes" name="commnotes" placeholder="Who, which channel" />
+                </label>
+              </div>
+            }
+          </fieldset>
+
           <fieldset class="m-0 border-0 p-0">
             <legend class="mb-2 p-0 text-[12px] text-ink-soft">Environments affected</legend>
             <div class="scroll-hidden flex max-h-[150px] flex-wrap gap-2 overflow-y-auto">
@@ -282,6 +349,7 @@ export class Actions {
   }
 
   protected readonly statuses = STATUSES;
+  protected readonly decisions = DECISIONS;
   protected readonly filters = ['ALL', 'OPEN', 'OVERDUE', 'COMPLETED'] as const;
 
   protected readonly query = signal('');
@@ -384,6 +452,13 @@ export class Actions {
       plannedDate: action.plannedDate ?? '',
       assigneeId: action.assignee?.id ?? '',
       deploymentIds: action.environments.map((e) => e.deploymentId),
+      decision: action.decision ?? '',
+      assessment: action.assessment ?? '',
+      riskApprover: action.riskApprover ?? '',
+      riskExpiresAt: action.riskExpiresAt ?? '',
+      customerComm: action.customerComm,
+      customerNotifiedAt: action.customerNotifiedAt ?? '',
+      customerCommNotes: action.customerCommNotes ?? '',
     });
   }
 
@@ -427,6 +502,13 @@ export class Actions {
       assigneeId: form.assigneeId || undefined,
       plannedDate: form.plannedDate || undefined,
       status: form.status,
+      decision: form.decision || null,
+      assessment: form.assessment.trim() || null,
+      riskApprover: form.decision === 'ACCEPT_RISK' ? form.riskApprover.trim() || null : null,
+      riskExpiresAt: form.decision === 'ACCEPT_RISK' ? form.riskExpiresAt || null : null,
+      customerComm: form.customerComm,
+      customerNotifiedAt: form.customerNotifiedAt || null,
+      customerCommNotes: form.customerCommNotes.trim() || null,
     };
 
     this.saving.set(true);
@@ -516,5 +598,12 @@ function blank(): Draft {
     plannedDate: '',
     assigneeId: '',
     deploymentIds: [],
+    decision: '',
+    assessment: '',
+    riskApprover: '',
+    riskExpiresAt: '',
+    customerComm: 'PENDING',
+    customerNotifiedAt: '',
+    customerCommNotes: '',
   };
 }

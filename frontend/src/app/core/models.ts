@@ -20,6 +20,7 @@ export interface Technology {
   id: string;
   name: string;
   componentType: ComponentType;
+  scope: 'INFRASTRUCTURE' | 'APPLICATION';
   vendor: string | null;
   eolSlug: string | null;
   cycleRule: CycleRule;

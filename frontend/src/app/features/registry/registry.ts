@@ -358,10 +358,23 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
               </select>
             </label>
           </div>
-          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-            Vendor
-            <input hlmInput [(ngModel)]="form.vendor" name="vendor" />
-          </label>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+              Scope
+              <select hlmInput [(ngModel)]="form.scope" name="scope">
+                <option value="INFRASTRUCTURE">Infrastructure component</option>
+                <option value="APPLICATION">Application dependency</option>
+              </select>
+            </label>
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+              Vendor
+              <input hlmInput [(ngModel)]="form.vendor" name="vendor" />
+            </label>
+          </div>
+          <p class="m-0 -mt-2 text-[12px] text-muted-foreground">
+            Scope decides who covers an upgrade: infrastructure under the subscription,
+            application dependencies through Lime releases.
+          </p>
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Cycle rule
             <select hlmInput [(ngModel)]="form.cycleRule" name="rule">
@@ -590,6 +603,7 @@ export class Registry {
       .updateTechnology(form.id, {
         name: form.name.trim(),
         componentType: form.componentType,
+        scope: form.scope,
         vendor: form.vendor ?? '',
         cycleRule: form.cycleRule,
         notes: form.notes ?? '',

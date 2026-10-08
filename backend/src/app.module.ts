@@ -5,6 +5,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { EditorGuard } from './modules/auth/guards/editor.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { CustomersModule } from './modules/customers/customers.module';
 import { DeploymentsModule } from './modules/deployments/deployments.module';
 import { EolSyncModule } from './modules/eol-sync/eol-sync.module';
 import { HealthModule } from './modules/health/health.module';
@@ -24,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
     HealthModule,
     EolSyncModule,
     ProjectsModule,
+    CustomersModule,
     TechnologiesModule,
     DeploymentsModule,
     UsersModule,

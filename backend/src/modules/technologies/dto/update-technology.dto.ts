@@ -2,6 +2,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { COMPONENT_TYPES, CYCLE_RULES } from './create-technology.dto';
 
+export const SCOPES = ['INFRASTRUCTURE', 'APPLICATION'] as const;
+
 export class UpdateTechnologyDto {
   @ApiPropertyOptional({ example: 'MongoDB' })
   @IsOptional()
@@ -14,6 +16,14 @@ export class UpdateTechnologyDto {
   @IsOptional()
   @IsIn(COMPONENT_TYPES)
   componentType?: (typeof COMPONENT_TYPES)[number];
+
+  @ApiPropertyOptional({
+    enum: SCOPES,
+    description: 'Infrastructure component, or application dependency shipped through Lime releases',
+  })
+  @IsOptional()
+  @IsIn(SCOPES)
+  scope?: (typeof SCOPES)[number];
 
   @ApiPropertyOptional({ example: 'MongoDB Inc.' })
   @IsOptional()
