@@ -64,6 +64,18 @@ export class TechnologiesController {
     return this.technologies.deleteCycle(cycleId);
   }
 
+  @Get('archived')
+  @ApiOperation({ summary: 'Archived technologies, newest first' })
+  archived() {
+    return this.technologies.findArchived();
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({ summary: 'Restore an archived technology' })
+  restore(@Param('id') id: string) {
+    return this.technologies.restore(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'One technology with its cycles and versions' })
   findOne(@Param('id') id: string) {

@@ -17,6 +17,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { DeploymentsService } from './deployments.service';
+import { SetOwnersDto } from './dto/owners.dto';
 import { ChangeComponentDto, ComponentChangeDto } from './dto/change-component.dto';
 import {
   AuthenticatedUser,
@@ -100,6 +101,13 @@ export class DeploymentsController {
     @Query('currentVersion') currentVersion?: string,
   ) {
     return this.deployments.versionsFor(technology, currentVersion);
+  }
+
+  @Patch(':id/owners')
+  @ApiOperation({ summary: 'Set which teams own an environment', description: 'The first team is the primary owner.' })
+  @ApiParam({ name: 'id', description: 'Environment (deployment) id' })
+  setOwners(@Param('id') id: string, @Body() body: SetOwnersDto) {
+    return this.deployments.setOwners(id, body.teamIds);
   }
 
   @Delete(':id')

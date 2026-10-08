@@ -15,16 +15,15 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
       where: { email: engineer.email },
       update: {
         displayName: engineer.displayName,
-        role: Role.EDITOR,
         isActive: true,
       },
       create: {
         email: engineer.email,
         displayName: engineer.displayName,
-        role: Role.EDITOR,
+        role: Role.SRE,
       },
     });
   }
 
-  console.log(`  users: ${ENGINEERS.length} engineers (EDITOR)`);
+  console.log(`  users: ${ENGINEERS.length} engineers (SRE)`);
 }

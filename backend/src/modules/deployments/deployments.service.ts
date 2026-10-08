@@ -233,6 +233,28 @@ export class DeploymentsService {
     }
   }
 
+  async setOwners(id: string, teamIds: string[]): Promise<{ id: string; owners: string[] }> {
+    const deployment = await this.prisma.deployment.findFirst({ where: { id, archivedAt: null } });
+    if (!deployment) {
+      throw new NotFoundException(`No environment "${id}"`);
+    }
+
+    const ids = [...new Set(teamIds)];
+    const teams = await this.prisma.team.findMany({ where: { id: { in: ids }, archivedAt: null } });
+    if (teams.length !== ids.length) {
+      throw new BadRequestException('Every owner must be an active team.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.deploymentOwner.deleteMany({ where: { deploymentId: id } }),
+      this.prisma.deploymentOwner.createMany({
+        data: ids.map((teamId, index) => ({ deploymentId: id, teamId, isPrimary: index === 0 })),
+      }),
+    ]);
+
+    return { id, owners: ids.map((teamId) => teams.find((t) => t.id === teamId)!.name) };
+  }
+
   async archive(id: string): Promise<void> {
     const deployment = await this.prisma.deployment.findFirst({
       where: { id, archivedAt: null },

@@ -5,6 +5,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { CAN } from '../can.decorator';
+import { can, Permission } from '../permissions';
 import { IS_PUBLIC } from '../public.decorator';
 
 const READ_ONLY = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -14,17 +16,15 @@ export class EditorGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isPublic) {
+    const targets = [context.getHandler(), context.getClass()];
+
+    if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) {
       return true;
     }
 
     const request = context.switchToHttp().getRequest<{
       method: string;
-      user?: { role?: string; email?: string };
+      user?: { role?: string };
     }>();
 
     if (READ_ONLY.has(request.method)) {
@@ -36,10 +36,12 @@ export class EditorGuard implements CanActivate {
       throw new ForbiddenException('Not signed in.');
     }
 
-    if (role === 'VIEWER') {
-      throw new ForbiddenException(
-        'Your account can view the registry but not change it.',
-      );
+    const required = this.reflector.getAllAndOverride<Permission[]>(CAN, targets) ?? [
+      'estate:write',
+    ];
+
+    if (!required.some((permission) => can(role, permission))) {
+      throw new ForbiddenException('Your role does not allow that change.');
     }
 
     return true;

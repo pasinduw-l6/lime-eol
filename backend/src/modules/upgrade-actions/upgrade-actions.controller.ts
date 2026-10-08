@@ -22,6 +22,8 @@ import {
   UpdateUpgradeActionDto,
 } from './dto/upgrade-action.dto';
 import { UpgradeActionsService } from './upgrade-actions.service';
+import { Can } from '../auth/can.decorator';
+import { AuthenticatedUser, CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('upgrade-actions')
 @Controller('upgrade-actions')
@@ -57,9 +59,18 @@ export class UpgradeActionsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Change a plan' })
-  update(@Param('id') id: string, @Body() body: UpdateUpgradeActionDto) {
-    return this.actions.update(id, body);
+  @Can('estate:write', 'plan:notice', 'plan:decision', 'plan:assess')
+  @ApiOperation({
+    summary: 'Change a plan',
+    description:
+      'Each field belongs to a role: notice fields to the BA team, the decision to account managers, the assessment to Product, the rest to SRE / DevOps.',
+  })
+  update(
+    @Param('id') id: string,
+    @Body() body: UpdateUpgradeActionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.actions.update(id, body, user.role);
   }
 
   @Post(':id/environments/complete')

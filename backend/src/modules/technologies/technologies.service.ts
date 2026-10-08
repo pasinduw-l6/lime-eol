@@ -64,6 +64,30 @@ export class TechnologiesService {
     return this.toDto(technology);
   }
 
+  async findArchived() {
+    const technologies = await this.prisma.technology.findMany({
+      where: { archivedAt: { not: null } },
+      orderBy: { archivedAt: 'desc' },
+    });
+    return technologies.map((t) => ({
+      id: t.id,
+      name: t.name,
+      componentType: t.componentType,
+      archivedAt: t.archivedAt?.toISOString() ?? null,
+    }));
+  }
+
+  async restore(id: string) {
+    const technology = await this.prisma.technology.findFirst({
+      where: { id, archivedAt: { not: null } },
+    });
+    if (!technology) {
+      throw new NotFoundException(`No archived technology "${id}"`);
+    }
+    await this.prisma.technology.update({ where: { id }, data: { archivedAt: null } });
+    return this.findOne(id);
+  }
+
   async update(id: string, input: UpdateTechnologyDto) {
     await this.findOne(id);
 

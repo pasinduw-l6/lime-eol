@@ -8,6 +8,10 @@ export const authConfig = registerAs(AUTH_CONFIG_KEY, () => {
 
   return {
     sessionSecret: env.SESSION_SECRET,
+    bootstrapAdmins: (env.BOOTSTRAP_ADMINS ?? '')
+      .split(',')
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
     oidcWeb: resolveOidcWeb(env),
   };
 });

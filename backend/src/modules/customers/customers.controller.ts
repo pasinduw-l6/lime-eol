@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CustomersService } from './customers.service';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import { Can } from '../auth/can.decorator';
 
 @ApiTags('customers')
 @Controller('customers')
@@ -15,6 +16,7 @@ export class CustomersController {
   }
 
   @Patch(':id')
+  @Can('customer:write')
   @ApiOperation({
     summary: 'Change a customer',
     description: 'The commercial model decides whether an upgrade is included or quoted.',

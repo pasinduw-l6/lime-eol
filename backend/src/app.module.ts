@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditInterceptor } from './modules/audit/audit.interceptor';
 import { AppConfigModule } from './config/config.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EditorGuard } from './modules/auth/guards/editor.guard';
@@ -12,6 +13,7 @@ import { HealthModule } from './modules/health/health.module';
 import { IssueTrackerModule } from './modules/issue-tracker/issue-tracker.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { TeamsModule } from './modules/teams/teams.module';
 import { TechnologiesModule } from './modules/technologies/technologies.module';
 import { UpgradeActionsModule } from './modules/upgrade-actions/upgrade-actions.module';
 import { UsersModule } from './modules/users/users.module';
@@ -29,6 +31,7 @@ import { PrismaModule } from './prisma/prisma.module';
     TechnologiesModule,
     DeploymentsModule,
     UsersModule,
+    TeamsModule,
     NotificationsModule,
     UpgradeActionsModule,
     IssueTrackerModule,
@@ -37,6 +40,7 @@ import { PrismaModule } from './prisma/prisma.module';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: EditorGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
 export class AppModule {}

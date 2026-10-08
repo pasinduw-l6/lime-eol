@@ -1,6 +1,7 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@prisma/client';
+import { authConfig, AuthConfig } from '../../config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SessionDto } from './dto/auth.dto';
 
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    @Inject(authConfig.KEY) private readonly config: AuthConfig,
   ) {}
 
   async sessionForExternalIdentity(
@@ -33,6 +35,9 @@ export class AuthService {
         },
       }));
 
+    const promote =
+      user.role !== Role.ADMIN && this.config.bootstrapAdmins.includes(address);
+
     if (!user.isActive) {
       throw new UnauthorizedException(
         'That account is deactivated. Ask an administrator to restore it.',
@@ -43,6 +48,7 @@ export class AuthService {
       where: { id: user.id },
       data: {
         lastLoginAt: new Date(),
+        role: promote ? Role.ADMIN : undefined,
         displayName: user.displayName ?? displayName ?? null,
       },
     });
@@ -51,13 +57,13 @@ export class AuthService {
 
     return {
       token: this.jwt.sign(
-        { sub: user.id, email: user.email, role: user.role },
+        { sub: user.id, email: user.email, role: promote ? Role.ADMIN : user.role },
         { expiresIn: TOKEN_TTL_SECONDS },
       ),
       id: user.id,
       email: user.email,
       displayName: name,
-      role: user.role,
+      role: promote ? Role.ADMIN : user.role,
       initials: initialsOf(name),
       expiresAt: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString(),
     };

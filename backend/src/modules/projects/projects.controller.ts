@@ -107,6 +107,22 @@ export class ProjectsController {
     return this.projects.setEngineers(id, body.engineerIds, body.leadId);
   }
 
+  @Get('archived')
+  @ApiOperation({ summary: 'Archived projects, newest first' })
+  archived() {
+    return this.projects.findArchived();
+  }
+
+  @Post(':id/restore')
+  @ApiOperation({
+    summary: 'Restore an archived project',
+    description: 'Its environments archived with it come back too.',
+  })
+  @ApiOkResponse({ type: ProjectDto })
+  restore(@Param('id') id: string): Promise<ProjectDto> {
+    return this.projects.restore(id);
+  }
+
   @Get(':id/activity')
   @ApiOperation({
     summary: 'Everything recorded across a project, newest first',

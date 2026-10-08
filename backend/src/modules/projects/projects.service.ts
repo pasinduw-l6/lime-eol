@@ -256,6 +256,40 @@ export class ProjectsService {
     ]);
   }
 
+  async findArchived() {
+    const projects = await this.prisma.project.findMany({
+      where: { archivedAt: { not: null } },
+      orderBy: { archivedAt: 'desc' },
+      include: { customer: true },
+    });
+    return projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      code: p.code,
+      customer: p.customer.name,
+      archivedAt: p.archivedAt?.toISOString() ?? null,
+    }));
+  }
+
+  async restore(id: string): Promise<ProjectDto> {
+    const project = await this.prisma.project.findFirst({
+      where: { id, archivedAt: { not: null } },
+    });
+    if (!project) {
+      throw new NotFoundException(`No archived project "${id}"`);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.deployment.updateMany({
+        where: { projectId: id, archivedAt: project.archivedAt },
+        data: { archivedAt: null },
+      }),
+      this.prisma.project.update({ where: { id }, data: { archivedAt: null } }),
+    ]);
+
+    return this.findOne(id);
+  }
+
   async addEnvironment(
     projectId: string,
     input: AddEnvironmentDto,

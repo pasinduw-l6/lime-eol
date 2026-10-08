@@ -29,6 +29,7 @@ export const envSchema = z
       .min(1, 'OIDC_WEB_CLIENT_SECRET is required'),
     OIDC_WEB_REDIRECT_URI: blankable(z.string().url().optional()),
     SESSION_SECRET: z.string().min(1, 'SESSION_SECRET is required'),
+    BOOTSTRAP_ADMINS: blankable(z.string().optional()),
 
     EOL_API_BASE: z.string().url().default('https://endoflife.date/api/v1'),
     SYNC_CRON: z.string().default('0 2 * * *'),

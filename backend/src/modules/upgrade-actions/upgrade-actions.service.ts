@@ -4,8 +4,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ActionStatus, CommStatus } from '@prisma/client';
+import { can, Permission } from '../auth/permissions';
 import { jiraConfig, JiraConfig } from '../../config';
 import { IssueTrackerService } from '../issue-tracker/issue-tracker.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -107,8 +109,9 @@ export class UpgradeActionsService {
     }
   }
 
-  async update(id: string, input: UpdateUpgradeActionDto) {
+  async update(id: string, input: UpdateUpgradeActionDto, role?: string) {
     await this.findOne(id);
+    assertFieldsAllowed(input, role);
 
     if (input.deploymentIds) {
       await this.prisma.$transaction([
@@ -347,6 +350,28 @@ function today(): Date {
   return new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
+}
+
+const FIELD_PERMISSION: Partial<Record<keyof UpdateUpgradeActionDto, Permission>> = {
+  customerComm: 'plan:notice',
+  customerCommNotes: 'plan:notice',
+  customerNotifiedAt: 'plan:notice',
+  decision: 'plan:decision',
+  riskApprover: 'plan:decision',
+  riskExpiresAt: 'plan:decision',
+  assessment: 'plan:assess',
+};
+
+function assertFieldsAllowed(input: UpdateUpgradeActionDto, role?: string): void {
+  if (role === undefined) return;
+
+  const refused = (Object.keys(input) as (keyof UpdateUpgradeActionDto)[])
+    .filter((field) => input[field] !== undefined)
+    .filter((field) => !can(role, FIELD_PERMISSION[field] ?? 'estate:write'));
+
+  if (refused.length > 0) {
+    throw new ForbiddenException(`Your role cannot change: ${refused.join(', ')}.`);
+  }
 }
 
 function toDate(value?: string | null): Date | null {

@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { authConfig, AuthConfig } from '../../../config';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 export interface JwtClaims {
   sub: string;
@@ -11,7 +12,10 @@ export interface JwtClaims {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(@Inject(authConfig.KEY) config: AuthConfig) {
+  constructor(
+    @Inject(authConfig.KEY) config: AuthConfig,
+    private readonly prisma: PrismaService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -19,7 +23,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  validate(claims: JwtClaims) {
-    return { id: claims.sub, email: claims.email, role: claims.role };
+  async validate(claims: JwtClaims) {
+    const user = await this.prisma.appUser.findUnique({
+      where: { id: claims.sub },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('That account is no longer active.');
+    }
+
+    return { id: user.id, email: user.email, role: user.role };
   }
 }
