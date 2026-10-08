@@ -8,6 +8,7 @@ export interface JwtClaims {
   sub: string;
   email: string;
   role: string;
+  purpose?: 'report';
 }
 
 @Injectable()
@@ -33,6 +34,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('That account is no longer active.');
     }
 
-    return { id: user.id, email: user.email, role: user.role };
+    return {
+      id: user.id,
+      email: user.email,
+      role: claims.purpose === 'report' ? 'VIEWER' : user.role,
+    };
   }
 }

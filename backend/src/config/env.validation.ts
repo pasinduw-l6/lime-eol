@@ -31,6 +31,8 @@ export const envSchema = z
     SESSION_SECRET: z.string().min(1, 'SESSION_SECRET is required'),
     BOOTSTRAP_ADMINS: blankable(z.string().optional()),
     PREVIEW_LOGIN: booleanish.default(false),
+    GOTENBERG_URL: z.string().url().default('http://gotenberg:3000'),
+    REPORT_BASE_URL: z.string().url().default('http://web'),
 
     EOL_API_BASE: z.string().url().default('https://endoflife.date/api/v1'),
     SYNC_CRON: z.string().default('0 2 * * *'),

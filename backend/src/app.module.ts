@@ -3,6 +3,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './modules/audit/audit.interceptor';
 import { AuditModule } from './modules/audit/audit.module';
 import { LimeReleasesModule } from './modules/lime-releases/lime-releases.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { AppConfigModule } from './config/config.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EditorGuard } from './modules/auth/guards/editor.guard';
@@ -36,6 +37,7 @@ import { PrismaModule } from './prisma/prisma.module';
     TeamsModule,
     AuditModule,
     LimeReleasesModule,
+    ReportsModule,
     NotificationsModule,
     UpgradeActionsModule,
     IssueTrackerModule,

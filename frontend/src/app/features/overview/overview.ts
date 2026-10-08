@@ -1,4 +1,5 @@
-import { Component, computed, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -7,6 +8,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { NOTICE_DAYS, parseDate, today } from '../../core/lifecycle';
 import { Cycle, EnvironmentName, Project } from '../../core/models';
+import { Feedback } from '../../core/feedback';
 import { RegistryStore } from '../../core/registry.store';
 import { humanGap } from '../../core/relative-time';
 import { TechIcon } from '../../shared/tech-icon';
@@ -125,14 +127,22 @@ function addMonths(date: Date, months: number): Date {
           <h1 class="m-0 mt-2 text-3xl font-semibold tracking-tight">{{ p.customer }}</h1>
           <p class="m-0 mt-1 text-base text-muted-foreground">{{ p.name }}</p>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-muted-foreground">As of {{ longDate(asOf) }}</span>
-          <button type="button" hlmBtn variant="outline" size="sm" class="no-print gap-1.5" (click)="print()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z" stroke-linejoin="round" />
-            </svg>
-            Print or save as PDF
-          </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="mr-1 text-sm text-muted-foreground">As of {{ longDate(asOf) }}</span>
+          @if (!projectId()) {
+            <button type="button" hlmBtn variant="outline" size="sm" class="no-print gap-1.5" [disabled]="downloading()" (click)="download('project', p.id)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              Project PDF
+            </button>
+            <button type="button" hlmBtn size="sm" class="no-print gap-1.5" [disabled]="downloading() || !customerId()" (click)="download('customer', customerId()!)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              {{ downloading() ? 'Preparing PDF…' : p.customer + ' PDF' }}
+            </button>
+          }
         </div>
       </header>
 
@@ -419,19 +429,63 @@ export class Overview {
     { phase: 'ended', meaning: 'The vendor no longer releases any fixes, including security fixes.' },
   ];
 
-  protected readonly project = computed<Project | null>(() => this.store.activeProject());
+  private readonly http = inject(HttpClient);
+  private readonly feedback = inject(Feedback);
+
+  readonly projectId = input<string | null>(null);
+
+  protected readonly downloading = signal(false);
+
+  protected readonly project = computed<Project | null>(() => {
+    const id = this.projectId();
+    return id ? (this.store.projects().find((p) => p.id === id) ?? null) : this.store.activeProject();
+  });
+
+  protected readonly customerId = computed(() => {
+    const project = this.project();
+    return project ? (this.store.apiProject(project.id)?.customerId ?? null) : null;
+  });
+
+  private readonly deployments = computed(() => {
+    const project = this.project();
+    return project ? this.store.deploymentsOf(project.id) : [];
+  });
 
   protected readonly envList = computed<EnvironmentName[]>(() => {
-    const present = new Set(this.store.deployments().map((d) => d.environment));
+    const present = new Set(this.deployments().map((d) => d.environment));
     return ENV_ORDER.filter((e) => present.has(e));
   });
+
+  protected download(kind: 'project' | 'customer', id: string): void {
+    this.downloading.set(true);
+    this.http
+      .get(`/api/v1/reports/${kind}/${id}.pdf`, { responseType: 'blob', observe: 'response' })
+      .subscribe({
+        next: (response) => {
+          this.downloading.set(false);
+          const disposition = response.headers.get('Content-Disposition') ?? '';
+          const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'Lime-Lifecycle.pdf';
+          const url = URL.createObjectURL(response.body!);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = name;
+          link.click();
+          URL.revokeObjectURL(url);
+        },
+        error: () => {
+          this.downloading.set(false);
+          this.feedback.error('The PDF could not be generated. Check that the PDF service is running.');
+        },
+      });
+  }
 
   protected readonly cards = computed<DetailCard[]>(() => {
     const now = today().getTime();
     const byCycle = new Map<string, DetailCard & { cycle: Cycle | null }>();
 
-    for (const deployment of this.store.deployments()) {
+    for (const deployment of this.deployments()) {
       for (const component of deployment.components) {
+        if (component.technology === 'Lime') continue;
         const resolved = this.store.resolve(component.technology, component.version);
         const key = resolved.cycle?.id ?? `${component.technology}@${component.version}`;
         const existing = byCycle.get(key);

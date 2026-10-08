@@ -10,6 +10,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login').then((m) => m.Login),
   },
   {
+    path: 'report/:kind/:id',
+    title: 'Report · Lime Lifecycle',
+    loadComponent: () => import('./features/report/report').then((m) => m.Report),
+  },
+  {
     path: 'auth/callback',
     title: 'Signing in · Lime Lifecycle',
     loadComponent: () =>

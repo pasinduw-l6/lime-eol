@@ -53,6 +53,14 @@ services:
       api:
         condition: service_started
 
+  gotenberg:
+    image: gotenberg/gotenberg:8-chromium
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --api-timeout=120s
+      - --chromium-auto-start=true
+
   pgadmin:
     image: dpage/pgadmin4
     profiles: ["tools"]

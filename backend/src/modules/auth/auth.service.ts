@@ -69,6 +69,10 @@ export class AuthService {
     };
   }
 
+  reportToken(userId: string): string {
+    return this.jwt.sign({ sub: userId, email: '', role: 'VIEWER', purpose: 'report' }, { expiresIn: 180 });
+  }
+
   async previewAccounts() {
     if (!this.config.previewLogin) {
       return { enabled: false, users: [] };
