@@ -6,6 +6,7 @@ import { RegistryStore } from '../../core/registry.store';
 import { ComponentType, Cycle, CycleRule, Technology } from '../../core/models';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
@@ -43,13 +44,13 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
 
 @Component({
   selector: 'lime-registry',
-  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, TechIcon],
+  imports: [HlmAlertImports, HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, TechIcon],
   host: { class: 'block' },
   template: `
-    <section hlmCard class="mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Registry</h1>
-        <p class="m-0 text-[14px] text-ink-soft">
+        <h1 class="m-0 text-3xl font-semibold tracking-tight">Registry</h1>
+        <p class="m-0 mt-1 text-sm text-muted-foreground">
           {{ technologies().length }} technologies · {{ cycleCount() }} cycles ·
           {{ engineers().length }} engineers
         </p>
@@ -57,10 +58,10 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
       <button type="button" hlmBtn (click)="openCatalogue()">
         Add technology
       </button>
-    </section>
+    </header>
 
     @if (error(); as message) {
-      <p hlmCard class="block mb-5 px-7 py-4 text-[14px] text-overdue" role="alert">{{ message }}</p>
+      <p hlmAlert variant="destructive" class="mb-5">{{ message }}</p>
     }
 
     <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">

@@ -41,8 +41,8 @@ const ICONS: Record<Severity, string> = {
   host: { class: 'block' },
   template: `
     <header class="mb-6">
-      <h1 class="m-0 text-[26px] font-semibold tracking-[-0.02em]">Operations</h1>
-      <p class="mt-1 mb-0 text-[14px] text-ink-soft">
+      <h1 class="m-0 text-3xl font-semibold tracking-tight">Operations</h1>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
         Send any notification, as often as you like. Nothing here is recorded,
         so it never silences the scheduled messages.
       </p>

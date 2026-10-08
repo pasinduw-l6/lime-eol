@@ -8,14 +8,14 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
   imports: [HlmCardImports, Schedule, Registry],
   host: { class: 'block' },
   template: `
-    <nav hlmCard class="mb-5 flex flex-wrap gap-1 px-5 py-3" aria-label="Lifecycle views">
+    <nav class="segmented mb-6" aria-label="Lifecycle views">
       @for (tab of tabs; track tab.key) {
         <button
           type="button"
-          class="rounded-full px-4 py-1.5 text-[13px]"
-          [class.bg-ink]="view() === tab.key"
-          [class.text-ground]="view() === tab.key"
-          [class.text-ink-soft]="view() !== tab.key"
+          class="px-4 py-1 text-sm"
+          [class.bg-background]="view() === tab.key"
+          [class.shadow-sm]="view() === tab.key"
+          [class.text-foreground]="view() === tab.key"
           [attr.aria-current]="view() === tab.key"
           (click)="view.set(tab.key)"
         >

@@ -17,6 +17,7 @@ import { Modal } from '../../shared/modal';
 import { PlanBoard } from '../../shared/plan-board';
 import { PlanCard } from '../../shared/plan-card';
 import { PlanDetail } from '../../shared/plan-detail';
+import { HlmAlertImports } from '@spartan-ng/helm/alert';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
@@ -44,13 +45,13 @@ interface Draft {
 
 @Component({
   selector: 'lime-actions',
-  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, FormsModule, Modal, PlanCard, PlanBoard, PlanDetail],
+  imports: [HlmAlertImports, HlmCardImports, HlmButton, HlmInput, HlmLabel, FormsModule, Modal, PlanCard, PlanBoard, PlanDetail],
   host: { class: 'block' },
   template: `
-    <section hlmCard class="mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Upgrade actions</h1>
-        <p class="m-0 text-[14px] text-ink-soft">
+        <h1 class="m-0 text-3xl font-semibold tracking-tight">Upgrade actions</h1>
+        <p class="m-0 mt-1 text-sm text-muted-foreground">
           {{ open().length }} open · {{ overdue().length }} overdue ·
           {{ done().length }} completed
           @if (unverified().length > 0) {
@@ -62,15 +63,15 @@ interface Draft {
         </p>
       </div>
       <button type="button" hlmBtn (click)="create()">New action</button>
-    </section>
+    </header>
 
     @if (api.actionsResource.error()) {
-      <p hlmCard class="block mb-5 px-7 py-4 text-[14px] text-overdue" role="alert">
+      <p hlmAlert variant="destructive" class="mb-5">
         Could not load upgrade actions from the API.
       </p>
     }
 
-    <section hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
+    <section hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-6 py-4">
       <input
         type="search"
         [(ngModel)]="query"
@@ -110,7 +111,7 @@ interface Draft {
     </div>
 
     @if (filtered().length === 0) {
-      <p hlmCard class="block px-7 py-10 text-center text-[14px] text-ink-soft">
+      <p hlmCard class="block px-6 py-10 text-center text-[14px] text-ink-soft">
         @if (api.actionsResource.isLoading()) {
           Loading…
         } @else {

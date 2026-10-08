@@ -44,11 +44,11 @@ const KIND_LABEL: Record<Kind, string> = {
   imports: [HlmCardImports, NgTemplateOutlet, TechIcon],
   host: { class: 'block' },
   template: `
-    <header hlmCard class="block mb-5 px-7 py-6">
+    <header class="mb-6">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Calendar</h1>
-          <p class="m-0 text-[14px] text-ink-soft">
+          <h1 class="m-0 text-3xl font-semibold tracking-tight">Calendar</h1>
+          <p class="m-0 mt-1 text-sm text-muted-foreground">
             {{ summary() }}
           </p>
         </div>
@@ -90,7 +90,7 @@ const KIND_LABEL: Record<Kind, string> = {
       </div>
     </ng-template>
 
-    <section hlmCard class="block px-7 py-6">
+    <section hlmCard class="block px-6 py-6">
       @for (group of groups(); track group.key) {
         @if (group.entries[0].id === todayMarker()) {
           <ng-container [ngTemplateOutlet]="todayLine" />

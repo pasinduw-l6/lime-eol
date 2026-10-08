@@ -20,23 +20,28 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
   imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, Environments],
   host: { class: 'block' },
   template: `
-    <section hlmCard class="block mb-5 px-7 py-6">
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Projects</h1>
-          <p class="m-0 text-[14px] text-ink-soft">
-            {{ projects().length }} customer installations ·
-            {{ atRiskProjects() }} with something out of support
-          </p>
-        </div>
-        <button type="button" hlmBtn (click)="toggleForm()">
-          {{ showForm() ? 'Cancel' : 'New project' }}
-        </button>
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="m-0 text-3xl font-semibold tracking-tight">Projects</h1>
+        <p class="m-0 mt-1 text-sm text-muted-foreground">
+          {{ projects().length }} customer installations ·
+          {{ atRiskProjects() }} with something out of support
+        </p>
       </div>
+      <button type="button" hlmBtn [variant]="showForm() ? 'outline' : 'default'" (click)="toggleForm()">
+        {{ showForm() ? 'Cancel' : 'New project' }}
+      </button>
+    </header>
 
-      @if (showForm()) {
+    @if (showForm()) {
+      <section hlmCard class="mb-5" aria-labelledby="new-project">
+        <div hlmCardHeader>
+          <h2 hlmCardTitle id="new-project">New project</h2>
+          <p hlmCardDescription>Each environment starts with the stack you list, recorded as its first entry in the change history.</p>
+        </div>
         <form
-          class="mt-6 grid gap-5 border-t border-rule pt-6 lg:grid-cols-2"
+          hlmCardContent
+          class="grid gap-5 lg:grid-cols-2"
           (submit)="create($event)"
         >
           <div class="grid gap-4">
@@ -228,16 +233,17 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             </div>
           </div>
         </form>
-      }
-    </section>
+      </section>
+    }
 
-    <section hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
+    <div class="mb-4 flex flex-wrap items-center gap-3">
       <input
+        hlmInput
         type="search"
         [(ngModel)]="query"
         placeholder="Search project, customer or code"
         aria-label="Search projects"
-        class="min-w-[240px] flex-1 rounded-full border border-rule bg-elevated px-4 py-2 text-[14px] text-ink"
+        class="max-w-sm min-w-[240px] flex-1"
       />
       <div class="segmented">
         @for (f of statusFilters; track f) {
@@ -253,8 +259,8 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
           </button>
         }
       </div>
-      <span class="tabular text-[13px] text-ink-soft">{{ filtered().length }} shown</span>
-    </section>
+      <span class="tabular ml-auto text-sm text-muted-foreground">{{ filtered().length }} shown</span>
+    </div>
 
     <section hlmCard class="block overflow-hidden py-0">
       <table hlmTable class="w-full border-collapse text-[14px]">

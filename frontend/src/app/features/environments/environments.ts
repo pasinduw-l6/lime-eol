@@ -22,19 +22,19 @@ import { HlmButton } from '@spartan-ng/helm/button';
   host: { class: 'block' },
   template: `
     @if (api.isLoading()) {
-      <p hlmCard class="block px-7 py-10 text-center text-[14px] text-ink-soft">
+      <p hlmCard class="block px-6 py-10 text-center text-[14px] text-ink-soft">
         Loading environments…
       </p>
     } @else if (api.error()) {
-      <p hlmCard class="block px-7 py-10 text-center text-[14px] text-overdue" role="alert">
+      <p hlmCard class="block px-6 py-10 text-center text-[14px] text-overdue" role="alert">
         Could not load projects from the API.
       </p>
     } @else {
       @for (project of projects(); track project.id) {
-        <section hlmCard class="block mb-5 px-7 py-6">
+        <section hlmCard class="block mb-5 px-6 py-6">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">
+              <h1 class="m-0 text-2xl font-semibold tracking-tight">
                 {{ project.name }}
               </h1>
               <p class="m-0 text-[14px] text-ink-soft">
@@ -85,7 +85,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
         </section>
 
         @if (selected(project); as env) {
-          <section hlmCard class="block px-7 py-6">
+          <section hlmCard class="block px-6 py-6">
             <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 class="m-0 text-[17px] font-semibold">
@@ -228,7 +228,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
           </section>
         }
       } @empty {
-        <p hlmCard class="block px-7 py-10 text-center text-[14px] text-ink-soft">
+        <p hlmCard class="block px-6 py-10 text-center text-[14px] text-ink-soft">
           No projects yet.
         </p>
       }

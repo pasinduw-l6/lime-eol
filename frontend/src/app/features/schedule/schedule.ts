@@ -39,9 +39,9 @@ interface Row {
   imports: [HlmCardImports, HlmTableImports, TechnologyView, RouterLink],
   host: { class: 'block' },
   template: `
-    <header hlmCard class="block mb-5 px-7 py-6">
-      <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Schedule</h1>
-      <p class="mt-1 mb-4 max-w-[62ch] text-[14px] text-ink-soft">
+    <header class="mb-6">
+      <h1 class="m-0 text-3xl font-semibold tracking-tight">Schedule</h1>
+      <p class="mt-1 mb-4 max-w-[62ch] text-sm text-muted-foreground">
         @if (picked() === 'estate') {
           Every technology cycle running in a customer environment, placed on the
           date its support ends.
@@ -90,7 +90,7 @@ interface Row {
     </header>
 
     @if (status() !== 'ALL' && picked() === 'estate') {
-      <div hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-7 py-3">
+      <div hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-6 py-3">
         <span class="text-[13px] text-ink-soft">Showing only</span>
         <span
           class="rounded-full border px-3 py-1 text-[13px]"
@@ -109,12 +109,12 @@ interface Row {
     }
 
     @if (picked() !== 'estate') {
-      <section hlmCard class="block px-7 py-6">
+      <section hlmCard class="block px-6 py-6">
         <lime-technology-view [slug]="slugFor(picked())" [technology]="picked()" />
       </section>
     } @else {
     @if (inbox().length > 0) {
-      <section hlmCard class="block mb-5 px-7 py-5" aria-labelledby="needs-you">
+      <section hlmCard class="block mb-5 px-6 py-5" aria-labelledby="needs-you">
         <h2 id="needs-you" class="m-0 mb-2 text-[13px] font-semibold">
           Needs you
         </h2>
@@ -142,7 +142,7 @@ interface Row {
       </section>
     }
 
-    <section hlmCard class="block px-7 py-6">
+    <section hlmCard class="block px-6 py-6">
       <div class="mb-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[12px] text-ink-soft">
         <span><span class="inline-block h-2 w-3 align-middle" [style.background]="fill('EOL')"></span> past end of life</span>
         <span><span class="inline-block h-2 w-3 align-middle" [style.background]="fill('NEAR')"></span> ends within {{ noticeDays }} days</span>
@@ -252,7 +252,7 @@ interface Row {
     </section>
 
     @if (selected(); as cycle) {
-      <aside hlmCard class="block mt-5 px-7 py-5" aria-labelledby="impact">
+      <aside hlmCard class="block mt-5 px-6 py-5" aria-labelledby="impact">
         <div class="flex items-baseline justify-between gap-4">
           <h2 id="impact" class="m-0 text-[17px] font-semibold">
             {{ cycle.technology }} {{ cycle.label }}
