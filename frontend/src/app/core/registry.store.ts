@@ -53,8 +53,6 @@ export class RegistryStore {
   readonly isLoading = this.api.isLoading;
   readonly loadError = this.api.error;
 
-  readonly writesArePersisted = false;
-
 
   private readonly _technologies = linkedSignal<Technology[]>(() =>
     this.api.technologies().map((t) => ({
@@ -308,123 +306,11 @@ export class RegistryStore {
   );
 
 
-  saveTechnology(input: Omit<Technology, 'id'> & { id?: string }): Technology {
-    const technology: Technology = { ...input, id: input.id ?? newId('t') };
-    this._technologies.update((all) =>
-      input.id ? all.map((t) => (t.id === input.id ? technology : t)) : [...all, technology],
-    );
-    return technology;
-  }
-
-  deleteTechnology(id: string): string | null {
-    const technology = this._technologies().find((t) => t.id === id);
-    if (!technology) return 'That technology no longer exists.';
-
-    const users = this._deployments().filter((d) =>
-      d.components.some((c) => c.technology === technology.name),
-    );
-    if (users.length > 0) {
-      return `${technology.name} is still installed on ${users.length} environment(s). Remove it there first.`;
-    }
-
-    this._technologies.update((all) => all.filter((t) => t.id !== id));
-    this._cycles.update((all) => all.filter((c) => c.technology !== technology.name));
-    return null;
-  }
-
-  saveCycle(input: Omit<Cycle, 'id'> & { id?: string }): Cycle {
-    const cycle: Cycle = { ...input, id: input.id ?? newId('c') };
-    this._cycles.update((all) =>
-      input.id ? all.map((c) => (c.id === input.id ? cycle : c)) : [...all, cycle],
-    );
-    return cycle;
-  }
-
-  deleteCycle(id: string): string | null {
-    const cycle = this._cycles().find((c) => c.id === id);
-    if (!cycle) return 'That cycle no longer exists.';
-    if (this.deploymentsUsing(cycle).length > 0) {
-      return `${cycle.technology} ${cycle.cycle} is still deployed. Remove it from those environments first.`;
-    }
-    this._cycles.update((all) => all.filter((c) => c.id !== id));
-    return null;
-  }
-
-
-  deleteEngineer(id: string): string | null {
-    const staffed = this._projects().filter((p) => p.engineerIds.includes(id));
-    if (staffed.length > 0) {
-      return `Still assigned to ${staffed.length} project(s). Unassign them first.`;
-    }
-    this._engineers.update((all) => all.filter((e) => e.id !== id));
-    return null;
-  }
-
-
   updateProject(id: string, patch: Partial<Project>): void {
     this._projects.update((all) =>
       all.map((p) => (p.id === id ? { ...p, ...patch, id: p.id } : p)),
     );
   }
-
-  deleteProject(id: string): void {
-    this._projects.update((all) => all.filter((p) => p.id !== id));
-    this._deployments.update((all) => all.filter((d) => d.projectId !== id));
-    if (this.scope() === id) {
-      this.scope.set('all');
-    }
-  }
-
-  addEnvironment(
-    projectId: string,
-    environment: EnvironmentName,
-    location: Deployment['location'],
-    locationDetail: string,
-  ): string | null {
-    const project = this._projects().find((p) => p.id === projectId);
-    if (!project) return 'That project no longer exists.';
-    if (this.deploymentsOf(projectId).some((d) => d.environment === environment)) {
-      return `${project.customer} already has a ${environment} environment.`;
-    }
-
-    this._deployments.update((all) => [
-      ...all,
-      {
-        id: `${projectId}-${environment.toLowerCase()}`,
-        projectId,
-        customer: project.customer,
-        customerCode: project.code,
-        name: `${project.name} ${environment}`,
-        environment,
-        location,
-        locationDetail,
-        limeVersion: project.limeVersion,
-        owners: ['DevOps'],
-        components: [],
-      },
-    ]);
-    return null;
-  }
-
-  updateDeployment(id: string, patch: Partial<Deployment>): void {
-    this._deployments.update((all) =>
-      all.map((d) => (d.id === id ? { ...d, ...patch, id: d.id } : d)),
-    );
-  }
-
-  deleteDeployment(id: string): void {
-    this._deployments.update((all) => all.filter((d) => d.id !== id));
-    this._actions.update((all) =>
-      all.map((a) => ({ ...a, deploymentIds: a.deploymentIds.filter((x) => x !== id) })),
-    );
-  }
-
-
-
-  deleteAction(id: string): void {
-    this._actions.update((all) => all.filter((a) => a.id !== id));
-  }
-
 
   readonly changeEvents = computed(() => {
     const out: {
@@ -504,8 +390,4 @@ export class RegistryStore {
         : [...all, next];
     });
   }
-}
-
-function newId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 }

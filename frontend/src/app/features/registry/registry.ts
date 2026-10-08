@@ -378,11 +378,6 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
             <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
           }
 
-          <p class="m-0 text-[11.5px] text-ink-faint">
-            Edits are held in this browser only — the registry has no update
-            endpoint yet.
-          </p>
-
           <div class="flex justify-end gap-2">
             <button type="button" hlmBtn variant="outline" (click)="techDraft.set(null)">Cancel</button>
             <button type="submit" hlmBtn>Save changes</button>
@@ -422,6 +417,9 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
               <input type="date" hlmInput [(ngModel)]="form.eolDate" name="eol" />
             </label>
           </div>
+          @if (error()) {
+            <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
+          }
           <div class="flex justify-end gap-2">
             <button type="button" hlmBtn variant="outline" (click)="cycleDraft.set(null)">Cancel</button>
             <button type="submit" hlmBtn>
@@ -583,37 +581,86 @@ export class Registry {
       return;
     }
 
-    this.store.saveTechnology(form);
-    this.techDraft.set(null);
-    this.error.set(null);
+    if (!form.id) {
+      return;
+    }
+
+    this.saving.set(true);
+    this.api
+      .updateTechnology(form.id, {
+        name: form.name.trim(),
+        componentType: form.componentType,
+        vendor: form.vendor ?? '',
+        cycleRule: form.cycleRule,
+        notes: form.notes ?? '',
+      })
+      .subscribe(this.done(() => this.techDraft.set(null), 'That technology could not be saved.'));
   }
 
   protected saveCycle(event: Event): void {
     event.preventDefault();
     const form = this.cycleDraft();
     if (!form?.cycle.trim()) {
+      this.error.set('A cycle needs a name, such as 7.2.');
       return;
     }
-    this.store.saveCycle({
-      ...form,
-      label: form.label || form.cycle,
-      eolSource: 'MANUAL',
+
+    const body = {
+      cycle: form.cycle.trim(),
+      releaseDate: form.releaseDate || null,
+      activeSupportEnd: form.activeSupportEnd || null,
+      eolDate: form.eolDate || null,
       versions: this.versionsText()
         .split(',')
         .map((v) => v.trim())
         .filter(Boolean),
-    });
-    this.cycleDraft.set(null);
+    };
+
+    const technology = this.technologies().find((t) => t.name === form.technology);
+    if (!form.id && !technology) {
+      this.error.set('That technology is no longer in the registry.');
+      return;
+    }
+
+    this.saving.set(true);
+    const request = form.id
+      ? this.api.updateCycle(form.id, body)
+      : this.api.createCycle(technology!.id, body);
+    request.subscribe(this.done(() => this.cycleDraft.set(null), 'That cycle could not be saved.'));
   }
 
-
-
   protected removeTechnology(technology: Technology): void {
-    this.error.set(this.store.deleteTechnology(technology.id));
+    if (!confirm(`Archive ${technology.name}? It disappears from the registry but its history is kept.`)) {
+      return;
+    }
+    this.api
+      .archiveTechnology(technology.id)
+      .subscribe(this.done(() => undefined, `${technology.name} could not be archived.`));
   }
 
   protected removeCycle(cycle: Cycle): void {
-    this.error.set(this.store.deleteCycle(cycle.id));
+    if (!confirm(`Delete cycle ${cycle.technology} ${cycle.cycle}?`)) {
+      return;
+    }
+    this.api
+      .deleteCycle(cycle.id)
+      .subscribe(this.done(() => undefined, `${cycle.technology} ${cycle.cycle} could not be deleted.`));
+  }
+
+  private done(after: () => void, fallback: string) {
+    return {
+      next: () => {
+        this.saving.set(false);
+        this.error.set(null);
+        after();
+        this.api.reload();
+      },
+      error: (err: { error?: { message?: string | string[] } }) => {
+        this.saving.set(false);
+        const message = err.error?.message;
+        this.error.set(Array.isArray(message) ? message.join('. ') : (message ?? fallback));
+      },
+    };
   }
 
 

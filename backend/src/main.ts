@@ -27,7 +27,7 @@ async function bootstrap(): Promise<void> {
 
   logger.log(`API ready on http://localhost:${appConfig.port}/${API_PREFIX}`);
   logger.log(`Swagger ready on http://localhost:${appConfig.port}/${SWAGGER_PATH}`);
-  logger.log(`Auth mode: ${authConfig.mode}`);
+  logger.log(`Microsoft sign-in redirects to ${authConfig.oidcWeb.redirectUri}`);
 }
 
 void bootstrap();

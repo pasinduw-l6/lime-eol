@@ -4,13 +4,18 @@ import {
   Inject,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { parseVersion } from '../../lifecycle/version.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   EOL_DATA_SOURCE,
   EolDataSource,
 } from '../eol-sync/ports/eol-data-source.port';
 import { CreateTechnologyDto } from './dto/create-technology.dto';
+import { CreateCycleDto, UpdateCycleDto } from './dto/cycle.dto';
+import { UpdateTechnologyDto } from './dto/update-technology.dto';
 import {
   iconFor,
   suggestComponentType,
@@ -41,6 +46,238 @@ export class TechnologiesService {
     });
 
     return technologies.map((technology) => this.toDto(technology));
+  }
+
+  async findOne(id: string) {
+    const technology = await this.prisma.technology.findFirst({
+      where: { id, archivedAt: null },
+      include: {
+        cycles: {
+          orderBy: { eolDate: 'asc' },
+          include: { versions: { orderBy: [{ major: 'desc' }, { minor: 'desc' }] } },
+        },
+      },
+    });
+    if (!technology) {
+      throw new NotFoundException(`No technology "${id}"`);
+    }
+    return this.toDto(technology);
+  }
+
+  async update(id: string, input: UpdateTechnologyDto) {
+    await this.findOne(id);
+
+    if (input.name) {
+      const clash = await this.prisma.technology.findFirst({
+        where: { name: input.name, id: { not: id } },
+      });
+      if (clash) {
+        throw new ConflictException(`${input.name} is already in the registry.`);
+      }
+    }
+
+    await this.prisma.technology.update({
+      where: { id },
+      data: {
+        name: input.name,
+        componentType: input.componentType,
+        vendor: input.vendor === undefined ? undefined : input.vendor.trim() || null,
+        cycleRule: input.cycleRule,
+        notes: input.notes === undefined ? undefined : input.notes.trim() || null,
+      },
+    });
+
+    return this.findOne(id);
+  }
+
+  async archive(id: string): Promise<void> {
+    const technology = await this.findOne(id);
+    const users = await this.environmentsUsing({ cycle: { technologyId: id } });
+
+    if (users.length > 0) {
+      throw new ConflictException(
+        `${technology.name} is still installed on ${users.join(', ')}. Remove it there first.`,
+      );
+    }
+
+    await this.prisma.technology.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
+  }
+
+  async createCycle(technologyId: string, input: CreateCycleDto) {
+    await this.findOne(technologyId);
+    const name = input.cycle.trim();
+
+    const clash = await this.prisma.technologyCycle.findUnique({
+      where: { technologyId_cycle: { technologyId, cycle: name } },
+    });
+    if (clash) {
+      throw new ConflictException(`Cycle ${name} already exists.`);
+    }
+
+    const cycle = await this.prisma.technologyCycle.create({
+      data: {
+        technologyId,
+        cycle: name,
+        label: input.label?.trim() || null,
+        releaseDate: toDate(input.releaseDate ?? null),
+        activeSupportEnd: toDate(input.activeSupportEnd ?? null),
+        eolDate: toDate(input.eolDate ?? null),
+        isLts: input.isLts ?? false,
+        isMaintained: input.isMaintained ?? true,
+        latestPatch: input.latestPatch?.trim() || null,
+        notes: input.notes?.trim() || null,
+        eolSource: 'MANUAL',
+      },
+    });
+
+    await this.syncVersions(cycle.id, input.versions ?? []);
+    return this.findOne(technologyId);
+  }
+
+  async updateCycle(cycleId: string, input: UpdateCycleDto) {
+    const cycle = await this.prisma.technologyCycle.findUnique({ where: { id: cycleId } });
+    if (!cycle) {
+      throw new NotFoundException(`No cycle "${cycleId}"`);
+    }
+
+    const name = input.cycle?.trim();
+    if (name && name !== cycle.cycle) {
+      const clash = await this.prisma.technologyCycle.findUnique({
+        where: { technologyId_cycle: { technologyId: cycle.technologyId, cycle: name } },
+      });
+      if (clash) {
+        throw new ConflictException(`Cycle ${name} already exists.`);
+      }
+    }
+
+    const dates = {
+      releaseDate: input.releaseDate === undefined ? undefined : toDate(input.releaseDate),
+      activeSupportEnd:
+        input.activeSupportEnd === undefined ? undefined : toDate(input.activeSupportEnd),
+      eolDate: input.eolDate === undefined ? undefined : toDate(input.eolDate),
+    };
+
+    const history = (Object.keys(dates) as (keyof typeof dates)[])
+      .filter((field) => dates[field] !== undefined)
+      .filter((field) => isoDate(cycle[field]) !== isoDate(dates[field] ?? null))
+      .map((field) => ({
+        technologyCycleId: cycle.id,
+        field,
+        oldValue: isoDate(cycle[field]),
+        newValue: isoDate(dates[field] ?? null),
+        source: 'MANUAL' as const,
+      }));
+
+    await this.prisma.$transaction([
+      this.prisma.technologyCycle.update({
+        where: { id: cycleId },
+        data: {
+          cycle: name,
+          label: input.label === undefined ? undefined : input.label?.trim() || null,
+          ...dates,
+          isLts: input.isLts,
+          isMaintained: input.isMaintained,
+          latestPatch:
+            input.latestPatch === undefined ? undefined : input.latestPatch?.trim() || null,
+          notes: input.notes === undefined ? undefined : input.notes?.trim() || null,
+          eolSource: history.length > 0 ? 'MANUAL' : undefined,
+        },
+      }),
+      this.prisma.technologyCycleHistory.createMany({ data: history }),
+    ]);
+
+    if (input.versions) {
+      await this.syncVersions(cycleId, input.versions);
+    }
+
+    return this.findOne(cycle.technologyId);
+  }
+
+  async deleteCycle(cycleId: string): Promise<void> {
+    const cycle = await this.prisma.technologyCycle.findUnique({
+      where: { id: cycleId },
+      include: { _count: { select: { upgradeActions: true } } },
+    });
+    if (!cycle) {
+      throw new NotFoundException(`No cycle "${cycleId}"`);
+    }
+
+    const users = await this.environmentsUsing({ technologyCycleId: cycleId });
+    if (users.length > 0) {
+      throw new ConflictException(
+        `Cycle ${cycle.cycle} is still installed on ${users.join(', ')}. Remove it there first.`,
+      );
+    }
+    if (cycle._count.upgradeActions > 0) {
+      throw new ConflictException(`Cycle ${cycle.cycle} has upgrade plans. Delete those first.`);
+    }
+
+    const used = await this.prisma.componentChange.count({
+      where: {
+        OR: [
+          { fromVersion_: { technologyCycleId: cycleId } },
+          { toVersion_: { technologyCycleId: cycleId } },
+        ],
+      },
+    });
+    if (used > 0) {
+      throw new ConflictException(
+        `Cycle ${cycle.cycle} appears in the change history, so it cannot be deleted.`,
+      );
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.technologyVersion.deleteMany({ where: { technologyCycleId: cycleId } }),
+      this.prisma.technologyCycle.delete({ where: { id: cycleId } }),
+    ]);
+  }
+
+  private async environmentsUsing(
+    version: Prisma.TechnologyVersionWhereInput,
+  ): Promise<string[]> {
+    const rows = await this.prisma.deploymentComponent.findMany({
+      where: { techVersion: version, deployment: { archivedAt: null } },
+      include: { deployment: true },
+    });
+    return [...new Set(rows.map((r) => r.deployment.name))];
+  }
+
+  private async syncVersions(cycleId: string, wanted: string[]): Promise<void> {
+    const list = [...new Set(wanted.map((v) => v.trim()).filter(Boolean))];
+    const existing = await this.prisma.technologyVersion.findMany({
+      where: { technologyCycleId: cycleId },
+      include: { _count: { select: { deploymentOverrides: true, changesFrom: true, changesTo: true } } },
+    });
+
+    for (const version of list) {
+      if (existing.some((v) => v.fullVersion === version)) continue;
+      const parsed = parseVersion(version);
+      await this.prisma.technologyVersion.create({
+        data: {
+          technologyCycleId: cycleId,
+          fullVersion: version,
+          major: parsed.major,
+          minor: parsed.minor,
+          patch: parsed.patch,
+        },
+      });
+    }
+
+    const removable = existing.filter(
+      (v) =>
+        !list.includes(v.fullVersion) &&
+        v._count.deploymentOverrides === 0 &&
+        v._count.changesFrom === 0 &&
+        v._count.changesTo === 0,
+    );
+    if (removable.length > 0) {
+      await this.prisma.technologyVersion.deleteMany({
+        where: { id: { in: removable.map((v) => v.id) } },
+      });
+    }
   }
 
   async create(input: CreateTechnologyDto) {

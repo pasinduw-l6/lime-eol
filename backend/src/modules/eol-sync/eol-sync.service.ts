@@ -52,7 +52,7 @@ export class EolSyncService {
       }
 
       const existing = await this.prisma.technologyCycle.findMany({
-        where: { technologyId: technology.id },
+        where: { technologyId: technology.id, eolSource: 'API' },
       });
 
       for (const cycle of existing) {

@@ -233,6 +233,20 @@ export class DeploymentsService {
     }
   }
 
+  async archive(id: string): Promise<void> {
+    const deployment = await this.prisma.deployment.findFirst({
+      where: { id, archivedAt: null },
+    });
+    if (!deployment) {
+      throw new NotFoundException(`No environment "${id}"`);
+    }
+
+    await this.prisma.deployment.update({
+      where: { id },
+      data: { archivedAt: new Date() },
+    });
+  }
+
   async history(
     deploymentId: string,
     filters: { technology?: string; from?: string; to?: string; reason?: string } = {},

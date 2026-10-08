@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { Api } from '../../core/api';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
-import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
+import { Deployment, EnvironmentName, Project, ProjectStatus } from '../../core/models';
 import { Environments } from '../environments/environments';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -410,8 +410,8 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                       {{ d.components.length }} components
                     </span>
                   </span>
-                  <button type="button" class="text-[12px] text-overdue" (click)="removeEnvironment(d.id)">
-                    Remove
+                  <button type="button" class="text-[12px] text-overdue" [disabled]="busy()" (click)="removeEnvironment(d)">
+                    Archive
                   </button>
                 </li>
               } @empty {
@@ -432,7 +432,18 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 Region or site
                 <input hlmInput [(ngModel)]="newEnvDetail" name="newdetail" placeholder="eu-west-1" />
               </label>
-              <button type="button" hlmBtn variant="outline" (click)="addEnvironment(project.id)">Add</button>
+              @if (environmentsOf(project.id).length > 0) {
+                <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal flex-1">
+                  Start with the components of
+                  <select hlmInput [(ngModel)]="copyFrom" name="copyfrom">
+                    <option value="">Nothing</option>
+                    @for (d of environmentsOf(project.id); track d.id) {
+                      <option [value]="d.id">{{ d.environment }}</option>
+                    }
+                  </select>
+                </label>
+              }
+              <button type="button" hlmBtn variant="outline" [disabled]="busy()" (click)="addEnvironment(project.id)">Add</button>
             </div>
           </div>
 
@@ -442,7 +453,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
           <div class="flex flex-wrap justify-between gap-2 border-t border-rule pt-4">
             <button type="button" hlmBtn variant="destructive" (click)="confirmDelete.set(project)">
-              Delete project
+              Archive project
             </button>
             <span class="flex gap-2">
               <button type="button" hlmBtn variant="outline" (click)="managed.set(null)">Cancel</button>
@@ -457,19 +468,21 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
     @if (confirmDelete(); as project) {
       <lime-modal
-        title="Delete this project?"
+        title="Archive this project?"
         [subtitle]="project.name"
         (dismiss)="confirmDelete.set(null)"
       >
         <p class="m-0 mb-4 text-[14px] text-ink-soft">
-          This removes {{ environmentsOf(project.id).length }} environment(s) and
-          their full revision history. The upgrade record for this customer will
-          be gone. This cannot be undone.
+          {{ project.name }} and its {{ environmentsOf(project.id).length }} environment(s)
+          disappear from every list. Their change history and upgrade plans are kept.
         </p>
+        @if (manageError()) {
+          <p class="m-0 mb-4 text-[13px] text-overdue" role="alert">{{ manageError() }}</p>
+        }
         <div class="flex justify-end gap-2">
           <button type="button" hlmBtn variant="outline" (click)="confirmDelete.set(null)">Keep it</button>
-          <button type="button" hlmBtn variant="destructive" (click)="deleteProject(project.id)">
-            Delete everything
+          <button type="button" hlmBtn variant="destructive" [disabled]="busy()" (click)="deleteProject(project.id)">
+            Archive project
           </button>
         </div>
       </lime-modal>
@@ -574,6 +587,8 @@ export class Projects {
   protected readonly manageError = signal<string | null>(null);
   protected readonly newEnv = signal<EnvironmentName>('UAT');
   protected readonly newEnvDetail = signal('');
+  protected readonly copyFrom = signal('');
+  protected readonly busy = signal(false);
 
   protected editForm = {
     name: '',
@@ -604,19 +619,46 @@ export class Projects {
   }
 
   protected addEnvironment(projectId: string): void {
-    this.manageError.set(
-      this.store.addEnvironment(
-        projectId,
-        this.newEnv(),
-        'EC2',
-        this.newEnvDetail() || 'not recorded',
-      ),
-    );
-    this.newEnvDetail.set('');
+    this.busy.set(true);
+    this.api
+      .addEnvironment(projectId, {
+        environment: this.newEnv(),
+        location: 'EC2',
+        locationDetail: this.newEnvDetail().trim() || undefined,
+        copyFrom: this.copyFrom() || undefined,
+      })
+      .subscribe(
+        this.done(() => {
+          this.newEnvDetail.set('');
+          this.copyFrom.set('');
+        }, 'That environment could not be added.'),
+      );
   }
 
-  protected removeEnvironment(id: string): void {
-    this.store.deleteDeployment(id);
+  protected removeEnvironment(environment: Deployment): void {
+    if (!confirm(`Archive ${environment.environment}? Its change history is kept, and adding it again restores it.`)) {
+      return;
+    }
+    this.busy.set(true);
+    this.api
+      .archiveEnvironment(environment.id)
+      .subscribe(this.done(() => undefined, 'That environment could not be archived.'));
+  }
+
+  private done(after: () => void, fallback: string) {
+    return {
+      next: () => {
+        this.busy.set(false);
+        this.manageError.set(null);
+        after();
+        this.api.reload();
+      },
+      error: (err: { error?: { message?: string | string[] } }) => {
+        this.busy.set(false);
+        const message = err.error?.message;
+        this.manageError.set(Array.isArray(message) ? message.join('. ') : (message ?? fallback));
+      },
+    };
   }
 
   protected saveProject(id: string): void {
@@ -647,9 +689,13 @@ export class Projects {
   }
 
   protected deleteProject(id: string): void {
-    this.store.deleteProject(id);
-    this.confirmDelete.set(null);
-    this.managed.set(null);
+    this.busy.set(true);
+    this.api.archiveProject(id).subscribe(
+      this.done(() => {
+        this.confirmDelete.set(null);
+        this.managed.set(null);
+      }, 'That project could not be archived.'),
+    );
   }
 
   protected toggleForm(): void {

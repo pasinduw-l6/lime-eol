@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { DeploymentsService } from '../deployments/deployments.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { AddEnvironmentDto } from './dto/add-environment.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import {
   ComponentDto,
@@ -235,6 +236,95 @@ export class ProjectsService {
     });
 
     return this.findOne(id);
+  }
+
+  async archive(id: string): Promise<void> {
+    const project = await this.findOne(id);
+    const now = new Date();
+
+    await this.prisma.$transaction([
+      this.prisma.deployment.updateMany({
+        where: { projectId: project.id, archivedAt: null },
+        data: { archivedAt: now },
+      }),
+      this.prisma.project.update({
+        where: { id: project.id },
+        data: { archivedAt: now },
+      }),
+    ]);
+  }
+
+  async addEnvironment(
+    projectId: string,
+    input: AddEnvironmentDto,
+    actorId?: string,
+  ): Promise<ProjectDto> {
+    const project = await this.findOne(projectId);
+    const record = await this.prisma.project.findUniqueOrThrow({
+      where: { id: project.id },
+    });
+
+    if (project.environments.some((e) => e.environment === input.environment)) {
+      throw new ConflictException(`${project.name} already has a ${input.environment} environment.`);
+    }
+
+    const archived = await this.prisma.deployment.findUnique({
+      where: {
+        projectId_environment: { projectId: project.id, environment: input.environment },
+      },
+    });
+
+    const deployment = archived
+      ? await this.prisma.deployment.update({
+          where: { id: archived.id },
+          data: {
+            archivedAt: null,
+            location: input.location,
+            locationDetail: input.locationDetail,
+          },
+        })
+      : await this.prisma.deployment.create({
+          data: {
+            customerId: record.customerId,
+            projectId: project.id,
+            name: `${project.name} ${input.environment}`,
+            environment: input.environment,
+            location: input.location,
+            locationDetail: input.locationDetail,
+          },
+        });
+
+    const source = input.copyFrom
+      ? project.environments.find((e) => e.id === input.copyFrom)
+      : undefined;
+
+    if (input.copyFrom && !source) {
+      throw new BadRequestException('Components can only be copied from an environment of the same project.');
+    }
+
+    const current = new Set(
+      (project.environments.find((e) => e.id === deployment.id)?.components ?? []).map(
+        (c) => `${c.technology}@${c.version}`,
+      ),
+    );
+
+    for (const component of source?.components ?? []) {
+      if (current.has(`${component.technology}@${component.version}`)) {
+        continue;
+      }
+      await this.deployments.changeComponent(
+        deployment.id,
+        {
+          technology: component.technology,
+          toVersion: component.version,
+          reason: 'INITIAL_RECORD',
+          note: `Copied from ${source?.environment} when ${input.environment} was added`,
+        },
+        actorId,
+      );
+    }
+
+    return this.findOne(project.id);
   }
 
   async setEngineers(

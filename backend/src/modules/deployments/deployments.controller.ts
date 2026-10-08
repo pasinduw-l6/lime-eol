@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
+  HttpCode,
   Param,
   Patch,
   Query,
@@ -98,5 +100,16 @@ export class DeploymentsController {
     @Query('currentVersion') currentVersion?: string,
   ) {
     return this.deployments.versionsFor(technology, currentVersion);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Archive an environment',
+    description: 'Archived, not deleted: its change history is kept and adding it again restores it.',
+  })
+  @ApiParam({ name: 'id', description: 'Environment (deployment) id' })
+  archive(@Param('id') id: string): Promise<void> {
+    return this.deployments.archive(id);
   }
 }

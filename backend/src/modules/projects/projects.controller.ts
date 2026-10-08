@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -14,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { AddEnvironmentDto } from './dto/add-environment.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { SetEngineersDto } from './dto/set-engineers.dto';
 import { ProjectDto } from './dto/project-response.dto';
@@ -61,6 +64,32 @@ export class ProjectsController {
   })
   update(@Param('id') id: string, @Body() body: UpdateProjectDto) {
     return this.projects.update(id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Archive a project and its environments',
+    description:
+      'Archived, not deleted: the change history and upgrade plans still refer to it.',
+  })
+  archive(@Param('id') id: string): Promise<void> {
+    return this.projects.archive(id);
+  }
+
+  @Post(':id/environments')
+  @ApiOperation({
+    summary: 'Add an environment to a project',
+    description:
+      'Optionally starts with the components of another environment of the same project. Re-adding an archived environment restores it.',
+  })
+  @ApiCreatedResponse({ type: ProjectDto })
+  addEnvironment(
+    @Param('id') id: string,
+    @Body() body: AddEnvironmentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ProjectDto> {
+    return this.projects.addEnvironment(id, body, user.id);
   }
 
   @Patch(':id/engineers')

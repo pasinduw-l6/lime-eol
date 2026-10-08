@@ -73,6 +73,17 @@ export interface ApiTechnology {
   cycles: ApiCycle[];
 }
 
+export interface CycleInput {
+  cycle: string;
+  label?: string | null;
+  releaseDate?: string | null;
+  activeSupportEnd?: string | null;
+  eolDate?: string | null;
+  isLts?: boolean;
+  latestPatch?: string | null;
+  versions?: string[];
+}
+
 export interface ApiCatalogueProduct {
   slug: string;
   label: string;
@@ -351,6 +362,47 @@ export class Api {
       `/api/v1/projects/${encodeURIComponent(projectId)}/engineers`,
       { engineerIds, leadId },
     );
+  }
+
+  archiveProject(projectId: string) {
+    return this.http.delete<void>(`/api/v1/projects/${encodeURIComponent(projectId)}`);
+  }
+
+  addEnvironment(
+    projectId: string,
+    body: { environment: string; location: string; locationDetail?: string; copyFrom?: string },
+  ) {
+    return this.http.post<ApiProject>(
+      `/api/v1/projects/${encodeURIComponent(projectId)}/environments`,
+      body,
+    );
+  }
+
+  archiveEnvironment(deploymentId: string) {
+    return this.http.delete<void>(`/api/v1/deployments/${deploymentId}`);
+  }
+
+  updateTechnology(
+    id: string,
+    body: { name?: string; componentType?: string; vendor?: string; cycleRule?: string; notes?: string },
+  ) {
+    return this.http.patch<ApiTechnology>(`/api/v1/technologies/${id}`, body);
+  }
+
+  archiveTechnology(id: string) {
+    return this.http.delete<void>(`/api/v1/technologies/${id}`);
+  }
+
+  createCycle(technologyId: string, body: CycleInput) {
+    return this.http.post<ApiTechnology>(`/api/v1/technologies/${technologyId}/cycles`, body);
+  }
+
+  updateCycle(cycleId: string, body: Partial<CycleInput>) {
+    return this.http.patch<ApiTechnology>(`/api/v1/technologies/cycles/${cycleId}`, body);
+  }
+
+  deleteCycle(cycleId: string) {
+    return this.http.delete<void>(`/api/v1/technologies/cycles/${cycleId}`);
   }
 
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
