@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 import { Api, ApiProject } from './api';
 import { ComponentChange, summariseChange } from './diff';
 import { daysToEol, statusOf, SupportStatus } from './lifecycle';
@@ -15,6 +15,8 @@ import {
 } from './models';
 
 export type ProjectScope = 'all' | string;
+
+const SCOPE_KEY = 'lime.project';
 
 export interface NewProject {
   name: string;
@@ -157,6 +159,27 @@ export class RegistryStore {
   private readonly _topologies = signal<EnvTopology[]>([]);
 
   readonly scope = signal<ProjectScope>('all');
+
+  private readonly keepScope = effect(() => {
+    const projects = this._projects();
+    const scope = this.scope();
+    if (projects.length === 0) return;
+
+    if (projects.some((p) => p.id === scope)) {
+      try {
+        localStorage.setItem(SCOPE_KEY, scope);
+      } catch {
+      }
+      return;
+    }
+
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(SCOPE_KEY);
+    } catch {
+    }
+    this.scope.set(projects.find((p) => p.id === saved)?.id ?? projects[0].id);
+  });
 
   readonly technologies = this._technologies.asReadonly();
   readonly cycles = this._cycles.asReadonly();

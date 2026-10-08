@@ -2,10 +2,11 @@ import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Session, SessionStore } from '../../core/session';
 import { AuthLayout } from './auth-layout';
+import { HlmButton } from '@spartan-ng/helm/button';
 
 @Component({
   selector: 'lime-sso-callback',
-  imports: [RouterLink, AuthLayout],
+  imports: [HlmButton, RouterLink, AuthLayout],
   host: { class: 'block' },
   template: `
     <lime-auth-layout
@@ -16,7 +17,7 @@ import { AuthLayout } from './auth-layout';
         <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
         <a
           routerLink="/login"
-          class="btn btn-primary mt-5 w-full justify-center py-2.5 no-underline"
+          hlmBtn class="mt-5 w-full justify-center py-2.5 no-underline"
         >
           Back to sign in
         </a>

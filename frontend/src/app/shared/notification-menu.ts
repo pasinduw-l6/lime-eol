@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Api, ApiNotificationLog } from '../core/api';
 import { NotificationPreview } from '../features/notifications/notification-preview';
+import { HlmButton } from '@spartan-ng/helm/button';
 import { TechIcon } from './tech-icon';
 
 const SEEN_KEY = 'lime.notifications.seen';
@@ -12,13 +13,16 @@ interface Row extends ApiNotificationLog {
 
 @Component({
   selector: 'lime-notification-menu',
-  imports: [TechIcon],
+  imports: [HlmButton, TechIcon],
   host: { class: 'relative' },
   template: `
     <button
       type="button"
-      class="glass relative grid h-9 w-9 place-items-center rounded-full border border-rule text-ink-soft hover:text-ink"
-      [class.glass-accent]="open()"
+      hlmBtn
+      variant="ghost"
+      size="icon"
+      class="relative"
+      [class.bg-muted]="open()"
       [attr.aria-expanded]="open()"
       aria-haspopup="true"
       [attr.aria-label]="
@@ -34,7 +38,7 @@ interface Row extends ApiNotificationLog {
       @if (unreadCount() > 0) {
         <span
           class="tabular absolute -top-1 -right-1 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-semibold"
-          [style.background]="hasFailure() ? 'var(--color-overdue)' : 'var(--color-accent)'"
+          [style.background]="hasFailure() ? 'var(--color-overdue)' : 'var(--primary)'"
           [style.color]="hasFailure() ? '#ffffff' : 'var(--color-ground)'"
           aria-hidden="true"
           >{{ unreadCount() }}</span
@@ -46,7 +50,7 @@ interface Row extends ApiNotificationLog {
       <div class="fixed inset-0 z-30" (click)="open.set(false)" aria-hidden="true"></div>
 
       <div
-        class="card popover absolute top-[46px] right-0 z-40 w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden p-0 shadow-2xl"
+        class="popover absolute top-11 right-0 z-40 w-[400px] max-w-[calc(100vw-2rem)] overflow-hidden"
         role="region"
         aria-label="Notifications"
         (keydown.escape)="open.set(false)"
@@ -54,7 +58,7 @@ interface Row extends ApiNotificationLog {
         <header class="flex items-center justify-between gap-3 border-b border-rule px-4 py-3">
           <h2 class="m-0 text-[14px] font-semibold">Notifications</h2>
           @if (unreadCount() > 0) {
-            <button type="button" class="text-[12px] text-accent-bright" (click)="markAllRead()">
+            <button type="button" class="text-[12px] text-primary" (click)="markAllRead()">
               Mark all read
             </button>
           }
@@ -77,7 +81,7 @@ interface Row extends ApiNotificationLog {
             <li
               class="flex gap-3 border-b border-rule px-4 py-3 last:border-b-0"
               [style.background]="
-                row.unread ? 'color-mix(in oklab, var(--color-accent) 7%, transparent)' : null
+                row.unread ? 'color-mix(in oklab, var(--primary) 7%, transparent)' : null
               "
             >
               <span class="relative shrink-0 pt-0.5">

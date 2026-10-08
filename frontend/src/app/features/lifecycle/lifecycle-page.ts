@@ -1,13 +1,14 @@
 import { Component, signal } from '@angular/core';
 import { Registry } from '../registry/registry';
 import { Schedule } from '../schedule/schedule';
+import { HlmCardImports } from '@spartan-ng/helm/card';
 
 @Component({
   selector: 'lime-lifecycle-page',
-  imports: [Schedule, Registry],
+  imports: [HlmCardImports, Schedule, Registry],
   host: { class: 'block' },
   template: `
-    <nav class="card mb-5 flex flex-wrap gap-1 px-5 py-3" aria-label="Lifecycle views">
+    <nav hlmCard class="mb-5 flex flex-wrap gap-1 px-5 py-3" aria-label="Lifecycle views">
       @for (tab of tabs; track tab.key) {
         <button
           type="button"

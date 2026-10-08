@@ -8,6 +8,8 @@ import {
   toneBackground,
   toneColour,
 } from '../../core/relative-time';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 
 interface ApiRelease {
   cycle: string;
@@ -36,6 +38,7 @@ const LABEL_W = 54;
 
 @Component({
   selector: 'lime-technology-view',
+  imports: [HlmButton, HlmTableImports],
   host: { class: 'block' },
   template: `
     @if (product.isLoading()) {
@@ -62,7 +65,7 @@ const LABEL_W = 54;
             [href]="data.releasePolicyUrl"
             target="_blank"
             rel="noopener"
-            class="text-[13px] text-accent-bright no-underline hover:underline"
+            class="text-[13px] text-primary no-underline hover:underline"
             >Vendor release policy</a
           >
         }
@@ -96,7 +99,7 @@ const LABEL_W = 54;
             @if (lane.activeW > 0) {
               <rect
                 [attr.x]="lane.x" [attr.y]="lane.y + 4" [attr.width]="lane.activeW"
-                height="13" rx="2" fill="var(--color-accent-deep)"
+                height="13" rx="2" fill="var(--primary)"
               >
                 <title>Active support</title>
               </rect>
@@ -105,7 +108,7 @@ const LABEL_W = 54;
               <rect
                 [attr.x]="lane.x + lane.activeW" [attr.y]="lane.y + 4"
                 [attr.width]="lane.securityW" height="13" rx="2"
-                fill="var(--color-accent)"
+                fill="var(--primary)"
               >
                 <title>Security support</title>
               </rect>
@@ -130,11 +133,11 @@ const LABEL_W = 54;
 
       <div class="mt-3 mb-6 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-ink-soft">
         <span class="flex items-center gap-1.5">
-          <span class="inline-block h-2.5 w-4 rounded-[2px]" style="background: var(--color-accent-deep)"></span>
+          <span class="inline-block h-2.5 w-4 rounded-[2px]" style="background: var(--primary)"></span>
           Active support
         </span>
         <span class="flex items-center gap-1.5">
-          <span class="inline-block h-2.5 w-4 rounded-[2px]" style="background: var(--color-accent)"></span>
+          <span class="inline-block h-2.5 w-4 rounded-[2px]" style="background: var(--primary)"></span>
           Security support
         </span>
         <span class="flex items-center gap-1.5">
@@ -144,22 +147,22 @@ const LABEL_W = 54;
       </div>
 
       <div class="overflow-x-auto rounded-xl border border-rule">
-        <table class="w-full border-collapse text-[13px]">
+        <table hlmTable class="w-full border-collapse text-[13px]">
           <caption class="sr-only">Release cycles of {{ data.label }}</caption>
-          <thead>
-            <tr class="border-b border-rule text-left text-[12px] text-ink-soft">
-              <th class="px-4 py-2.5 font-medium">Release</th>
-              <th class="px-4 py-2.5 font-medium">Released</th>
-              <th class="px-4 py-2.5 font-medium">Active support</th>
-              <th class="px-4 py-2.5 font-medium">Security support</th>
-              <th class="px-4 py-2.5 font-medium">Latest</th>
-              <th class="px-4 py-2.5 font-medium">Your estate</th>
+          <thead hlmTHead>
+            <tr hlmTr class="border-b border-rule text-left text-[12px] text-ink-soft">
+              <th hlmTh class="px-4 py-2.5 font-medium">Release</th>
+              <th hlmTh class="px-4 py-2.5 font-medium">Released</th>
+              <th hlmTh class="px-4 py-2.5 font-medium">Active support</th>
+              <th hlmTh class="px-4 py-2.5 font-medium">Security support</th>
+              <th hlmTh class="px-4 py-2.5 font-medium">Latest</th>
+              <th hlmTh class="px-4 py-2.5 font-medium">Your estate</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody hlmTBody>
             @for (row of visibleRows(); track row.release.cycle) {
-              <tr class="border-b border-rule last:border-b-0">
-                <td class="tabular px-4 py-2.5 font-medium">
+              <tr hlmTr class="border-b border-rule last:border-b-0">
+                <td hlmTd class="whitespace-normal tabular px-4 py-2.5 font-medium">
                   <span [class.line-through]="row.retired" [class.text-ink-faint]="row.retired">
                     {{ row.release.cycle }}
                   </span>
@@ -167,28 +170,28 @@ const LABEL_W = 54;
                     <span class="ml-1.5 rounded border border-rule px-1.5 py-0.5 text-[10px] text-ink-soft">LTS</span>
                   }
                 </td>
-                <td class="px-4 py-2.5 text-ink-soft">
+                <td hlmTd class="whitespace-normal px-4 py-2.5 text-ink-soft">
                   <span class="block">{{ row.released.text }}</span>
                   <span class="tabular block text-[11px] text-ink-faint">
                     {{ date(row.release.releaseDate) }}
                   </span>
                 </td>
-                <td class="px-4 py-2.5" [style.background]="bg(row.active.tone)">
+                <td hlmTd class="whitespace-normal px-4 py-2.5" [style.background]="bg(row.active.tone)">
                   <span class="block" [style.color]="fg(row.active.tone)">{{ row.active.text }}</span>
                   <span class="tabular block text-[11px] text-ink-faint">
                     {{ date(row.release.activeSupportEnd) }}
                   </span>
                 </td>
-                <td class="px-4 py-2.5" [style.background]="bg(row.security.tone)">
+                <td hlmTd class="whitespace-normal px-4 py-2.5" [style.background]="bg(row.security.tone)">
                   <span class="block" [style.color]="fg(row.security.tone)">{{ row.security.text }}</span>
                   <span class="tabular block text-[11px] text-ink-faint">
                     {{ date(row.release.eolDate) }}
                   </span>
                 </td>
-                <td class="tabular px-4 py-2.5 text-ink-soft">
+                <td hlmTd class="whitespace-normal tabular px-4 py-2.5 text-ink-soft">
                   {{ row.release.latestSupported ?? '—' }}
                 </td>
-                <td class="px-4 py-2.5">
+                <td hlmTd class="whitespace-normal px-4 py-2.5">
                   @if (row.environments > 0) {
                     <span class="tabular" [style.color]="fg(row.security.tone)">
                       {{ row.environments }} env
@@ -205,7 +208,7 @@ const LABEL_W = 54;
 
       @if (hiddenCount() > 0) {
         <div class="mt-4 text-center">
-          <button type="button" class="btn" (click)="showAll.set(!showAll())">
+          <button type="button" hlmBtn variant="outline" (click)="showAll.set(!showAll())">
             {{ showAll() ? 'Hide unmaintained releases' : 'Show ' + hiddenCount() + ' unmaintained releases' }}
           </button>
         </div>

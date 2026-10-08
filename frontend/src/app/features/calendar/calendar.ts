@@ -5,6 +5,7 @@ import { formatDays, parseDate, statusFill, today } from '../../core/lifecycle';
 import { humanGap } from '../../core/relative-time';
 import { RegistryStore } from '../../core/registry.store';
 import { TechIcon } from '../../shared/tech-icon';
+import { HlmCardImports } from '@spartan-ng/helm/card';
 
 type Kind = 'DEADLINE' | 'PLANNED' | 'DONE';
 
@@ -28,7 +29,7 @@ interface MonthGroup {
 
 const KIND_COLOUR: Record<Kind, string> = {
   DEADLINE: 'var(--color-overdue)',
-  PLANNED: 'var(--color-accent-bright)',
+  PLANNED: 'var(--primary)',
   DONE: 'var(--color-good)',
 };
 
@@ -40,10 +41,10 @@ const KIND_LABEL: Record<Kind, string> = {
 
 @Component({
   selector: 'lime-calendar',
-  imports: [NgTemplateOutlet, TechIcon],
+  imports: [HlmCardImports, NgTemplateOutlet, TechIcon],
   host: { class: 'block' },
   template: `
-    <header class="card mb-5 px-7 py-6">
+    <header hlmCard class="block mb-5 px-7 py-6">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Calendar</h1>
@@ -56,7 +57,7 @@ const KIND_LABEL: Record<Kind, string> = {
           @for (k of kinds; track k.key) {
             <button
               type="button"
-              class="glass flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px]"
+              class="glass flex items-center gap-2 rounded-md border px-3.5 py-1.5 text-[13px]"
               [class.border-rule]="!enabled().includes(k.key)"
               [class.text-ink-faint]="!enabled().includes(k.key)"
               [style.border-color]="enabled().includes(k.key) ? k.colour : null"
@@ -77,19 +78,19 @@ const KIND_LABEL: Record<Kind, string> = {
       <div class="flex items-center gap-3 py-3">
         <span
           class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-[0.06em] uppercase"
-          style="background: var(--color-accent); color: var(--color-ground)"
+          style="background: var(--primary); color: var(--color-ground)"
         >
           Today
         </span>
         <span class="tabular text-[12px] text-ink-soft">{{ todayLabel }}</span>
-        <span class="h-px flex-1" style="background: var(--color-accent); opacity: 0.45"></span>
+        <span class="h-px flex-1" style="background: var(--primary); opacity: 0.45"></span>
         @if (trailing) {
           <span class="text-[12px] text-ink-faint">nothing scheduled ahead</span>
         }
       </div>
     </ng-template>
 
-    <section class="card px-7 py-6">
+    <section hlmCard class="block px-7 py-6">
       @for (group of groups(); track group.key) {
         @if (group.entries[0].id === todayMarker()) {
           <ng-container [ngTemplateOutlet]="todayLine" />

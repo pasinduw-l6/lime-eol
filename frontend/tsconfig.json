@@ -13,7 +13,69 @@
     "moduleResolution": "bundler",
     "importHelpers": true,
     "target": "ES2022",
-    "module": "ES2022"
+    "module": "ES2022",
+    "paths": {
+      "@spartan-ng/helm/button": [
+        "./src/app/ui/button/src/index.ts"
+      ],
+      "@spartan-ng/helm/utils": [
+        "./src/app/ui/utils/src/index.ts"
+      ],
+      "@spartan-ng/helm/card": [
+        "./src/app/ui/card/src/index.ts"
+      ],
+      "@spartan-ng/helm/badge": [
+        "./src/app/ui/badge/src/index.ts"
+      ],
+      "@spartan-ng/helm/input": [
+        "./src/app/ui/input/src/index.ts"
+      ],
+      "@spartan-ng/helm/label": [
+        "./src/app/ui/label/src/index.ts"
+      ],
+      "@spartan-ng/helm/native-select": [
+        "./src/app/ui/native-select/src/index.ts"
+      ],
+      "@spartan-ng/helm/table": [
+        "./src/app/ui/table/src/index.ts"
+      ],
+      "@spartan-ng/helm/tabs": [
+        "./src/app/ui/tabs/src/index.ts"
+      ],
+      "@spartan-ng/helm/tooltip": [
+        "./src/app/ui/tooltip/src/index.ts"
+      ],
+      "@spartan-ng/helm/avatar": [
+        "./src/app/ui/avatar/src/index.ts"
+      ],
+      "@spartan-ng/helm/progress": [
+        "./src/app/ui/progress/src/index.ts"
+      ],
+      "@spartan-ng/helm/separator": [
+        "./src/app/ui/separator/src/index.ts"
+      ],
+      "@spartan-ng/helm/dialog": [
+        "./src/app/ui/dialog/src/index.ts"
+      ],
+      "@spartan-ng/helm/toggle-group": [
+        "./src/app/ui/toggle-group/src/index.ts"
+      ],
+      "@spartan-ng/helm/toggle": [
+        "./src/app/ui/toggle/src/index.ts"
+      ],
+      "@spartan-ng/helm/field": [
+        "./src/app/ui/field/src/index.ts"
+      ],
+      "@spartan-ng/helm/alert": [
+        "./src/app/ui/alert/src/index.ts"
+      ],
+      "@spartan-ng/helm/empty": [
+        "./src/app/ui/empty/src/index.ts"
+      ],
+      "@spartan-ng/helm/popover": [
+        "./src/app/ui/popover/src/index.ts"
+      ]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

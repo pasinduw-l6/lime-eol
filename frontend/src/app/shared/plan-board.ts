@@ -3,6 +3,7 @@ import { ApiActionEnvironment, ApiUpgradeAction } from '../core/api';
 import { formatDays, statusFill, statusOf } from '../core/lifecycle';
 import { PlanTimeline } from './plan-timeline';
 import { TechIcon } from './tech-icon';
+import { HlmCardImports } from '@spartan-ng/helm/card';
 
 type Stage = 'planned' | 'jira' | 'deployed' | 'verified';
 
@@ -32,16 +33,16 @@ const COLUMNS: Column[] = [
 
 @Component({
   selector: 'lime-plan-board',
-  imports: [PlanTimeline, TechIcon],
+  imports: [HlmCardImports, PlanTimeline, TechIcon],
   host: { class: 'block' },
   template: `
-    <section class="card mb-4 px-5 py-4">
+    <section hlmCard class="block mb-4 px-5 py-4">
       <lime-plan-timeline [actions]="actions()" />
     </section>
 
     <div class="board-columns grid gap-3">
       @for (column of columns; track column.key) {
-        <section class="card flex min-h-[220px] flex-col px-3 py-3">
+        <section hlmCard class="flex min-h-[220px] flex-col px-3 py-3 gap-0">
           <header class="mb-2.5 flex items-baseline justify-between gap-2">
             <h3 class="m-0 flex items-center gap-1.5 text-[12px] font-semibold">
               {{ column.label }}
@@ -123,7 +124,7 @@ const COLUMNS: Column[] = [
     }
 
     .board-card:hover {
-      border-color: color-mix(in oklab, var(--color-accent-bright) 55%, transparent);
+      border-color: color-mix(in oklab, var(--primary) 55%, transparent);
       transform: translateY(-1px);
     }
 

@@ -1,12 +1,4 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  OnDestroy,
-  input,
-  viewChild,
-} from '@angular/core';
-import gsap from 'gsap';
+import { Component, input } from '@angular/core';
 import { TechMarquee } from './tech-marquee';
 
 @Component({
@@ -14,125 +6,66 @@ import { TechMarquee } from './tech-marquee';
   imports: [TechMarquee],
   host: { class: 'block' },
   template: `
-    <div class="auth-shell grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
-      <aside
-        class="relative hidden overflow-hidden px-14 py-12 lg:flex lg:flex-col"
-        style="background: linear-gradient(150deg, var(--color-accent-deep), var(--color-ground) 58%)"
-      >
+    <div class="grid min-h-svh bg-background lg:grid-cols-2">
+      <main class="flex flex-col gap-4 p-6 md:p-10">
+        <span class="brand-plate w-fit">
+          <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
+        </span>
+
+        <div class="flex flex-1 items-center justify-center">
+          <div class="animate-in fade-in-0 slide-in-from-bottom-2 w-full max-w-sm duration-300">
+            <div class="mb-6 flex flex-col gap-1.5 text-center">
+              <h1 class="m-0 text-2xl font-semibold tracking-tight">{{ heading() }}</h1>
+              <p class="m-0 text-sm text-balance text-muted-foreground">{{ subheading() }}</p>
+            </div>
+
+            <ng-content />
+          </div>
+        </div>
+      </main>
+
+      <aside class="relative hidden flex-col overflow-hidden bg-zinc-950 p-10 text-white lg:flex">
         <span
-          class="pointer-events-none absolute -top-24 -right-24 h-[420px] w-[420px] rounded-full"
-          style="background: radial-gradient(circle, color-mix(in oklab, var(--color-lime) 38%, transparent), transparent 68%)"
+          class="pointer-events-none absolute -top-32 -right-32 h-[460px] w-[460px] rounded-full opacity-40 blur-3xl"
+          style="background: var(--primary)"
           aria-hidden="true"
         ></span>
 
-        <span class="brand-plate relative inline-flex w-fit">
-          <img src="/nav-logo.png" alt="Lime" class="h-7 w-auto" />
-        </span>
-
         <div class="relative mt-auto max-w-[30rem]">
-          <h2
-            class="m-0 text-[40px] leading-[1.1] font-semibold tracking-[-0.03em] text-white"
-          >
+          <h2 class="m-0 text-4xl leading-[1.1] font-semibold tracking-tight">
             Know what expires<br />before it does.
           </h2>
-          <p class="mt-4 mb-0 text-[15px] leading-relaxed text-white/70">
+          <p class="mt-4 mb-0 text-[15px] leading-relaxed text-zinc-400">
             Every technology in every customer environment, with the date its
             support ends and a record of who changed what.
           </p>
 
-          <dl class="mt-9 grid grid-cols-3 gap-6 border-t border-white/15 pt-6">
+          <dl class="mt-9 grid grid-cols-3 gap-6 border-t border-white/10 pt-6">
             @for (fact of facts; track fact.label) {
-              <div class="auth-fact">
-                <dt class="m-0 text-[12px] text-white/55">{{ fact.label }}</dt>
-                <dd class="tabular m-0 text-[22px] font-semibold text-white">
-                  {{ fact.value }}
-                </dd>
+              <div>
+                <dt class="m-0 text-xs text-zinc-400">{{ fact.label }}</dt>
+                <dd class="tabular m-0 text-2xl font-semibold">{{ fact.value }}</dd>
               </div>
             }
           </dl>
         </div>
 
-        <div class="relative mt-10 -mx-14">
-          <p
-            class="mb-3 px-14 text-[11px] font-semibold tracking-[0.12em] text-white/45 uppercase"
-          >
-            <span aria-hidden="true">&#123;</span>
+        <div class="relative mt-10 -mx-10">
+          <p class="mb-3 px-10 text-xs font-medium tracking-widest text-zinc-500 uppercase">
             Lifecycles we track
-            <span aria-hidden="true">&#125;</span>
           </p>
-
           <lime-tech-marquee [row]="1" />
           <div class="mt-3">
             <lime-tech-marquee [row]="2" [reverse]="true" />
           </div>
         </div>
       </aside>
-
-      <main class="flex flex-col px-5 py-8 sm:px-10">
-        <span class="brand-plate inline-flex w-fit lg:invisible">
-          <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
-        </span>
-
-        <div #panel class="m-auto w-full max-w-[26rem] py-10">
-          <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">
-            {{ heading() }}
-          </h1>
-          <p class="mt-1.5 mb-7 text-[14px] text-ink-soft">{{ subheading() }}</p>
-
-          <ng-content />
-        </div>
-      </main>
     </div>
   `,
-  styles: `
-    .auth-fact {
-      animation: fact-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    }
-    .auth-fact:nth-child(2) {
-      animation-delay: 80ms;
-    }
-    .auth-fact:nth-child(3) {
-      animation-delay: 160ms;
-    }
-
-    @keyframes fact-in {
-      from {
-        opacity: 0;
-        transform: translateY(8px);
-      }
-      to {
-        opacity: 1;
-        transform: none;
-      }
-    }
-  `,
 })
-export class AuthLayout implements AfterViewInit, OnDestroy {
+export class AuthLayout {
   readonly heading = input.required<string>();
   readonly subheading = input.required<string>();
-
-  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
-  private tween?: gsap.core.Tween;
-
-  ngAfterViewInit(): void {
-    const panel = this.panel()?.nativeElement;
-
-    if (!panel || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return;
-    }
-
-    this.tween = gsap.from(panel, {
-      opacity: 0,
-      y: 14,
-      duration: 0.45,
-      ease: 'power3.out',
-      clearProps: 'opacity,transform',
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.tween?.kill();
-  }
 
   protected readonly facts = [
     { label: 'Tracked', value: '477' },

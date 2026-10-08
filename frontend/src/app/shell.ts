@@ -1,111 +1,115 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
 import { RegistryStore } from './core/registry.store';
 import { SessionStore } from './core/session';
 import { Theme } from './core/theme';
 import { Celebrate } from './shared/celebrate';
 import { NotificationMenu } from './shared/notification-menu';
-import { ShaderBackground } from './shared/shader-background';
 
 @Component({
   selector: 'lime-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Celebrate, ShaderBackground, NotificationMenu],
-  host: { class: 'block min-h-screen' },
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    FormsModule,
+    HlmAvatarImports,
+    HlmButton,
+    HlmInput,
+    Celebrate,
+    NotificationMenu,
+  ],
+  host: { class: 'block min-h-screen bg-background' },
   template: `
-    @defer (on idle) {
-      <lime-shader-background />
-    }
-
-    <div class="mx-auto flex min-h-screen max-w-[1500px] flex-col px-5 py-5">
-      <header
-        class="card app-bar mb-5 flex flex-wrap items-center gap-4 px-5 py-3"
-        role="banner"
-      >
+    <header class="app-bar border-b" role="banner">
+      <div class="mx-auto flex h-14 max-w-[1500px] items-center gap-3 px-5">
         <a
           routerLink="/overview"
-          class="brand-plate flex items-center no-underline"
+          class="brand-plate shrink-0 no-underline"
           aria-label="Lime Lifecycle — overview"
         >
           <img src="/nav-logo.png" alt="Lime" class="h-6 w-auto" />
         </a>
 
+        <span class="h-5 w-px bg-border" aria-hidden="true"></span>
+
         <div class="relative">
           <button
             type="button"
-            class="glass flex items-center gap-2 rounded-full border border-rule bg-elevated px-3.5 py-2 text-[13px]"
+            hlmBtn
+            variant="outline"
+            size="sm"
+            class="max-w-[260px] justify-between gap-2"
             [attr.aria-expanded]="open()"
             aria-haspopup="listbox"
             (click)="toggle()"
           >
-            <span class="tabular text-ink-faint">{{ activeCode() }}</span>
-            <span class="max-w-[190px] truncate text-ink">{{ activeLabel() }}</span>
-            <span class="text-ink-soft" aria-hidden="true">▾</span>
+            <span class="tabular text-xs text-muted-foreground">{{ activeCode() }}</span>
+            <span class="truncate">{{ activeLabel() }}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-50" aria-hidden="true">
+              <path d="m7 15 5 5 5-5M7 9l5-5 5 5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
           </button>
 
           @if (open()) {
+            <div class="fixed inset-0 z-30" (click)="open.set(false)" aria-hidden="true"></div>
             <div
-              class="card popover absolute top-[46px] left-0 z-20 w-[320px] p-3 shadow-2xl"
+              class="popover absolute top-10 left-0 z-40 w-[320px] p-1"
               role="listbox"
               (keydown.escape)="open.set(false)"
             >
-              <input
-                type="search"
-                [(ngModel)]="filter"
-                placeholder="Find a project"
-                aria-label="Find a project"
-                class="mb-2 w-full rounded-lg border border-rule bg-elevated px-3 py-2 text-[13px] text-ink"
-              />
-              <div class="scroll-hidden max-h-[320px] overflow-y-auto">
-                <button
-                  type="button"
-                  role="option"
-                  [attr.aria-selected]="scope() === 'all'"
-                  class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] hover:bg-elevated"
-                  [class.bg-elevated]="scope() === 'all'"
-                  (click)="choose('all')"
-                >
-                  <span>All projects</span>
-                  <span class="tabular text-[12px] text-ink-soft">{{ projects().length }}</span>
-                </button>
-
+              <div class="border-b p-1 pb-2">
+                <input
+                  hlmInput
+                  type="search"
+                  [(ngModel)]="filter"
+                  placeholder="Find a project…"
+                  aria-label="Find a project"
+                  class="h-8"
+                />
+              </div>
+              <div class="scroll-hidden max-h-[320px] overflow-y-auto p-1">
                 @for (p of matches(); track p.id) {
                   <button
                     type="button"
                     role="option"
                     [attr.aria-selected]="scope() === p.id"
-                    class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[13px] hover:bg-elevated"
-                    [class.bg-elevated]="scope() === p.id"
+                    class="flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                    [class.bg-accent]="scope() === p.id"
                     (click)="choose(p.id)"
                   >
                     <span class="min-w-0">
                       <span class="block truncate">{{ p.name }}</span>
-                      <span class="tabular block text-[11px] text-ink-soft">
+                      <span class="tabular block text-xs text-muted-foreground">
                         {{ p.code }} · Lime {{ p.limeVersion }}
                       </span>
                     </span>
                     @if (riskOf(p.id); as risk) {
                       @if (risk.eol > 0) {
-                        <span class="tabular shrink-0 text-[12px] text-overdue">{{ risk.eol }}</span>
+                        <span class="tabular shrink-0 rounded-md bg-destructive/10 px-1.5 text-xs text-destructive">{{ risk.eol }}</span>
                       } @else if (risk.near > 0) {
-                        <span class="tabular shrink-0 text-[12px] text-soon">{{ risk.near }}</span>
+                        <span class="tabular shrink-0 rounded-md bg-warning/15 px-1.5 text-xs text-warning">{{ risk.near }}</span>
                       }
                     }
                   </button>
                 } @empty {
-                  <p class="px-3 py-3 text-[13px] text-ink-soft">No project matches.</p>
+                  <p class="px-2 py-6 text-center text-sm text-muted-foreground">No project matches.</p>
                 }
               </div>
             </div>
           }
         </div>
 
-        <nav class="flex flex-1 flex-wrap justify-center gap-1" aria-label="Sections">
+        <nav class="flex flex-1 items-center gap-1 overflow-x-auto" aria-label="Sections">
           @for (item of nav; track item.path) {
             <a [routerLink]="item.path" routerLinkActive="pill-active" class="pill">
               {{ item.label }}
               @if (item.badge && needsYou() > 0) {
-                <span class="tabular text-[12px] text-overdue">{{ needsYou() }}</span>
+                <span class="tabular rounded-md bg-destructive/10 px-1.5 text-xs text-destructive">{{ needsYou() }}</span>
               }
             </a>
           }
@@ -115,7 +119,9 @@ import { ShaderBackground } from './shared/shader-background';
 
         <button
           type="button"
-          class="glass grid h-9 w-9 place-items-center rounded-full border border-rule bg-elevated text-ink-soft hover:text-ink"
+          hlmBtn
+          variant="ghost"
+          size="icon"
           (click)="theme.toggle()"
           [attr.aria-label]="
             theme.mode() === 'dark' ? 'Switch to the light theme' : 'Switch to the dark theme'
@@ -135,35 +141,24 @@ import { ShaderBackground } from './shared/shader-background';
         </button>
 
         @if (session.user(); as me) {
-          <span
-            class="glass flex items-center gap-2.5 rounded-full border border-rule bg-elevated py-1 pr-3 pl-1"
-            [title]="me.email + ' · ' + me.role.toLowerCase()"
-          >
-            <span
-              class="grid h-7 w-7 place-items-center rounded-full brand-gradient text-[11px]"
-              aria-hidden="true"
-              >{{ me.initials }}</span
-            >
-            <span class="text-[13px]">{{ me.displayName }}</span>
+          <span class="flex items-center gap-2" [title]="me.email + ' · ' + me.role.toLowerCase()">
+            <hlm-avatar size="sm">
+              <span hlmAvatarFallback class="bg-primary text-[10px] font-semibold text-primary-foreground">{{ me.initials }}</span>
+            </hlm-avatar>
+            <span class="hidden text-sm font-medium xl:inline">{{ me.displayName }}</span>
             @if (me.role === 'VIEWER') {
-              <span class="text-[11px] text-ink-faint">read only</span>
+              <span class="rounded-md border px-1.5 text-xs text-muted-foreground">read only</span>
             }
           </span>
         }
 
-        <button
-          type="button"
-          class="text-[13px] text-ink-soft hover:text-ink"
-          (click)="signOut()"
-        >
-          Sign out
-        </button>
-      </header>
+        <button type="button" hlmBtn variant="ghost" size="sm" (click)="signOut()">Sign out</button>
+      </div>
+    </header>
 
-      <main class="flex-1" (click)="open.set(false)">
-        <router-outlet />
-      </main>
-    </div>
+    <main class="mx-auto w-full max-w-[1500px] flex-1 px-5 py-6">
+      <router-outlet />
+    </main>
 
     <lime-celebrate />
   `,
@@ -206,11 +201,11 @@ export class Shell {
   });
 
   protected readonly activeLabel = computed(
-    () => this.store.activeProject()?.name ?? 'All projects',
+    () => this.store.activeProject()?.name ?? 'No project',
   );
 
   protected readonly activeCode = computed(
-    () => this.store.activeProject()?.code ?? 'ALL',
+    () => this.store.activeProject()?.code ?? '—',
   );
 
   protected readonly needsYou = () => this.store.inbox().length;

@@ -1,11 +1,12 @@
 import { Component, computed, input } from '@angular/core';
 import { AuthLayout } from './auth-layout';
+import { HlmButton } from '@spartan-ng/helm/button';
 
 const SSO_LOGIN_PATH = '/api/v1/auth/oidc/login';
 
 @Component({
   selector: 'lime-login',
-  imports: [AuthLayout],
+  imports: [HlmButton, AuthLayout],
   host: { class: 'block' },
   template: `
     <lime-auth-layout
@@ -21,7 +22,10 @@ const SSO_LOGIN_PATH = '/api/v1/auth/oidc/login';
 
         <button
           type="button"
-          class="btn btn-primary w-full justify-center gap-2.5 py-2.5"
+          hlmBtn
+          variant="outline"
+          size="lg"
+          class="w-full gap-2.5"
           (click)="startSso()"
         >
           <svg

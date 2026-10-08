@@ -3,13 +3,14 @@ import { ApiActionEnvironment, ApiUpgradeAction } from '../core/api';
 import { formatDate, formatDays, statusFill, statusOf } from '../core/lifecycle';
 import { JiraPanel } from './jira-panel';
 import { TechIcon } from './tech-icon';
+import { HlmCardImports } from '@spartan-ng/helm/card';
 
 @Component({
   selector: 'lime-plan-card',
-  imports: [TechIcon, JiraPanel],
+  imports: [HlmCardImports, TechIcon, JiraPanel],
   host: { class: 'block' },
   template: `
-    <article class="card relative overflow-hidden pl-6 pr-6 py-5">
+    <article hlmCard class="block relative overflow-hidden pl-6 pr-6 py-5">
       <span
         class="absolute inset-y-0 left-0 w-[5px]"
         [style.background]="urgencyColour()"
@@ -86,7 +87,7 @@ import { TechIcon } from './tech-icon';
               } @else {
                 <button
                   type="button"
-                  class="mt-1 text-[11.5px] text-accent-bright hover:underline"
+                  class="mt-1 text-[11.5px] text-primary hover:underline"
                   (click)="complete.emit(env.deploymentId)"
                 >
                   mark done
@@ -113,7 +114,7 @@ import { TechIcon } from './tech-icon';
         </p>
 
         <span class="flex items-center gap-4 text-[12px]">
-          <button type="button" class="text-accent-bright" (click)="editing.emit()">
+          <button type="button" class="text-primary" (click)="editing.emit()">
             Edit
           </button>
           <button type="button" class="text-overdue" (click)="removing.emit()">

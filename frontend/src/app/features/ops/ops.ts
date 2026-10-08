@@ -1,5 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmButton } from '@spartan-ng/helm/button';
 
 type Severity = 'critical' | 'warning' | 'info' | 'good';
 
@@ -35,6 +37,7 @@ const ICONS: Record<Severity, string> = {
 
 @Component({
   selector: 'lime-ops',
+  imports: [HlmCardImports, HlmButton],
   host: { class: 'block' },
   template: `
     <header class="mb-6">
@@ -45,22 +48,22 @@ const ICONS: Record<Severity, string> = {
       </p>
     </header>
 
-    <section class="card mb-5 flex flex-wrap items-center gap-2 p-4">
-      <button class="btn" (click)="resync()" [disabled]="busy()">
+    <section hlmCard class="mb-5 flex flex-wrap items-center gap-2 p-4">
+      <button hlmBtn variant="outline" (click)="resync()" [disabled]="busy()">
         {{ busy() === 'resync' ? 'Syncing…' : 'Resync end-of-life dates' }}
       </button>
-      <button class="btn" (click)="load()" [disabled]="!!busy()">Refresh list</button>
-      <button class="btn btn-primary" (click)="sendAll()"
+      <button hlmBtn variant="outline" (click)="load()" [disabled]="!!busy()">Refresh list</button>
+      <button hlmBtn (click)="sendAll()"
         [disabled]="!!busy() || items().length === 0">
         Send all {{ items().length }}
       </button>
-      <button class="btn" (click)="test()" [disabled]="!!busy()">Test webhook</button>
+      <button hlmBtn variant="outline" (click)="test()" [disabled]="!!busy()">Test webhook</button>
 
       <span class="ml-auto text-[13px] text-ink-soft">{{ note() }}</span>
     </section>
 
     @if (sync(); as s) {
-      <section class="card mb-5 p-4 text-[13px]">
+      <section hlmCard class="block mb-5 p-4 text-[13px]">
         <p class="m-0">
           {{ s.cyclesUpdated }} cycles refreshed across {{ s.technologies }}
           technologies · {{ s.changes.length }} changed
@@ -91,7 +94,7 @@ const ICONS: Record<Severity, string> = {
     }
 
     @for (group of groups(); track group) {
-      <section class="card mb-4 p-4">
+      <section hlmCard class="block mb-4 p-4">
         <h2 class="m-0 mb-3 text-[13px] tracking-[0.1em] text-ink-soft uppercase">
           {{ group }}
         </h2>
@@ -105,7 +108,7 @@ const ICONS: Record<Severity, string> = {
                 <p class="m-0 truncate text-[12px] text-ink-soft">{{ item.subtitle }}</p>
               }
             </div>
-            <button class="btn shrink-0" (click)="send(item)" [disabled]="!!busy()">
+            <button hlmBtn variant="outline" class="shrink-0" (click)="send(item)" [disabled]="!!busy()">
               {{ busy() === item.key ? 'Sending…' : 'Send' }}
             </button>
           </div>

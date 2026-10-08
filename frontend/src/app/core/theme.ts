@@ -12,6 +12,7 @@ export class Theme {
     effect(() => {
       const mode = this.mode();
       document.documentElement.dataset['theme'] = mode;
+      document.documentElement.classList.toggle('dark', mode === 'dark');
 
       try {
         localStorage.setItem(STORAGE_KEY, mode);

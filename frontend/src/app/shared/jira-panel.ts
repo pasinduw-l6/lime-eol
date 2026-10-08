@@ -6,10 +6,12 @@ import {
   ApiJiraLink,
   JiraStatusCategory,
 } from '../core/api';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
 
 @Component({
   selector: 'lime-jira-panel',
-  imports: [FormsModule],
+  imports: [HlmButton, HlmInput, FormsModule],
   host: { class: 'block' },
   template: `
     <div class="mt-4 border-t border-rule pt-4">
@@ -27,7 +29,7 @@ import {
         @if (jira.linked) {
           <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
             <a
-              class="tabular text-[13px] font-semibold text-accent-bright hover:underline"
+              class="tabular text-[13px] font-semibold text-primary hover:underline"
               [href]="jira.url"
               target="_blank"
               rel="noopener noreferrer"
@@ -68,7 +70,7 @@ import {
               <span class="text-ink-faint">{{ syncedLabel() }}</span>
               <button
                 type="button"
-                class="text-accent-bright disabled:opacity-50"
+                class="text-primary disabled:opacity-50"
                 [disabled]="busy()"
                 (click)="sync()"
               >
@@ -134,14 +136,14 @@ import {
               (submit)="addStep($event)"
             >
               <input
-                class="input mt-0"
+                hlmInput
                 [(ngModel)]="newSummary"
                 name="stepsummary"
                 placeholder="Add a step in Jira"
                 [disabled]="adding()"
               />
               <select
-                class="input mt-0"
+                hlmInput
                 [(ngModel)]="newAssignee"
                 name="stepassignee"
                 [disabled]="adding()"
@@ -153,7 +155,7 @@ import {
                 }
               </select>
               <input
-                class="input mt-0"
+                hlmInput
                 type="date"
                 [(ngModel)]="newDue"
                 name="stepdue"
@@ -161,7 +163,7 @@ import {
                 aria-label="Due date"
                 title="Due date"
               />
-              <button type="submit" class="btn" [disabled]="adding()">
+              <button type="submit" hlmBtn variant="outline" [disabled]="adding()">
                 {{ adding() ? 'Adding…' : 'Add' }}
               </button>
             </form>
@@ -175,13 +177,13 @@ import {
             @if (connected()) {
               <form class="ml-auto flex items-center gap-2" (submit)="submitLink($event)">
                 <input
-                  class="input tabular mt-0 w-[150px]"
+                  hlmInput class="tabular w-[150px]"
                   [(ngModel)]="issueKey"
                   name="issuekey"
                   [placeholder]="demo() ? 'DEMO-101' : 'OPS-1042'"
                   aria-label="Jira issue key"
                 />
-                <button type="submit" class="btn" [disabled]="busy()">
+                <button type="submit" hlmBtn variant="outline" [disabled]="busy()">
                   {{ busy() ? 'Linking…' : 'Link issue' }}
                 </button>
               </form>
@@ -354,7 +356,7 @@ export class JiraPanel {
       case 'done':
         return 'var(--color-good)';
       case 'in-progress':
-        return 'var(--color-accent-bright)';
+        return 'var(--primary)';
       case 'to-do':
         return 'var(--color-ink-soft)';
       default:

@@ -8,7 +8,7 @@ const REASON_COLOUR: Record<string, string> = {
   DRIFT_CORRECTION: 'var(--color-soon)',
   INITIAL_RECORD: 'var(--color-ink-faint)',
   DECOMMISSION: 'var(--color-ink-faint)',
-  PLANNED_UPGRADE: 'var(--color-accent-bright)',
+  PLANNED_UPGRADE: 'var(--primary)',
 };
 
 const REASON_LABEL: Record<string, string> = {
@@ -64,7 +64,7 @@ const REASON_LABEL: Record<string, string> = {
 
             <span class="mt-0.5 block text-[12px] text-ink-soft">
               @if (entry.ticket) {
-                <span class="tabular text-accent-bright">{{ entry.ticket }}</span>
+                <span class="tabular text-primary">{{ entry.ticket }}</span>
                 <span> · </span>
               }
               {{ entry.who }}
@@ -74,7 +74,7 @@ const REASON_LABEL: Record<string, string> = {
                   [href]="entry.evidenceUrl"
                   target="_blank"
                   rel="noopener"
-                  class="text-accent-bright no-underline hover:underline"
+                  class="text-primary no-underline hover:underline"
                   >evidence</a
                 >
               }
@@ -125,7 +125,7 @@ export class ChangeTimeline {
         ? `${change.technology} ${change.fromVersion} → ${change.toVersion}`
         : `${change.technology} ${change.toVersion} installed`,
       reason: REASON_LABEL[change.reason] ?? change.reason.toLowerCase(),
-      colour: REASON_COLOUR[change.reason] ?? 'var(--color-accent)',
+      colour: REASON_COLOUR[change.reason] ?? 'var(--primary)',
       ticket: change.ticketRef,
       who: change.recordedBy ? `by ${change.recordedBy}` : 'recorded by unknown',
       note: change.note,

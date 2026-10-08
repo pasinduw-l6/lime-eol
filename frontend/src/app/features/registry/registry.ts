@@ -6,6 +6,11 @@ import { RegistryStore } from '../../core/registry.store';
 import { ComponentType, Cycle, CycleRule, Technology } from '../../core/models';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 
 const COMPONENT_TYPES: ComponentType[] = [
   'DATABASE',
@@ -38,10 +43,10 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
 
 @Component({
   selector: 'lime-registry',
-  imports: [FormsModule, Modal, TechIcon],
+  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, TechIcon],
   host: { class: 'block' },
   template: `
-    <section class="card mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
+    <section hlmCard class="mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
       <div>
         <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Registry</h1>
         <p class="m-0 text-[14px] text-ink-soft">
@@ -49,17 +54,17 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
           {{ engineers().length }} engineers
         </p>
       </div>
-      <button type="button" class="btn btn-primary" (click)="openCatalogue()">
+      <button type="button" hlmBtn (click)="openCatalogue()">
         Add technology
       </button>
     </section>
 
     @if (error(); as message) {
-      <p class="card mb-5 px-7 py-4 text-[14px] text-overdue" role="alert">{{ message }}</p>
+      <p hlmCard class="block mb-5 px-7 py-4 text-[14px] text-overdue" role="alert">{{ message }}</p>
     }
 
     <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <section class="card overflow-hidden">
+      <section hlmCard class="block overflow-hidden py-0">
         <header class="border-b border-rule px-6 py-4">
           <h2 class="m-0 text-[15px] font-semibold">Technologies</h2>
         </header>
@@ -90,7 +95,7 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
                 <span class="tabular text-[12px] text-overdue">{{ row.atRisk }} at risk</span>
               }
               <span class="flex gap-2 text-[12px]">
-                <button type="button" class="text-accent-bright" (click)="editTechnology(row.technology)">Edit</button>
+                <button type="button" class="text-primary" (click)="editTechnology(row.technology)">Edit</button>
                 <button type="button" class="text-overdue" (click)="removeTechnology(row.technology)">Delete</button>
               </span>
             </div>
@@ -101,46 +106,46 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
                   <h3 class="m-0 text-[13px] font-semibold">Cycles</h3>
                   <button
                     type="button"
-                    class="text-[12px] text-accent-bright"
+                    class="text-[12px] text-primary"
                     (click)="cycleDraft.set(newCycle(row.technology))"
                   >
                     Add cycle by hand
                   </button>
                 </div>
-                <table class="w-full border-collapse text-[13px]">
-                  <thead>
-                    <tr class="text-left text-[11px] text-ink-soft">
-                      <th class="py-1 pr-3 font-medium">Cycle</th>
-                      <th class="py-1 pr-3 font-medium">Versions</th>
-                      <th class="py-1 pr-3 font-medium">Ends</th>
-                      <th class="py-1 pr-3 font-medium">Source</th>
-                      <th class="py-1 text-right font-medium"></th>
+                <table hlmTable class="w-full border-collapse text-[13px]">
+                  <thead hlmTHead>
+                    <tr hlmTr class="text-left text-[11px] text-ink-soft">
+                      <th hlmTh class="py-1 pr-3 font-medium">Cycle</th>
+                      <th hlmTh class="py-1 pr-3 font-medium">Versions</th>
+                      <th hlmTh class="py-1 pr-3 font-medium">Ends</th>
+                      <th hlmTh class="py-1 pr-3 font-medium">Source</th>
+                      <th hlmTh class="py-1 text-right font-medium"></th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody hlmTBody>
                     @for (c of row.cycles; track c.cycle.id) {
-                      <tr class="border-t border-rule">
-                        <td class="tabular py-1.5 pr-3">{{ c.cycle.cycle }}</td>
-                        <td class="tabular py-1.5 pr-3 text-ink-soft">
+                      <tr hlmTr class="border-t border-rule">
+                        <td hlmTd class="whitespace-normal tabular py-1.5 pr-3">{{ c.cycle.cycle }}</td>
+                        <td hlmTd class="whitespace-normal tabular py-1.5 pr-3 text-ink-soft">
                           {{ c.cycle.versions.join(', ') || '—' }}
                         </td>
-                        <td class="tabular py-1.5 pr-3" [style.color]="c.colour">
+                        <td hlmTd class="whitespace-normal tabular py-1.5 pr-3" [style.color]="c.colour">
                           {{ date(c.cycle.eolDate) }}
                           <span class="text-[11px]">({{ days(c.days) }})</span>
                         </td>
-                        <td class="py-1.5 pr-3 text-[11px] text-ink-soft">
+                        <td hlmTd class="whitespace-normal py-1.5 pr-3 text-[11px] text-ink-soft">
                           {{ c.cycle.eolSource === 'API' ? 'endoflife.date' : 'entered by hand' }}
                         </td>
-                        <td class="py-1.5 text-right">
+                        <td hlmTd class="whitespace-normal py-1.5 text-right">
                           <span class="flex justify-end gap-2 text-[12px]">
-                            <button type="button" class="text-accent-bright" (click)="editCycle(c.cycle)">Edit</button>
+                            <button type="button" class="text-primary" (click)="editCycle(c.cycle)">Edit</button>
                             <button type="button" class="text-overdue" (click)="removeCycle(c.cycle)">Delete</button>
                           </span>
                         </td>
                       </tr>
                     } @empty {
-                      <tr>
-                        <td colspan="5" class="py-3 text-ink-soft">
+                      <tr hlmTr>
+                        <td hlmTd colspan="5" class="py-3 text-ink-soft">
                           No cycles yet. Sync from endoflife.date or add one by hand.
                         </td>
                       </tr>
@@ -153,7 +158,7 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
         }
       </section>
 
-      <section class="card overflow-hidden">
+      <section hlmCard class="block overflow-hidden py-0">
         <header class="border-b border-rule px-6 py-4">
           <h2 class="m-0 text-[15px] font-semibold">Team</h2>
           <p class="m-0 text-[12px] text-ink-soft">
@@ -214,17 +219,17 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
                   {{ product.slug }} · {{ product.category }}
                 </p>
               </div>
-              <button type="button" class="btn" (click)="chosen.set(null)">Change</button>
+              <button type="button" hlmBtn variant="outline" (click)="chosen.set(null)">Change</button>
             </div>
 
             <div class="grid gap-3 sm:grid-cols-2">
-              <label class="field">
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
                 Name in this registry
-                <input class="input" [(ngModel)]="draftName" name="dname" />
+                <input hlmInput [(ngModel)]="draftName" name="dname" />
               </label>
-              <label class="field">
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
                 Type
-                <select class="input" [(ngModel)]="draftType" name="dtype">
+                <select hlmInput [(ngModel)]="draftType" name="dtype">
                   @for (t of componentTypes; track t) {
                     <option [value]="t">{{ t.toLowerCase() }}</option>
                   }
@@ -242,10 +247,10 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
             }
 
             <div class="flex justify-end gap-2">
-              <button type="button" class="btn" (click)="closeCatalogue()">Cancel</button>
+              <button type="button" hlmBtn variant="outline" (click)="closeCatalogue()">Cancel</button>
               <button
                 type="button"
-                class="btn btn-primary"
+                hlmBtn
                 [disabled]="saving()"
                 (click)="addFromCatalogue(product)"
               >
@@ -255,10 +260,10 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
           </div>
         } @else {
           <div class="grid gap-3">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Search {{ api.catalogue().length }} tracked products
               <input
-                class="input"
+                hlmInput
                 [(ngModel)]="catalogueQuery"
                 name="catq"
                 placeholder="redis, kafka, rhel, tomcat…"
@@ -270,9 +275,9 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
               @for (c of categories(); track c) {
                 <button
                   type="button"
-                  class="glass rounded-full border px-3 py-1 text-[12px]"
-                  [class.border-accent]="category() === c"
-                  [class.text-accent-bright]="category() === c"
+                  class="glass rounded-md border px-3 py-1 text-[12px]"
+                  [class.border-primary]="category() === c"
+                  [class.text-primary]="category() === c"
                   [class.border-rule]="category() !== c"
                   [class.text-ink-soft]="category() !== c"
                   (click)="category.set(category() === c ? null : c)"
@@ -340,33 +345,33 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
       >
         <form class="grid gap-4" (submit)="saveTechnology($event)">
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Name
-              <input class="input" [(ngModel)]="form.name" name="name" />
+              <input hlmInput [(ngModel)]="form.name" name="name" />
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Type
-              <select class="input" [(ngModel)]="form.componentType" name="type">
+              <select hlmInput [(ngModel)]="form.componentType" name="type">
                 @for (t of componentTypes; track t) {
                   <option [value]="t">{{ t.toLowerCase() }}</option>
                 }
               </select>
             </label>
           </div>
-          <label class="field">
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Vendor
-            <input class="input" [(ngModel)]="form.vendor" name="vendor" />
+            <input hlmInput [(ngModel)]="form.vendor" name="vendor" />
           </label>
-          <label class="field">
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Cycle rule
-            <select class="input" [(ngModel)]="form.cycleRule" name="rule">
+            <select hlmInput [(ngModel)]="form.cycleRule" name="rule">
               <option value="MAJOR">MAJOR — 20.11.1 becomes 20</option>
               <option value="MAJOR_MINOR">MAJOR_MINOR — 6.0.14 becomes 6.0</option>
             </select>
           </label>
-          <label class="field">
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Notes
-            <input class="input" [(ngModel)]="form.notes" name="notes" />
+            <input hlmInput [(ngModel)]="form.notes" name="notes" />
           </label>
 
           @if (error()) {
@@ -379,8 +384,8 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
           </p>
 
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn" (click)="techDraft.set(null)">Cancel</button>
-            <button type="submit" class="btn btn-primary">Save changes</button>
+            <button type="button" hlmBtn variant="outline" (click)="techDraft.set(null)">Cancel</button>
+            <button type="submit" hlmBtn>Save changes</button>
           </div>
         </form>
       </lime-modal>
@@ -394,32 +399,32 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
       >
         <form class="grid gap-4" (submit)="saveCycle($event)">
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Cycle
-              <input class="input tabular" [(ngModel)]="form.cycle" name="cycle" placeholder="7.2" />
+              <input hlmInput class="tabular" [(ngModel)]="form.cycle" name="cycle" placeholder="7.2" />
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Versions in use (comma separated)
-              <input class="input tabular" [(ngModel)]="versionsText" name="versions" placeholder="7.2.4, 7.2.1" />
+              <input hlmInput class="tabular" [(ngModel)]="versionsText" name="versions" placeholder="7.2.4, 7.2.1" />
             </label>
           </div>
           <div class="grid gap-3 sm:grid-cols-3">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Released
-              <input type="date" class="input" [(ngModel)]="form.releaseDate" name="released" />
+              <input type="date" hlmInput [(ngModel)]="form.releaseDate" name="released" />
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Active support ends
-              <input type="date" class="input" [(ngModel)]="form.activeSupportEnd" name="active" />
+              <input type="date" hlmInput [(ngModel)]="form.activeSupportEnd" name="active" />
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               End of life
-              <input type="date" class="input" [(ngModel)]="form.eolDate" name="eol" />
+              <input type="date" hlmInput [(ngModel)]="form.eolDate" name="eol" />
             </label>
           </div>
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn" (click)="cycleDraft.set(null)">Cancel</button>
-            <button type="submit" class="btn btn-primary">
+            <button type="button" hlmBtn variant="outline" (click)="cycleDraft.set(null)">Cancel</button>
+            <button type="submit" hlmBtn>
               {{ form.id ? 'Save changes' : 'Add cycle' }}
             </button>
           </div>

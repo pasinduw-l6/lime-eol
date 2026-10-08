@@ -16,6 +16,10 @@ import { Modal } from '../../shared/modal';
 import { PlanBoard } from '../../shared/plan-board';
 import { PlanCard } from '../../shared/plan-card';
 import { PlanDetail } from '../../shared/plan-detail';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
 
 const STATUSES = ['NOT_STARTED', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'DEFERRED'];
 
@@ -32,10 +36,10 @@ interface Draft {
 
 @Component({
   selector: 'lime-actions',
-  imports: [FormsModule, Modal, PlanCard, PlanBoard, PlanDetail],
+  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, FormsModule, Modal, PlanCard, PlanBoard, PlanDetail],
   host: { class: 'block' },
   template: `
-    <section class="card mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
+    <section hlmCard class="mb-5 flex flex-wrap items-start justify-between gap-4 px-7 py-6">
       <div>
         <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Upgrade actions</h1>
         <p class="m-0 text-[14px] text-ink-soft">
@@ -49,30 +53,30 @@ interface Draft {
           }
         </p>
       </div>
-      <button type="button" class="btn btn-primary" (click)="create()">New action</button>
+      <button type="button" hlmBtn (click)="create()">New action</button>
     </section>
 
     @if (api.actionsResource.error()) {
-      <p class="card mb-5 px-7 py-4 text-[14px] text-overdue" role="alert">
+      <p hlmCard class="block mb-5 px-7 py-4 text-[14px] text-overdue" role="alert">
         Could not load upgrade actions from the API.
       </p>
     }
 
-    <section class="card mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
+    <section hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
       <input
         type="search"
         [(ngModel)]="query"
         placeholder="Search technology, ticket or assignee"
         aria-label="Search actions"
-        class="input mt-0 min-w-[240px] flex-1 rounded-full"
+        hlmInput class="min-w-[240px] flex-1"
       />
-      <div class="glass flex flex-wrap gap-1 rounded-full border border-rule bg-elevated p-1">
+      <div class="segmented flex-wrap">
         @for (f of filters; track f) {
           <button
             type="button"
-            class="rounded-full px-3.5 py-1.5 text-[13px] capitalize"
-            [class.bg-ink]="filter() === f"
-            [class.text-ground]="filter() === f"
+            class="px-3.5 py-1 text-[13px] capitalize"
+            [class.bg-background]="filter() === f" [class.shadow-sm]="filter() === f"
+            [class.text-foreground]="filter() === f"
             [class.text-ink-soft]="filter() !== f"
             (click)="filter.set(f)"
           >
@@ -86,10 +90,10 @@ interface Draft {
       @for (mode of views; track mode) {
         <button
           type="button"
-          class="glass rounded-full border border-rule px-3 py-1 text-[12px] capitalize"
+          class="glass rounded-md border border-rule px-3 py-1 text-[12px] capitalize"
           [class.bg-ink]="view() === mode"
-          [style.color]="view() === mode ? 'var(--color-accent-bright)' : null"
-          [style.border-color]="view() === mode ? 'var(--color-accent-bright)' : null"
+          [style.color]="view() === mode ? 'var(--primary)' : null"
+          [style.border-color]="view() === mode ? 'var(--primary)' : null"
           (click)="view.set(mode)"
         >
           {{ mode }}
@@ -98,12 +102,12 @@ interface Draft {
     </div>
 
     @if (filtered().length === 0) {
-      <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
+      <p hlmCard class="block px-7 py-10 text-center text-[14px] text-ink-soft">
         @if (api.actionsResource.isLoading()) {
           Loading…
         } @else {
           No action matches.
-          <button type="button" class="text-accent-bright" (click)="create()">Create one</button>.
+          <button type="button" class="text-primary" (click)="create()">Create one</button>.
         }
       </p>
     } @else if (view() === 'board') {
@@ -133,10 +137,10 @@ interface Draft {
       >
         <form class="grid gap-4" (submit)="save($event)">
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Technology
               <select
-                class="input"
+                hlmInput
                 [(ngModel)]="form.technology"
                 name="technology"
                 (change)="onTechnology()"
@@ -147,9 +151,9 @@ interface Draft {
                 }
               </select>
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Cycle running out
-              <select class="input" [(ngModel)]="form.technologyCycleId" name="cycle">
+              <select hlmInput [(ngModel)]="form.technologyCycleId" name="cycle">
                 <option value="">Choose…</option>
                 @for (c of cyclesFor(form.technology); track c.id) {
                   <option [value]="c.id">{{ c.cycle }} — ends {{ date(c.eolDate) }}</option>
@@ -159,33 +163,33 @@ interface Draft {
           </div>
 
           <div class="grid gap-3 sm:grid-cols-3">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Target version
-              <select class="input tabular" [(ngModel)]="form.targetVersion" name="target">
+              <select hlmInput class="tabular" [(ngModel)]="form.targetVersion" name="target">
                 <option value="">Choose…</option>
                 @for (t of targetsFor(form.technology, form.technologyCycleId); track t.value) {
                   <option [value]="t.value">{{ t.label }}</option>
                 }
               </select>
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Status
-              <select class="input" [(ngModel)]="form.status" name="status">
+              <select hlmInput [(ngModel)]="form.status" name="status">
                 @for (s of statuses; track s) {
                   <option [value]="s">{{ s.toLowerCase().replace('_', ' ') }}</option>
                 }
               </select>
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Planned date
-              <input type="date" class="input" [(ngModel)]="form.plannedDate" name="planned" />
+              <input type="date" hlmInput [(ngModel)]="form.plannedDate" name="planned" />
             </label>
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Assignee
-              <select class="input" [(ngModel)]="form.assigneeId" name="assignee">
+              <select hlmInput [(ngModel)]="form.assigneeId" name="assignee">
                 <option value="">Unassigned</option>
                 @for (e of engineers(); track e.id) {
                   <option [value]="e.id">{{ e.name }}</option>
@@ -200,8 +204,8 @@ interface Draft {
               @for (d of deployments(); track d.id) {
                 <button
                   type="button"
-                  class="glass rounded-full border px-3 py-1.5 text-[12px]"
-                  [class.border-accent]="form.deploymentIds.includes(d.id)"
+                  class="glass rounded-md border px-3 py-1.5 text-[12px]"
+                  [class.border-primary]="form.deploymentIds.includes(d.id)"
                   [class.border-rule]="!form.deploymentIds.includes(d.id)"
                   (click)="toggleDeployment(d.id)"
                 >
@@ -216,8 +220,8 @@ interface Draft {
           }
 
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn" (click)="closeDraft()">Cancel</button>
-            <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            <button type="button" hlmBtn variant="outline" (click)="closeDraft()">Cancel</button>
+            <button type="submit" hlmBtn [disabled]="saving()">
               {{ saving() ? 'Saving…' : form.id ? 'Save changes' : 'Create action' }}
             </button>
           </div>
@@ -235,8 +239,8 @@ interface Draft {
           The deadline stays; only the plan for it is removed.
         </p>
         <div class="flex justify-end gap-2">
-          <button type="button" class="btn" (click)="confirmDelete.set(null)">Cancel</button>
-          <button type="button" class="btn btn-danger" (click)="remove(action)">Delete</button>
+          <button type="button" hlmBtn variant="outline" (click)="confirmDelete.set(null)">Cancel</button>
+          <button type="button" hlmBtn variant="destructive" (click)="remove(action)">Delete</button>
         </div>
       </lime-modal>
     }
@@ -480,7 +484,7 @@ export class Actions {
       case 'OVERDUE':
         return 'var(--color-overdue)';
       case 'IN_PROGRESS':
-        return 'var(--color-accent-bright)';
+        return 'var(--primary)';
       case 'DEFERRED':
         return 'var(--color-ink-faint)';
       default:

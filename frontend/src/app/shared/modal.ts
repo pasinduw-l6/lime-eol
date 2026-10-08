@@ -1,84 +1,57 @@
-import {
-  AfterViewInit,
-  Component,
-  ElementRef,
-  OnDestroy,
-  input,
-  output,
-  viewChild,
-} from '@angular/core';
-import gsap from 'gsap';
+import { Component, input, output } from '@angular/core';
+import { HlmButton } from '@spartan-ng/helm/button';
 
 @Component({
   selector: 'lime-modal',
+  imports: [HlmButton],
   host: { class: 'block' },
   template: `
     <div
-      class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-10"
-      style="background: rgb(0 0 0 / 45%); backdrop-filter: blur(6px)"
+      class="animate-in fade-in-0 fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-10 duration-150 supports-backdrop-filter:backdrop-blur-xs"
       (click)="dismiss.emit()"
       (keydown.escape)="dismiss.emit()"
       tabindex="-1"
     >
       <div
-        #panel
-        class="card popover relative w-full px-7 py-6"
+        class="animate-in fade-in-0 zoom-in-95 relative grid w-full gap-6 rounded-xl bg-popover p-6 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-150"
         [style.max-width]="'min(' + maxWidth() + 'px, 100%)'"
         role="dialog"
         aria-modal="true"
         [attr.aria-label]="title()"
         (click)="$event.stopPropagation()"
       >
-        <header class="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <h2 class="m-0 text-[19px] font-semibold tracking-[-0.01em]">{{ title() }}</h2>
-            @if (subtitle()) {
-              <p class="m-0 text-[13px] text-ink-soft">{{ subtitle() }}</p>
-            }
-          </div>
-          <button
-            type="button"
-            class="rounded-full px-2 text-[18px] text-ink-soft hover:text-ink"
-            (click)="dismiss.emit()"
-            aria-label="Close"
-          >
-            ×
-          </button>
+        <header class="flex flex-col gap-2 pr-8">
+          <h2 class="m-0 text-lg leading-none font-semibold">{{ title() }}</h2>
+          @if (subtitle()) {
+            <p class="m-0 text-sm text-muted-foreground">{{ subtitle() }}</p>
+          }
         </header>
 
-        <ng-content />
+        <button
+          type="button"
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="absolute top-4 right-4 text-muted-foreground"
+          (click)="dismiss.emit()"
+          aria-label="Close"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" stroke-linecap="round" />
+          </svg>
+        </button>
+
+        <div>
+          <ng-content />
+        </div>
       </div>
     </div>
   `,
 })
-export class Modal implements AfterViewInit, OnDestroy {
+export class Modal {
   readonly title = input.required<string>();
 
   readonly maxWidth = input(620);
   readonly subtitle = input<string>('');
   readonly dismiss = output<void>();
-
-  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
-  private tween?: gsap.core.Tween;
-
-  ngAfterViewInit(): void {
-    const panel = this.panel()?.nativeElement;
-
-    if (!panel || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return;
-    }
-
-    this.tween = gsap.from(panel, {
-      opacity: 0,
-      y: 18,
-      scale: 0.97,
-      duration: 0.38,
-      ease: 'back.out(1.4)',
-      clearProps: 'opacity,transform',
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.tween?.kill();
-  }
 }

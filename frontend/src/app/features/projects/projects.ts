@@ -6,15 +6,20 @@ import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
 import { EnvironmentName, Project, ProjectStatus } from '../../core/models';
 import { Environments } from '../environments/environments';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 
 const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
 @Component({
   selector: 'lime-projects',
-  imports: [FormsModule, Modal, Environments],
+  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, Environments],
   host: { class: 'block' },
   template: `
-    <section class="card mb-5 px-7 py-6">
+    <section hlmCard class="block mb-5 px-7 py-6">
       <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Projects</h1>
@@ -23,7 +28,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             {{ atRiskProjects() }} with something out of support
           </p>
         </div>
-        <button type="button" class="btn btn-primary" (click)="toggleForm()">
+        <button type="button" hlmBtn (click)="toggleForm()">
           {{ showForm() ? 'Cancel' : 'New project' }}
         </button>
       </div>
@@ -124,9 +129,9 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 @for (env of allEnvironments; track env) {
                   <button
                     type="button"
-                    class="glass rounded-full border px-4 py-1.5 text-[13px]"
-                    [class.border-accent]="form.environments.includes(env)"
-                    [class.bg-accent]="form.environments.includes(env)"
+                    class="glass rounded-md border px-4 py-1.5 text-[13px]"
+                    [class.border-primary]="form.environments.includes(env)"
+                    [class.bg-primary]="form.environments.includes(env)"
                     [class.border-rule]="!form.environments.includes(env)"
                     (click)="toggleEnv(env)"
                   >
@@ -144,8 +149,8 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 @for (e of engineers(); track e.id) {
                   <button
                     type="button"
-                    class="glass flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px]"
-                    [class.border-accent]="form.engineerIds.includes(e.id)"
+                    class="glass flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px]"
+                    [class.border-primary]="form.engineerIds.includes(e.id)"
                     [class.bg-elevated]="form.engineerIds.includes(e.id)"
                     [class.border-rule]="!form.engineerIds.includes(e.id)"
                     (click)="toggleEngineer(e.id)"
@@ -168,7 +173,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
               @for (row of form.stack; track $index) {
                 <div class="mb-2 grid grid-cols-[1fr_130px_32px] gap-2">
                   <select
-                    class="input mt-0"
+                    hlmInput
                     [(ngModel)]="row.technology"
                     [name]="'tech' + $index"
                   >
@@ -178,7 +183,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                     }
                   </select>
                   <input
-                    class="input tabular mt-0"
+                    hlmInput class="tabular"
                     [(ngModel)]="row.version"
                     [name]="'ver' + $index"
                     [attr.list]="'versions-' + $index"
@@ -200,7 +205,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                 </div>
               }
 
-              <button type="button" class="btn mt-1" (click)="addStackRow()">
+              <button type="button" hlmBtn variant="outline" class="mt-1" (click)="addStackRow()">
                 Add component
               </button>
             </fieldset>
@@ -217,15 +222,15 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             }
 
             <div class="flex gap-2">
-              <button type="submit" class="btn btn-primary">Create project</button>
-              <button type="button" class="btn" (click)="toggleForm()">Cancel</button>
+              <button type="submit" hlmBtn>Create project</button>
+              <button type="button" hlmBtn variant="outline" (click)="toggleForm()">Cancel</button>
             </div>
           </div>
         </form>
       }
     </section>
 
-    <section class="card mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
+    <section hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-7 py-4">
       <input
         type="search"
         [(ngModel)]="query"
@@ -233,13 +238,13 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
         aria-label="Search projects"
         class="min-w-[240px] flex-1 rounded-full border border-rule bg-elevated px-4 py-2 text-[14px] text-ink"
       />
-      <div class="glass flex gap-1 rounded-full border border-rule bg-elevated p-1">
+      <div class="segmented">
         @for (f of statusFilters; track f) {
           <button
             type="button"
-            class="rounded-full px-3.5 py-1.5 text-[13px] capitalize"
-            [class.bg-ink]="statusFilter() === f"
-            [class.text-ground]="statusFilter() === f"
+            class="px-3.5 py-1 text-[13px] capitalize"
+            [class.bg-background]="statusFilter() === f" [class.shadow-sm]="statusFilter() === f"
+            [class.text-foreground]="statusFilter() === f"
             [class.text-ink-soft]="statusFilter() !== f"
             (click)="statusFilter.set(f)"
           >
@@ -250,23 +255,23 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
       <span class="tabular text-[13px] text-ink-soft">{{ filtered().length }} shown</span>
     </section>
 
-    <section class="card overflow-hidden">
-      <table class="w-full border-collapse text-[14px]">
+    <section hlmCard class="block overflow-hidden py-0">
+      <table hlmTable class="w-full border-collapse text-[14px]">
         <caption class="sr-only">Projects with Lime version, staffing and risk</caption>
-        <thead>
-          <tr class="border-b border-rule text-left text-[12px] text-ink-soft">
-            <th class="px-6 py-3 font-medium">Project</th>
-            <th class="px-3 py-3 font-medium">Lime</th>
-            <th class="px-3 py-3 font-medium">Environments</th>
-            <th class="px-3 py-3 font-medium">Engineers</th>
-            <th class="px-3 py-3 font-medium">At risk</th>
-            <th class="px-6 py-3 font-medium">Status</th>
+        <thead hlmTHead>
+          <tr hlmTr class="border-b border-rule text-left text-[12px] text-ink-soft">
+            <th hlmTh class="px-6 py-3 font-medium">Project</th>
+            <th hlmTh class="px-3 py-3 font-medium">Lime</th>
+            <th hlmTh class="px-3 py-3 font-medium">Environments</th>
+            <th hlmTh class="px-3 py-3 font-medium">Engineers</th>
+            <th hlmTh class="px-3 py-3 font-medium">At risk</th>
+            <th hlmTh class="px-6 py-3 font-medium">Status</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody hlmTBody>
           @for (row of filtered(); track row.project.id) {
-            <tr class="border-b border-rule last:border-b-0">
-              <td class="px-6 py-3">
+            <tr hlmTr class="border-b border-rule last:border-b-0">
+              <td hlmTd class="whitespace-normal px-6 py-3">
                 <button
                   type="button"
                   class="text-left"
@@ -279,11 +284,11 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                   </span>
                 </button>
               </td>
-              <td class="tabular px-3 py-3">{{ row.project.limeVersion }}</td>
-              <td class="px-3 py-3 text-ink-soft">
+              <td hlmTd class="whitespace-normal tabular px-3 py-3">{{ row.project.limeVersion }}</td>
+              <td hlmTd class="whitespace-normal px-3 py-3 text-ink-soft">
                 {{ row.environments.join(', ') || '—' }}
               </td>
-              <td class="px-3 py-3">
+              <td hlmTd class="whitespace-normal px-3 py-3">
                 <span class="flex -space-x-1.5">
                   @for (e of row.engineers; track e.id) {
                     <span
@@ -294,7 +299,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                   }
                 </span>
               </td>
-              <td class="tabular px-3 py-3">
+              <td hlmTd class="whitespace-normal tabular px-3 py-3">
                 @if (row.risk.eol > 0) {
                   <span class="text-overdue">{{ row.risk.eol }} EOL</span>
                 }
@@ -308,26 +313,26 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                   <span class="text-ink-faint">clear</span>
                 }
               </td>
-              <td class="px-6 py-3">
+              <td hlmTd class="whitespace-normal px-6 py-3">
                 <span class="flex items-center justify-end gap-3">
                   <span
                     class="rounded-full border px-2.5 py-0.5 text-[12px]"
                     [class.border-rule]="row.project.status !== 'ACTIVE'"
                     [class.text-ink-soft]="row.project.status !== 'ACTIVE'"
-                    [class.border-accent]="row.project.status === 'ACTIVE'"
-                    [class.text-accent-bright]="row.project.status === 'ACTIVE'"
+                    [class.border-primary]="row.project.status === 'ACTIVE'"
+                    [class.text-primary]="row.project.status === 'ACTIVE'"
                   >
                     {{ row.project.status.toLowerCase() }}
                   </span>
-                  <button type="button" class="text-[12px] text-accent-bright" (click)="manage(row.project)">
+                  <button type="button" class="text-[12px] text-primary" (click)="manage(row.project)">
                     Manage
                   </button>
                 </span>
               </td>
             </tr>
           } @empty {
-            <tr>
-              <td colspan="6" class="px-6 py-8 text-center text-ink-soft">
+            <tr hlmTr>
+              <td hlmTd colspan="6" class="px-6 py-8 text-center text-ink-soft">
                 No project matches that search.
               </td>
             </tr>
@@ -346,14 +351,14 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
       >
         <div class="grid gap-5">
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Project name
-              <input class="input" [(ngModel)]="editForm.name" name="ename" />
+              <input hlmInput [(ngModel)]="editForm.name" name="ename" />
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Lime version
               <input
-                class="input tabular"
+                hlmInput class="tabular"
                 list="lime-versions"
                 [(ngModel)]="editForm.limeVersion"
                 name="elime"
@@ -367,9 +372,9 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             </label>
           </div>
 
-          <label class="field">
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Status
-            <select class="input" [(ngModel)]="editForm.status" name="estatus">
+            <select hlmInput [(ngModel)]="editForm.status" name="estatus">
               @for (s of statuses; track s) {
                 <option [value]="s">{{ s.toLowerCase() }}</option>
               }
@@ -382,8 +387,8 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
               @for (e of engineers(); track e.id) {
                 <button
                   type="button"
-                  class="glass rounded-full border px-3 py-1.5 text-[12px]"
-                  [class.border-accent]="editForm.engineerIds.includes(e.id)"
+                  class="glass rounded-md border px-3 py-1.5 text-[12px]"
+                  [class.border-primary]="editForm.engineerIds.includes(e.id)"
                   [class.bg-elevated]="editForm.engineerIds.includes(e.id)"
                   [class.border-rule]="!editForm.engineerIds.includes(e.id)"
                   (click)="toggleEditEngineer(e.id)"
@@ -415,19 +420,19 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             </ul>
 
             <div class="flex flex-wrap items-end gap-2">
-              <label class="field flex-1">
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal flex-1">
                 Add environment
-                <select class="input" [(ngModel)]="newEnv" name="newenv">
+                <select hlmInput [(ngModel)]="newEnv" name="newenv">
                   @for (env of allEnvironments; track env) {
                     <option [value]="env">{{ env }}</option>
                   }
                 </select>
               </label>
-              <label class="field flex-1">
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal flex-1">
                 Region or site
-                <input class="input" [(ngModel)]="newEnvDetail" name="newdetail" placeholder="eu-west-1" />
+                <input hlmInput [(ngModel)]="newEnvDetail" name="newdetail" placeholder="eu-west-1" />
               </label>
-              <button type="button" class="btn" (click)="addEnvironment(project.id)">Add</button>
+              <button type="button" hlmBtn variant="outline" (click)="addEnvironment(project.id)">Add</button>
             </div>
           </div>
 
@@ -436,12 +441,12 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
           }
 
           <div class="flex flex-wrap justify-between gap-2 border-t border-rule pt-4">
-            <button type="button" class="btn btn-danger" (click)="confirmDelete.set(project)">
+            <button type="button" hlmBtn variant="destructive" (click)="confirmDelete.set(project)">
               Delete project
             </button>
             <span class="flex gap-2">
-              <button type="button" class="btn" (click)="managed.set(null)">Cancel</button>
-              <button type="button" class="btn btn-primary" (click)="saveProject(project.id)">
+              <button type="button" hlmBtn variant="outline" (click)="managed.set(null)">Cancel</button>
+              <button type="button" hlmBtn (click)="saveProject(project.id)">
                 Save changes
               </button>
             </span>
@@ -462,8 +467,8 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
           be gone. This cannot be undone.
         </p>
         <div class="flex justify-end gap-2">
-          <button type="button" class="btn" (click)="confirmDelete.set(null)">Keep it</button>
-          <button type="button" class="btn btn-danger" (click)="deleteProject(project.id)">
+          <button type="button" hlmBtn variant="outline" (click)="confirmDelete.set(null)">Keep it</button>
+          <button type="button" hlmBtn variant="destructive" (click)="deleteProject(project.id)">
             Delete everything
           </button>
         </div>

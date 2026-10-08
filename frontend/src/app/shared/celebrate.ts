@@ -7,17 +7,19 @@ import {
 } from '@angular/core';
 import gsap from 'gsap';
 import { Celebrations } from '../core/celebration.service';
+import { HlmCardImports } from '@spartan-ng/helm/card';
 
 const CONFETTI = [
   'var(--color-lime)',
   'var(--color-lime-bright)',
-  'var(--color-accent)',
-  'var(--color-accent-bright)',
+  'var(--primary)',
+  'var(--primary)',
   'var(--color-soon)',
 ];
 
 @Component({
   selector: 'lime-celebrate',
+  imports: [HlmCardImports],
   host: { class: 'block' },
   template: `
     @if (celebrations.current(); as party) {
@@ -30,7 +32,7 @@ const CONFETTI = [
 
         <div
           #card
-          class="card relative flex w-[21rem] items-center gap-3.5 px-4 py-4"
+          hlmCard class="relative flex w-[21rem] items-center gap-3.5 px-4 py-4"
           style="border-color: color-mix(in oklab, var(--color-lime) 55%, transparent)"
         >
           <img

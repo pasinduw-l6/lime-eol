@@ -12,6 +12,8 @@ import {
 import { RegistryStore } from '../../core/registry.store';
 import { Cycle } from '../../core/models';
 import { TechnologyView } from './technology-view';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmTableImports } from '@spartan-ng/helm/table';
 
 const MS_PER_DAY = 86_400_000;
 const CHART_WIDTH = 940;
@@ -34,10 +36,10 @@ interface Row {
 
 @Component({
   selector: 'lime-schedule',
-  imports: [TechnologyView, RouterLink],
+  imports: [HlmCardImports, HlmTableImports, TechnologyView, RouterLink],
   host: { class: 'block' },
   template: `
-    <header class="card mb-5 px-7 py-6">
+    <header hlmCard class="block mb-5 px-7 py-6">
       <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">Schedule</h1>
       <p class="mt-1 mb-4 max-w-[62ch] text-[14px] text-ink-soft">
         @if (picked() === 'estate') {
@@ -54,7 +56,7 @@ interface Row {
           type="button"
           role="tab"
           [attr.aria-selected]="picked() === 'estate'"
-          class="glass rounded-full border px-4 py-1.5 text-[13px]"
+          class="glass rounded-md border px-4 py-1.5 text-[13px]"
           [class.border-ink]="picked() === 'estate'"
           [class.bg-ink]="picked() === 'estate'"
           [class.text-ground]="picked() === 'estate'"
@@ -70,7 +72,7 @@ interface Row {
             type="button"
             role="tab"
             [attr.aria-selected]="picked() === tech.name"
-            class="glass flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px]"
+            class="glass flex items-center gap-2 rounded-md border px-4 py-1.5 text-[13px]"
             [class.border-ink]="picked() === tech.name"
             [class.bg-ink]="picked() === tech.name"
             [class.text-ground]="picked() === tech.name"
@@ -88,7 +90,7 @@ interface Row {
     </header>
 
     @if (status() !== 'ALL' && picked() === 'estate') {
-      <div class="card mb-5 flex flex-wrap items-center gap-3 px-7 py-3">
+      <div hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-7 py-3">
         <span class="text-[13px] text-ink-soft">Showing only</span>
         <span
           class="rounded-full border px-3 py-1 text-[13px]"
@@ -100,19 +102,19 @@ interface Row {
         <a
           [routerLink]="['/schedule']"
           [queryParams]="{}"
-          class="text-[13px] text-accent-bright no-underline hover:underline"
+          class="text-[13px] text-primary no-underline hover:underline"
           >Clear filter</a
         >
       </div>
     }
 
     @if (picked() !== 'estate') {
-      <section class="card px-7 py-6">
+      <section hlmCard class="block px-7 py-6">
         <lime-technology-view [slug]="slugFor(picked())" [technology]="picked()" />
       </section>
     } @else {
     @if (inbox().length > 0) {
-      <section class="card mb-5 px-7 py-5" aria-labelledby="needs-you">
+      <section hlmCard class="block mb-5 px-7 py-5" aria-labelledby="needs-you">
         <h2 id="needs-you" class="m-0 mb-2 text-[13px] font-semibold">
           Needs you
         </h2>
@@ -140,7 +142,7 @@ interface Row {
       </section>
     }
 
-    <section class="card px-7 py-6">
+    <section hlmCard class="block px-7 py-6">
       <div class="mb-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-[12px] text-ink-soft">
         <span><span class="inline-block h-2 w-3 align-middle" [style.background]="fill('EOL')"></span> past end of life</span>
         <span><span class="inline-block h-2 w-3 align-middle" [style.background]="fill('NEAR')"></span> ends within {{ noticeDays }} days</span>
@@ -221,27 +223,27 @@ interface Row {
           </svg>
         </div>
       } @else {
-        <table class="w-full border-collapse text-[14px]">
+        <table hlmTable class="w-full border-collapse text-[14px]">
           <caption class="sr-only">Support schedule as data</caption>
-          <thead>
-            <tr class="border-b border-rule text-left">
-              <th class="py-2 pr-4 font-medium">Technology</th>
-              <th class="py-2 pr-4 font-medium">Cycle</th>
-              <th class="py-2 pr-4 font-medium">End of life</th>
-              <th class="py-2 pr-4 font-medium">Days</th>
-              <th class="py-2 pr-4 font-medium">Status</th>
-              <th class="py-2 font-medium">Environments</th>
+          <thead hlmTHead>
+            <tr hlmTr class="border-b border-rule text-left">
+              <th hlmTh class="py-2 pr-4 font-medium">Technology</th>
+              <th hlmTh class="py-2 pr-4 font-medium">Cycle</th>
+              <th hlmTh class="py-2 pr-4 font-medium">End of life</th>
+              <th hlmTh class="py-2 pr-4 font-medium">Days</th>
+              <th hlmTh class="py-2 pr-4 font-medium">Status</th>
+              <th hlmTh class="py-2 font-medium">Environments</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody hlmTBody>
             @for (row of rows(); track row.cycle.id) {
-              <tr class="border-b border-rule">
-                <td class="py-2 pr-4">{{ row.cycle.technology }}</td>
-                <td class="tabular py-2 pr-4">{{ row.cycle.cycle }}</td>
-                <td class="tabular py-2 pr-4">{{ date(row.cycle.eolDate) }}</td>
-                <td class="tabular py-2 pr-4" [class]="textClass(row.days)">{{ days(row.days) }}</td>
-                <td class="py-2 pr-4">{{ label(row.days) }}</td>
-                <td class="py-2">{{ row.deployments }}</td>
+              <tr hlmTr class="border-b border-rule">
+                <td hlmTd class="whitespace-normal py-2 pr-4">{{ row.cycle.technology }}</td>
+                <td hlmTd class="whitespace-normal tabular py-2 pr-4">{{ row.cycle.cycle }}</td>
+                <td hlmTd class="whitespace-normal tabular py-2 pr-4">{{ date(row.cycle.eolDate) }}</td>
+                <td hlmTd class="whitespace-normal tabular py-2 pr-4" [class]="textClass(row.days)">{{ days(row.days) }}</td>
+                <td hlmTd class="whitespace-normal py-2 pr-4">{{ label(row.days) }}</td>
+                <td hlmTd class="whitespace-normal py-2">{{ row.deployments }}</td>
               </tr>
             }
           </tbody>
@@ -250,7 +252,7 @@ interface Row {
     </section>
 
     @if (selected(); as cycle) {
-      <aside class="card mt-5 px-7 py-5" aria-labelledby="impact">
+      <aside hlmCard class="block mt-5 px-7 py-5" aria-labelledby="impact">
         <div class="flex items-baseline justify-between gap-4">
           <h2 id="impact" class="m-0 text-[17px] font-semibold">
             {{ cycle.technology }} {{ cycle.label }}

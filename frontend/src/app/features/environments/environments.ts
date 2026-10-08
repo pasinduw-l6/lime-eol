@@ -13,23 +13,25 @@ import { formatDate, formatDays, statusFill, statusLabel } from '../../core/life
 import { TechIcon } from '../../shared/tech-icon';
 import { AddComponent } from './add-component';
 import { UpdateComponent } from './update-component';
+import { HlmCardImports } from '@spartan-ng/helm/card';
+import { HlmButton } from '@spartan-ng/helm/button';
 
 @Component({
   selector: 'lime-environments',
-  imports: [TechIcon, AddComponent, UpdateComponent, ChangeTimeline],
+  imports: [HlmCardImports, HlmButton, TechIcon, AddComponent, UpdateComponent, ChangeTimeline],
   host: { class: 'block' },
   template: `
     @if (api.isLoading()) {
-      <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
+      <p hlmCard class="block px-7 py-10 text-center text-[14px] text-ink-soft">
         Loading environments…
       </p>
     } @else if (api.error()) {
-      <p class="card px-7 py-10 text-center text-[14px] text-overdue" role="alert">
+      <p hlmCard class="block px-7 py-10 text-center text-[14px] text-overdue" role="alert">
         Could not load projects from the API.
       </p>
     } @else {
       @for (project of projects(); track project.id) {
-        <section class="card mb-5 px-7 py-6">
+        <section hlmCard class="block mb-5 px-7 py-6">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 class="m-0 text-[30px] font-semibold tracking-[-0.02em]">
@@ -65,7 +67,7 @@ import { UpdateComponent } from './update-component';
                 type="button"
                 role="tab"
                 [attr.aria-selected]="selectedId() === env.id"
-                class="glass flex items-center gap-2 rounded-full border px-4 py-1.5 text-[13px]"
+                class="glass flex items-center gap-2 rounded-md border px-4 py-1.5 text-[13px]"
                 [class.border-ink]="selectedId() === env.id"
                 [class.bg-ink]="selectedId() === env.id"
                 [class.text-ground]="selectedId() === env.id"
@@ -83,7 +85,7 @@ import { UpdateComponent } from './update-component';
         </section>
 
         @if (selected(project); as env) {
-          <section class="card px-7 py-6">
+          <section hlmCard class="block px-7 py-6">
             <header class="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 class="m-0 text-[17px] font-semibold">
@@ -96,17 +98,17 @@ import { UpdateComponent } from './update-component';
               </div>
 
               <div class="flex items-center gap-2">
-                <button type="button" class="btn" (click)="adding.set(env)">
+                <button type="button" hlmBtn variant="outline" (click)="adding.set(env)">
                   Add component
                 </button>
 
-                <div class="glass flex gap-1 rounded-full border border-rule bg-elevated p-1">
+                <div class="segmented">
                   @for (v of views; track v.key) {
                     <button
                       type="button"
-                      class="rounded-full px-4 py-1.5 text-[13px]"
-                      [class.bg-accent]="view() === v.key"
-                      [class.text-ground]="view() === v.key"
+                      class="px-4 py-1 text-[13px]"
+                      [class.bg-background]="view() === v.key" [class.shadow-sm]="view() === v.key"
+                      [class.text-foreground]="view() === v.key"
                       [class.text-ink-soft]="view() !== v.key"
                       (click)="setView(v.key, env.id)"
                     >
@@ -139,7 +141,7 @@ import { UpdateComponent } from './update-component';
                   <a
                     [href]="csvUrl(env.id)"
                     download
-                    class="text-accent-bright no-underline hover:underline"
+                    class="text-primary no-underline hover:underline"
                     >Export CSV</a
                   >
                 </span>
@@ -152,7 +154,7 @@ import { UpdateComponent } from './update-component';
               @for (component of env.components; track component.technology) {
                 <button
                   type="button"
-                  class="glass overflow-hidden rounded-[14px] border border-rule bg-elevated text-left transition-colors hover:border-accent"
+                  class="glass overflow-hidden rounded-[14px] border border-rule bg-elevated text-left transition-colors hover:border-primary"
                   (click)="edit(env, component)"
                   [attr.aria-label]="'Update ' + component.technology + ' on ' + env.environment"
                 >
@@ -205,7 +207,7 @@ import { UpdateComponent } from './update-component';
                     }
                     <div class="flex justify-between gap-2 pt-1">
                       <dt class="text-ink-soft">Recorded changes</dt>
-                      <dd class="tabular m-0 text-accent-bright">update →</dd>
+                      <dd class="tabular m-0 text-primary">update →</dd>
                     </div>
                   </dl>
                 </button>
@@ -213,7 +215,7 @@ import { UpdateComponent } from './update-component';
 
               <button
                 type="button"
-                class="glass grid min-h-[140px] place-items-center rounded-[14px] border border-dashed border-rule text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-ink"
+                class="glass grid min-h-[140px] place-items-center rounded-[14px] border border-dashed border-rule text-[13px] text-ink-soft transition-colors hover:border-primary hover:text-ink"
                 (click)="adding.set(env)"
               >
                 <span>
@@ -226,7 +228,7 @@ import { UpdateComponent } from './update-component';
           </section>
         }
       } @empty {
-        <p class="card px-7 py-10 text-center text-[14px] text-ink-soft">
+        <p hlmCard class="block px-7 py-10 text-center text-[14px] text-ink-soft">
           No projects yet.
         </p>
       }

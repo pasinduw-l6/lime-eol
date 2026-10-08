@@ -15,10 +15,13 @@ import { ChangeTimeline } from '../../shared/change-timeline';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
 import { MIN_WORKING_MS, Working } from '../../shared/working';
+import { HlmButton } from '@spartan-ng/helm/button';
+import { HlmInput } from '@spartan-ng/helm/input';
+import { HlmLabel } from '@spartan-ng/helm/label';
 
 @Component({
   selector: 'lime-update-component',
-  imports: [FormsModule, Modal, TechIcon, ChangeTimeline, Working],
+  imports: [HlmButton, HlmInput, HlmLabel, FormsModule, Modal, TechIcon, ChangeTimeline, Working],
   host: { class: 'block' },
   template: `
     <lime-modal
@@ -41,9 +44,9 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
         </div>
 
         <form class="grid gap-4" (submit)="save($event)">
-          <label class="field">
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             New version
-            <select class="input" [(ngModel)]="version" name="version">
+            <select hlmInput [(ngModel)]="version" name="version">
               <option value="">Choose a newer version…</option>
               @for (group of options(); track group.cycle) {
                 <optgroup [label]="cycleLabel(group)">
@@ -60,10 +63,10 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
             }
           </label>
 
-          <label class="field">
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             …or type the version
             <input
-              class="input tabular"
+              hlmInput class="tabular"
               [(ngModel)]="version"
               name="typed"
               placeholder="8.0.32"
@@ -71,13 +74,13 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
           </label>
 
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Effective date
-              <input type="date" class="input" [(ngModel)]="effectiveAt" name="effective" />
+              <input type="date" hlmInput [(ngModel)]="effectiveAt" name="effective" />
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Reason
-              <select class="input" [(ngModel)]="reason" name="reason">
+              <select hlmInput [(ngModel)]="reason" name="reason">
                 @for (r of reasons; track r.key) {
                   <option [value]="r.key">{{ r.label }}</option>
                 }
@@ -86,19 +89,19 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Change request
               <input
-                class="input tabular"
+                hlmInput class="tabular"
                 [(ngModel)]="ticketRef"
                 name="ticket"
                 placeholder="LIME-1042"
               />
             </label>
-            <label class="field">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Evidence link
               <input
-                class="input"
+                hlmInput
                 [(ngModel)]="evidenceUrl"
                 name="evidence"
                 placeholder="https://git.example.com/infra/pull/218"
@@ -106,10 +109,10 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
             </label>
           </div>
 
-          <label class="field">
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Note
             <input
-              class="input"
+              hlmInput
               [(ngModel)]="note"
               name="note"
               placeholder="Rolled out in the September window"
@@ -127,8 +130,8 @@ import { MIN_WORKING_MS, Working } from '../../shared/working';
           }
 
           <div class="flex justify-end gap-2">
-            <button type="button" class="btn" (click)="close.emit()">Cancel</button>
-            <button type="submit" class="btn btn-primary" [disabled]="saving()">
+            <button type="button" hlmBtn variant="outline" (click)="close.emit()">Cancel</button>
+            <button type="submit" hlmBtn [disabled]="saving()">
               {{ saving() ? 'Recording…' : 'Record change' }}
             </button>
           </div>
@@ -319,7 +322,7 @@ export class UpdateComponent {
       case 'INITIAL_RECORD':
         return 'var(--color-ink-faint)';
       default:
-        return 'var(--color-accent-bright)';
+        return 'var(--primary)';
     }
   }
 

@@ -39,12 +39,12 @@ const DAY = 86_400_000;
 
         <span
           class="absolute top-[14px] bottom-[20px] w-px"
-          style="background: var(--color-accent-bright)"
+          style="background: var(--primary)"
           [style.left.%]="today()"
         ></span>
         <span
           class="tabular absolute top-[2px] -translate-x-1/2 rounded-full px-1.5 text-[9.5px]"
-          style="color: var(--color-accent-bright)"
+          style="color: var(--primary)"
           [style.left.%]="today()"
         >
           today
