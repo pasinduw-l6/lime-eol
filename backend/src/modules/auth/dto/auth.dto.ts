@@ -13,7 +13,7 @@ export class SessionDto {
   @ApiProperty()
   displayName!: string;
 
-  @ApiProperty({ enum: ['ADMIN', 'SRE', 'PRODUCT', 'BA', 'ACCOUNT', 'VIEWER'] })
+  @ApiProperty({ enum: ['VIEWER', 'SRE', 'ADMIN'] })
   role!: string;
 
   @ApiProperty({ description: 'Two letters, for the header avatar' })

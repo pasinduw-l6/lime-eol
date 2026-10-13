@@ -1,6 +1,7 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JIRA_CONFIG_KEY, JiraConfig } from '../../config';
+import { IntegrationsModule } from '../integrations/integrations.module';
 import { DemoIssueTracker } from './adapters/demo.adapter';
 import { JiraAdapter } from './adapters/jira.adapter';
 import { NullIssueTracker } from './adapters/null.adapter';
@@ -9,6 +10,7 @@ import { IssueTrackerService } from './issue-tracker.service';
 import { ISSUE_TRACKER } from './ports/issue-tracker.port';
 
 @Module({
+  imports: [IntegrationsModule],
   controllers: [IssueTrackerController],
   providers: [
     DemoIssueTracker,

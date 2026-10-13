@@ -1,5 +1,6 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -11,10 +12,11 @@ import { Feedback } from '../../core/feedback';
 import { ROLES, ROLE_INFO, RoleName } from '../../core/permissions';
 import { SessionStore } from '../../core/session';
 import { Modal } from '../../shared/modal';
+import { AccessGrid } from './access-grid';
 import { AuditLog } from './audit-log';
 import { LimeReleases } from './lime-releases';
 
-type Tab = 'users' | 'teams' | 'lime' | 'audit';
+type Tab = 'users' | 'access' | 'teams' | 'lime' | 'audit';
 
 interface TeamDraft {
   id?: string;
@@ -36,12 +38,19 @@ interface TeamDraft {
     Modal,
     LimeReleases,
     AuditLog,
+    AccessGrid,
+    RouterLink,
   ],
   host: { class: 'block' },
   template: `
-    <header class="mb-6">
-      <h1 class="m-0 text-3xl font-semibold tracking-tight">Settings</h1>
-      <p class="m-0 mt-1 text-sm text-muted-foreground">People, teams, Lime releases and the record of every change.</p>
+    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="m-0 text-3xl font-semibold tracking-tight">Settings</h1>
+        <p class="m-0 mt-1 text-sm text-muted-foreground">People, teams, Lime releases and the record of every change.</p>
+      </div>
+      @if (canOpenOps()) {
+        <a routerLink="/ops" hlmBtn variant="outline">Operations ›</a>
+      }
     </header>
 
     <nav class="segmented mb-6" aria-label="Settings sections">
@@ -69,7 +78,7 @@ interface TeamDraft {
             become Viewers.
           </p>
         </div>
-        <form hlmCardContent class="grid gap-3 md:grid-cols-[1fr_1fr_200px_auto] md:items-end" (submit)="invite($event)">
+        <form hlmCardContent class="grid gap-3 md:grid-cols-[1fr_1fr_190px_190px_auto] md:items-end" (submit)="invite($event)">
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Work email
             <input hlmInput type="email" name="email" [(ngModel)]="inviteEmail" placeholder="nimal@linearsix.com" />
@@ -86,7 +95,19 @@ interface TeamDraft {
               }
             </select>
           </label>
+          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+            Project access
+            <select hlmInput name="access" [(ngModel)]="inviteAccess" [disabled]="inviteRole === 'ADMIN'">
+              <option value="">Chosen projects only</option>
+              <option value="VIEW">All projects · View</option>
+              <option value="EDIT">All projects · Edit</option>
+            </select>
+          </label>
           <button type="submit" hlmBtn [disabled]="busy()">Add person</button>
+          <p class="m-0 text-xs text-muted-foreground md:col-span-5">
+            With "Chosen projects only", give access per project under Project access. Engineers assigned to a project
+            can always edit it.
+          </p>
         </form>
       </section>
 
@@ -108,7 +129,7 @@ interface TeamDraft {
                 <th hlmTh class="pl-6">Person</th>
                 <th hlmTh>Role</th>
                 <th hlmTh>Teams</th>
-                <th hlmTh>Projects</th>
+                <th hlmTh>Project access</th>
                 <th hlmTh>Last sign-in</th>
                 <th hlmTh class="pr-6"><span class="sr-only">Actions</span></th>
               </tr>
@@ -143,7 +164,19 @@ interface TeamDraft {
                       }
                     </span>
                   </td>
-                  <td hlmTd class="tabular">{{ u.projectCount }}</td>
+                  <td hlmTd class="whitespace-normal">
+                    <button type="button" class="text-left hover:underline" (click)="tab.set('access')">
+                      @if (u.role === 'ADMIN') {
+                        Everything
+                      } @else if (u.allProjects) {
+                        All projects · {{ u.allProjects === 'EDIT' ? 'Edit' : 'View' }}
+                      } @else if (u.accessCount + u.projectCount === 0) {
+                        <span class="text-destructive">No projects</span>
+                      } @else {
+                        {{ u.accessCount }} granted{{ u.projectCount ? ' · ' + u.projectCount + ' staffed' : '' }}
+                      }
+                    </button>
+                  </td>
                   <td hlmTd class="tabular text-muted-foreground">{{ when(u.lastLoginAt) }}</td>
                   <td hlmTd class="pr-6 text-right">
                     @if (u.isActive) {
@@ -174,7 +207,7 @@ interface TeamDraft {
       <section hlmCard class="mt-5" aria-labelledby="roles">
         <div hlmCardHeader>
           <h2 hlmCardTitle id="roles">What each role can do</h2>
-          <p hlmCardDescription>From the end-of-life handling process. Everyone can view everything.</p>
+          <p hlmCardDescription>From the end-of-life handling process. The role decides what kind of change a person can make; Project access decides on which projects.</p>
         </div>
         <div hlmCardContent>
           <dl class="m-0 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -187,6 +220,8 @@ interface TeamDraft {
           </dl>
         </div>
       </section>
+    } @else if (tab() === 'access') {
+      <lime-access-grid />
     } @else if (tab() === 'teams') {
       <div class="mb-4 flex flex-wrap items-center gap-3">
         <button type="button" hlmBtn (click)="newTeam()">New team</button>
@@ -307,6 +342,7 @@ export class Settings {
   protected readonly tabs = computed(() => {
     const all: { key: Tab; label: string; allowed: boolean }[] = [
       { key: 'users', label: 'Users & roles', allowed: this.session.isAdmin() },
+      { key: 'access', label: 'Project access', allowed: this.session.isAdmin() },
       { key: 'teams', label: 'Teams', allowed: this.session.isAdmin() },
       { key: 'lime', label: 'Lime releases', allowed: this.session.isAdmin() || this.session.can('lime:write') },
       { key: 'audit', label: 'Audit log', allowed: this.session.isAdmin() },
@@ -314,10 +350,16 @@ export class Settings {
     return all.filter((t) => t.allowed);
   });
   protected readonly tab = signal<Tab>(this.session.isAdmin() ? 'users' : 'lime');
+  readonly section = input<string>('');
+  private readonly fromUrl = effect(() => {
+    const wanted = this.section() as Tab;
+    if (wanted && this.tabs().some((t) => t.key === wanted)) this.tab.set(wanted);
+  });
   protected readonly roles = ROLES;
   protected readonly roleInfo = ROLE_INFO;
   protected readonly busy = signal(false);
   protected readonly me = computed(() => this.session.user()?.id);
+  protected readonly canOpenOps = computed(() => this.session.can('integration:write'));
 
   protected readonly users = signal<ApiUser[]>([]);
   protected readonly showInactive = signal(false);
@@ -330,6 +372,7 @@ export class Settings {
   protected inviteEmail = '';
   protected inviteName = '';
   protected inviteRole: RoleName = 'VIEWER';
+  protected inviteAccess: 'VIEW' | 'EDIT' | '' = '';
 
   protected readonly teamDraft = signal<TeamDraft | null>(null);
   protected readonly showArchivedTeams = signal(false);
@@ -358,12 +401,14 @@ export class Settings {
         email: this.inviteEmail.trim(),
         displayName: this.inviteName.trim() || undefined,
         role: this.inviteRole,
+        allProjects: this.inviteAccess || null,
       })
       .subscribe({
         next: (user) => {
           this.busy.set(false);
           this.inviteEmail = '';
           this.inviteName = '';
+          this.inviteAccess = '';
           this.feedback.success(`${user.name} added as ${ROLE_INFO[user.role].label}.`);
           this.refresh();
         },

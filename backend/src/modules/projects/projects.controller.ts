@@ -1,3 +1,5 @@
+import { AccessService } from '../access/access.service';
+import { Scope } from '../access/scope.decorator';
 import {
   Body,
   Controller,
@@ -29,7 +31,10 @@ import {
 @ApiTags('projects')
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projects: ProjectsService) {}
+  constructor(
+    private readonly projects: ProjectsService,
+    private readonly access: AccessService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -38,11 +43,15 @@ export class ProjectsController {
       'One call per screen: each environment carries its components with lifecycle state already resolved, so the client never fans out per row.',
   })
   @ApiOkResponse({ type: [ProjectDto] })
-  findAll(): Promise<ProjectDto[]> {
-    return this.projects.findAll();
+  async findAll(@CurrentUser() user: AuthenticatedUser): Promise<ProjectDto[]> {
+    const [scope, list] = await Promise.all([this.access.scope(user.id), this.projects.findAll()]);
+    return list
+      .map((project) => ({ ...project, access: this.access.levelIn(scope, project.id) }))
+      .filter((project) => project.access !== null);
   }
 
   @Post()
+  @Scope('global')
   @ApiOperation({
     summary: 'Create a project with its environments and their stack',
     description:
@@ -57,6 +66,7 @@ export class ProjectsController {
   }
 
   @Patch(':id')
+  @Scope('project')
   @ApiOperation({
     summary: 'Change the details of a project',
     description:
@@ -67,6 +77,7 @@ export class ProjectsController {
   }
 
   @Delete(':id')
+  @Scope('project')
   @HttpCode(204)
   @ApiOperation({
     summary: 'Archive a project and its environments',
@@ -78,6 +89,7 @@ export class ProjectsController {
   }
 
   @Post(':id/environments')
+  @Scope('project')
   @ApiOperation({
     summary: 'Add an environment to a project',
     description:
@@ -93,6 +105,7 @@ export class ProjectsController {
   }
 
   @Patch(':id/engineers')
+  @Scope('project')
   @ApiOperation({
     summary: 'Replace who is staffed on a project',
     description:
@@ -109,11 +122,16 @@ export class ProjectsController {
 
   @Get('archived')
   @ApiOperation({ summary: 'Archived projects, newest first' })
-  archived() {
-    return this.projects.findArchived();
+  async archived(@CurrentUser() user: AuthenticatedUser) {
+    const [visible, list] = await Promise.all([
+      this.access.visibleProjectIds(user.id),
+      this.projects.findArchived(),
+    ]);
+    return visible === null ? list : list.filter((p) => visible.includes(p.id));
   }
 
   @Post(':id/restore')
+  @Scope('project')
   @ApiOperation({
     summary: 'Restore an archived project',
     description: 'Its environments archived with it come back too.',
@@ -124,6 +142,7 @@ export class ProjectsController {
   }
 
   @Get(':id/activity')
+  @Scope('project')
   @ApiOperation({
     summary: 'Everything recorded across a project, newest first',
     description:
@@ -135,6 +154,7 @@ export class ProjectsController {
   }
 
   @Get(':id')
+  @Scope('project')
   @ApiOperation({ summary: 'One project, by id or code' })
   @ApiParam({ name: 'id', example: 'SYP' })
   @ApiOkResponse({ type: ProjectDto })

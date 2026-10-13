@@ -98,6 +98,15 @@ export class ProjectDto {
   @ApiPropertyOptional({ example: '2023-01-01', nullable: true })
   startedAt!: string | null;
 
+  @ApiPropertyOptional({ nullable: true, description: 'Null means the server default from .env' })
+  jiraIntegrationId!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: 'OPS' })
+  jiraProjectKey!: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Null means the server default from .env' })
+  teamsIntegrationId!: string | null;
+
   @ApiProperty({ type: [EngineerDto] })
   engineers!: EngineerDto[];
 

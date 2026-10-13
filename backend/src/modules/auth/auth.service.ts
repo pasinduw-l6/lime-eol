@@ -32,6 +32,7 @@ export class AuthService {
           email: address,
           displayName: displayName ?? null,
           role: Role.VIEWER,
+          allProjects: 'VIEW',
         },
       }));
 

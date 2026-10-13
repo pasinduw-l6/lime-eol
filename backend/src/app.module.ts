@@ -4,6 +4,9 @@ import { AuditInterceptor } from './modules/audit/audit.interceptor';
 import { AuditModule } from './modules/audit/audit.module';
 import { LimeReleasesModule } from './modules/lime-releases/lime-releases.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { AccessModule } from './modules/access/access.module';
+import { ProjectAccessGuard } from './modules/access/access.guard';
 import { AppConfigModule } from './config/config.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { EditorGuard } from './modules/auth/guards/editor.guard';
@@ -26,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module';
   imports: [
     AppConfigModule,
     PrismaModule,
+    AccessModule,
     AuthModule,
     HealthModule,
     EolSyncModule,
@@ -38,6 +42,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuditModule,
     LimeReleasesModule,
     ReportsModule,
+    IntegrationsModule,
     NotificationsModule,
     UpgradeActionsModule,
     IssueTrackerModule,
@@ -46,6 +51,7 @@ import { PrismaModule } from './prisma/prisma.module';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: EditorGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: ProjectAccessGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })

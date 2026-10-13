@@ -8,6 +8,8 @@ import {
   NotificationChannel,
 } from './ports/notification-channel.port';
 import { buildDigest, buildDeadlineCard, Due } from './notifications.renderer';
+import { IntegrationsService } from '../integrations/integrations.service';
+import { TeamsAdapter } from './adapters/teams.adapter';
 
 const MS_PER_DAY = 86_400_000;
 
@@ -33,7 +35,42 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     @Inject(NOTIFICATION_CHANNEL) private readonly channel: NotificationChannel,
     @Inject(notificationConfig.KEY) private readonly config: NotificationConfig,
+    private readonly teams: TeamsAdapter,
+    private readonly integrations: IntegrationsService,
   ) {}
+
+  private async toProjectChannels(dues: Due[], appUrl: string, result: RunResult): Promise<void> {
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: [...new Set(dues.map((d) => d.projectId))] }, teamsIntegrationId: { not: null } },
+      select: { id: true, teamsIntegrationId: true },
+    });
+
+    const byChannel = new Map<string, Due[]>();
+    for (const project of projects) {
+      const list = byChannel.get(project.teamsIntegrationId!) ?? [];
+      list.push(...dues.filter((d) => d.projectId === project.id));
+      byChannel.set(project.teamsIntegrationId!, list);
+    }
+
+    for (const [integrationId, covers] of byChannel) {
+      const target = await this.integrations.teamsUrl(integrationId).catch(() => null);
+      if (!target) continue;
+
+      const card = covers.length > 1
+        ? buildDigest(covers, appUrl)
+        : buildDeadlineCard(covers[0]!, appUrl);
+
+      try {
+        await this.teams.sendTo(target, card);
+        result.sent++;
+      } catch (caught) {
+        result.failed++;
+        this.logger.warn(
+          `Could not post "${card.title}" to ${target.name}: ${caught instanceof Error ? caught.message : 'the send failed'}`,
+        );
+      }
+    }
+  }
 
   async due(): Promise<Due[]> {
     const rules = await this.prisma.notificationRule.findMany({
@@ -205,6 +242,7 @@ export class NotificationsService {
       const digest = buildDigest(fresh, appUrl);
       result.cards.push(digest);
       await this.deliver(digest, fresh, result);
+      await this.toProjectChannels(fresh, appUrl, result);
       return result;
     }
 
@@ -214,6 +252,7 @@ export class NotificationsService {
       await this.deliver(card, [due], result);
     }
 
+    await this.toProjectChannels(fresh, appUrl, result);
     return result;
   }
 

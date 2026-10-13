@@ -36,18 +36,23 @@ export class TeamsAdapter implements NotificationChannel {
     });
   }
 
+  sendTo(target: { name: string; url: string }, card: NotificationCard): Promise<void> {
+    return this.post(card.title, toAdaptiveCard(card), target);
+  }
+
   private async post(
     label: string,
     payload: Record<string, unknown>,
+    target?: { name: string; url: string },
   ): Promise<void> {
     if (this.config.dryRun) {
       this.logger.log(
-        `[dry run] would post "${label}" to ${this.name}\n${JSON.stringify(payload, null, 2)}`,
+        `[dry run] would post "${label}" to ${target?.name ?? this.name}\n${JSON.stringify(payload, null, 2)}`,
       );
       return;
     }
 
-    const url = this.config.teamsWebhookUrl;
+    const url = target?.url ?? this.config.teamsWebhookUrl;
     if (!url) {
       throw new Error('No TEAMS_WEBHOOK_URL is configured.');
     }

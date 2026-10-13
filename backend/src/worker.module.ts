@@ -1,3 +1,4 @@
+import { AccessModule } from './modules/access/access.module';
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppConfigModule } from './config/config.module';
@@ -8,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module';
   imports: [
     AppConfigModule,
     PrismaModule,
+    AccessModule,
     ScheduleModule.forRoot(),
     JobsModule,
   ],

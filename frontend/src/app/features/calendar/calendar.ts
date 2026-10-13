@@ -1,13 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
-import { Api, ApiActivity } from '../../core/api';
+import { Api, ApiActivity, ApiTimeLog } from '../../core/api';
 import { formatDays, parseDate, statusFill, today } from '../../core/lifecycle';
 import { humanGap } from '../../core/relative-time';
 import { RegistryStore } from '../../core/registry.store';
 import { TechIcon } from '../../shared/tech-icon';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 
-type Kind = 'DEADLINE' | 'PLANNED' | 'DONE';
+type Kind = 'DEADLINE' | 'PLANNED' | 'TASK' | 'DONE' | 'TIME';
 
 interface Entry {
   id: string;
@@ -31,12 +31,16 @@ const KIND_COLOUR: Record<Kind, string> = {
   DEADLINE: 'var(--color-overdue)',
   PLANNED: 'var(--primary)',
   DONE: 'var(--color-good)',
+  TIME: 'oklch(0.58 0.2 292)',
+  TASK: 'oklch(0.62 0.17 255)',
 };
 
 const KIND_LABEL: Record<Kind, string> = {
   DEADLINE: 'deadline',
   PLANNED: 'planned',
   DONE: 'done',
+  TIME: 'time logged',
+  TASK: 'sub-task due',
 };
 
 @Component({
@@ -184,13 +188,24 @@ export class Calendar {
   protected readonly kinds = [
     { key: 'DEADLINE' as const, label: 'Deadlines', colour: KIND_COLOUR.DEADLINE },
     { key: 'PLANNED' as const, label: 'Planned', colour: KIND_COLOUR.PLANNED },
+    { key: 'TASK' as const, label: 'Sub-tasks', colour: KIND_COLOUR.TASK },
     { key: 'DONE' as const, label: 'Done', colour: KIND_COLOUR.DONE },
+    { key: 'TIME' as const, label: 'Time logged', colour: KIND_COLOUR.TIME },
   ];
 
-  protected readonly enabled = signal<Kind[]>(['DEADLINE', 'PLANNED', 'DONE']);
+  protected readonly enabled = signal<Kind[]>(['DEADLINE', 'PLANNED', 'TASK', 'DONE', 'TIME']);
+  private readonly logged = signal<ApiTimeLog[]>([]);
   private readonly recorded = signal<ApiActivity[]>([]);
 
   constructor() {
+    const day = 86_400_000;
+    const from = new Date(today().getTime() - 365 * day).toISOString().slice(0, 10);
+    const to = new Date(today().getTime() + day).toISOString().slice(0, 10);
+    this.api.timeLog(from, to).subscribe({
+      next: (rows) => this.logged.set(rows),
+      error: () => this.logged.set([]),
+    });
+
     effect(() => {
       const scoped = this.store.activeProject();
       const ids = scoped
@@ -244,6 +259,61 @@ export class Calendar {
           .join(' · '),
         colour: KIND_COLOUR.DONE,
         past: true,
+      });
+    }
+
+    for (const plan of this.api.actions()) {
+      for (const task of plan.subtasks ?? []) {
+        const date = parseDate(task.dueDate ?? task.startDate);
+        if (!date) {
+          continue;
+        }
+        const done = task.statusCategory === 'done';
+        out.push({
+          id: `task-${plan.id}-${task.key}`,
+          kind: 'TASK',
+          date,
+          day: String(date.getUTCDate()).padStart(2, '0'),
+          technology: plan.technology,
+          title: `${task.key} · ${task.summary}`,
+          meta: [
+            task.dueDate ? 'due' : 'starts',
+            task.assignee ?? 'unassigned',
+            task.status,
+            task.estimateSeconds || task.spentSeconds
+              ? `${hours(task.spentSeconds ?? 0)} of ${hours(task.estimateSeconds ?? 0)}`
+              : null,
+            `${plan.technology} ${plan.cycle}${plan.targetVersion ? ' → ' + plan.targetVersion : ''} plan`,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          colour: done ? KIND_COLOUR.DONE : KIND_COLOUR.TASK,
+          past: done || date.getTime() < now,
+        });
+      }
+    }
+
+    for (const log of this.logged()) {
+      const date = parseDate(log.started.slice(0, 10));
+      if (!date) {
+        continue;
+      }
+      out.push({
+        id: `time-${log.id}`,
+        kind: 'TIME',
+        date,
+        day: String(date.getUTCDate()).padStart(2, '0'),
+        technology: log.technology,
+        title: `${hours(log.seconds)} on ${log.issueKey} · ${log.summary}`,
+        meta: [
+          log.author,
+          `${log.technology} ${log.cycle}${log.targetVersion ? ' → ' + log.targetVersion : ''} plan`,
+          log.comment,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        colour: KIND_COLOUR.TIME,
+        past: date.getTime() <= now,
       });
     }
 
@@ -334,8 +404,9 @@ export class Calendar {
   protected readonly summary = computed(() => {
     const all = this.all();
     const done = all.filter((e) => e.kind === 'DONE').length;
-    const ahead = all.filter((e) => !e.past && e.kind !== 'DONE').length;
-    return `${done} recorded · ${ahead} ahead · ${this.groups().length} months with activity`;
+    const ahead = all.filter((e) => !e.past && e.kind !== 'DONE' && e.kind !== 'TIME').length;
+    const logged = this.logged().reduce((sum, log) => sum + log.seconds, 0);
+    return `${done} recorded · ${ahead} ahead · ${hours(logged)} logged · ${this.groups().length} months with activity`;
   });
 
   protected countOf(kind: Kind): number {
@@ -351,6 +422,13 @@ export class Calendar {
   protected label(kind: Kind): string {
     return KIND_LABEL[kind];
   }
+}
+
+function hours(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : h === 0 ? `${m}m` : `${h}h ${m}m`;
 }
 
 function monthName(year: number, month: number): string {

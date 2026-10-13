@@ -60,6 +60,7 @@ services:
       - gotenberg
       - --api-timeout=120s
       - --chromium-auto-start=true
+      - --chromium-clear-cache=true
 
   pgadmin:
     image: dpage/pgadmin4

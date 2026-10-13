@@ -2,11 +2,15 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { jiraConfig, JiraConfig } from '../../../config';
 import {
   Assignee,
+  IssueChange,
   IssueStatusCategory,
   IssueTracker,
   NewIssue,
   NewSubtask,
+  NewWorklog,
   TrackedIssue,
+  Transition,
+  Worklog,
 } from '../ports/issue-tracker.port';
 
 const MAX_ATTEMPTS = 3;
@@ -61,23 +65,114 @@ export class JiraAdapter implements IssueTracker {
   }
 
   async getIssue(key: string): Promise<TrackedIssue> {
+    const start = await this.startField();
     const issue = await this.request<RawIssue>(
       `/rest/api/3/issue/${encodeURIComponent(key)}` +
-        `?fields=summary,status,assignee,parent`,
+        `?fields=${await this.fieldList()}`,
     );
-    return this.toTracked(issue);
+    return this.toTracked(issue, start);
+  }
+
+  async updateIssue(key: string, change: IssueChange): Promise<TrackedIssue> {
+    const fields: Record<string, unknown> = {};
+
+    if (change.summary !== undefined) fields['summary'] = change.summary;
+    if (change.dueDate !== undefined) fields['duedate'] = change.dueDate;
+    if (change.assigneeId !== undefined) {
+      fields['assignee'] = change.assigneeId ? { accountId: change.assigneeId } : null;
+    }
+    if (change.startDate !== undefined) {
+      const start = await this.startField();
+      if (!start) {
+        throw new Error('This Jira site has no "Start date" field, so a start date cannot be saved.');
+      }
+      fields[start] = change.startDate;
+    }
+    if (change.estimateSeconds !== undefined && change.estimateSeconds !== null) {
+      fields['timetracking'] = { originalEstimate: `${Math.max(1, Math.round(change.estimateSeconds / 60))}m` };
+    }
+
+    if (Object.keys(fields).length > 0) {
+      await this.send(`/rest/api/3/issue/${encodeURIComponent(key)}`, 'PUT', { fields });
+    }
+    return this.getIssue(key);
+  }
+
+  async getTransitions(key: string): Promise<Transition[]> {
+    const body = await this.request<{
+      transitions?: { id: string; name: string; to?: { name?: string; statusCategory?: { key?: string } } }[];
+    }>(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`);
+
+    return (body.transitions ?? []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      to: t.to?.name ?? t.name,
+      category: toCategory(t.to?.statusCategory?.key),
+    }));
+  }
+
+  async transition(key: string, transitionId: string): Promise<TrackedIssue> {
+    await this.send(`/rest/api/3/issue/${encodeURIComponent(key)}/transitions`, 'POST', {
+      transition: { id: transitionId },
+    });
+    return this.getIssue(key);
+  }
+
+  async getWorklogs(key: string): Promise<Worklog[]> {
+    const body = await this.request<{ worklogs?: RawWorklog[] }>(
+      `/rest/api/3/issue/${encodeURIComponent(key)}/worklog?maxResults=100`,
+    );
+    return (body.worklogs ?? []).map(toWorklog).sort((a, b) => b.started.localeCompare(a.started));
+  }
+
+  async addWorklog(key: string, entry: NewWorklog): Promise<Worklog> {
+    const created = await this.send<RawWorklog>(
+      `/rest/api/3/issue/${encodeURIComponent(key)}/worklog`,
+      'POST',
+      {
+        timeSpentSeconds: entry.seconds,
+        started: `${entry.date}T09:00:00.000+0000`,
+        ...(entry.comment ? { comment: toAdf(entry.comment) } : {}),
+      },
+    );
+    return toWorklog(created!);
+  }
+
+  private startFieldId: string | null | undefined;
+
+  private async startField(): Promise<string | null> {
+    if (this.startFieldId !== undefined) return this.startFieldId;
+    try {
+      const fields = await this.request<{ id: string; name: string; schema?: { type?: string } }[]>(
+        '/rest/api/3/field',
+      );
+      const match =
+        fields.find((f) => f.name.toLowerCase() === 'start date' && f.schema?.type === 'date') ??
+        fields.find((f) => f.name.toLowerCase() === 'start date');
+      this.startFieldId = match?.id ?? null;
+    } catch {
+      this.startFieldId = null;
+    }
+    return this.startFieldId;
+  }
+
+  private async fieldList(): Promise<string> {
+    const start = await this.startField();
+    return ['summary', 'status', 'assignee', 'parent', 'duedate', 'timetracking', ...(start ? [start] : [])].join(',');
   }
 
   async getChildren(key: string): Promise<TrackedIssue[]> {
     const jql = `parent = "${key.replace(/"/g, '')}" ORDER BY created ASC`;
     const issues: RawIssue[] = [];
+    const start = await this.startField();
+    const fields = await this.fieldList();
     let cursor: string | undefined;
 
     do {
       const params = new URLSearchParams({
         jql,
         maxResults: String(PAGE_SIZE),
-        fields: 'summary,status,assignee,parent',
+        fields,
       });
       if (cursor) {
         params.set('nextPageToken', cursor);
@@ -90,7 +185,13 @@ export class JiraAdapter implements IssueTracker {
       cursor = page.nextPageToken;
     } while (cursor);
 
-    return issues.map((issue) => this.toTracked(issue));
+    return issues.map((issue) => this.toTracked(issue, start));
+  }
+
+  async getProject(key: string): Promise<{ key: string; name: string }> {
+    return this.request<{ key: string; name: string }>(
+      `/rest/api/3/project/${encodeURIComponent(key)}`,
+    );
   }
 
   async getAssignees(issueKey: string): Promise<Assignee[]> {
@@ -122,12 +223,14 @@ export class JiraAdapter implements IssueTracker {
   async createSubtask(parentKey: string, input: NewSubtask): Promise<TrackedIssue> {
     const projectKey = parentKey.split('-')[0];
     const issueTypeId = await this.subtaskTypeId(projectKey);
+    const start = input.startDate ? await this.startField() : null;
 
     return this.post({
       project: { key: projectKey },
       parent: { key: parentKey },
       issuetype: { id: issueTypeId },
       ...this.commonFields(input),
+      ...(start ? { [start]: input.startDate } : {}),
     });
   }
 
@@ -143,6 +246,9 @@ export class JiraAdapter implements IssueTracker {
     if (input.assigneeId) {
       fields['assignee'] = { accountId: input.assigneeId };
     }
+    if (input.estimateSeconds) {
+      fields['timetracking'] = { originalEstimate: `${Math.max(1, Math.round(input.estimateSeconds / 60))}m` };
+    }
 
     return fields;
   }
@@ -152,7 +258,7 @@ export class JiraAdapter implements IssueTracker {
       fields,
     });
 
-    return this.getIssue(created.key);
+    return this.getIssue(created!.key);
   }
 
   private async taskTypeId(projectKey: string): Promise<string> {
@@ -204,8 +310,10 @@ export class JiraAdapter implements IssueTracker {
     return type.id;
   }
 
-  private toTracked(issue: RawIssue): TrackedIssue {
+  private toTracked(issue: RawIssue, startField: string | null = null): TrackedIssue {
     const fields = issue.fields ?? {};
+    const time = fields.timetracking ?? {};
+    const start = startField ? (fields as Record<string, unknown>)[startField] : null;
     return {
       id: issue.id,
       key: issue.key,
@@ -215,6 +323,11 @@ export class JiraAdapter implements IssueTracker {
       assignee: fields.assignee?.displayName ?? null,
       url: `${this.config.baseUrl}/browse/${issue.key}`,
       parentKey: fields.parent?.key ?? null,
+      startDate: typeof start === 'string' ? start.slice(0, 10) : null,
+      dueDate: fields.duedate ?? null,
+      estimateSeconds: time.originalEstimateSeconds ?? null,
+      spentSeconds: time.timeSpentSeconds ?? null,
+      remainingSeconds: time.remainingEstimateSeconds ?? null,
     };
   }
 
@@ -256,7 +369,7 @@ export class JiraAdapter implements IssueTracker {
     path: string,
     method: 'POST' | 'PUT',
     body: unknown,
-  ): Promise<T> {
+  ): Promise<T | undefined> {
     if (!this.configured) {
       throw new Error('No Jira credentials are configured.');
     }
@@ -280,7 +393,8 @@ export class JiraAdapter implements IssueTracker {
       throw new Error(await describe(response));
     }
 
-    return (await response.json()) as T;
+    const text = await response.text();
+    return text ? (JSON.parse(text) as T) : undefined;
   }
 
   private async request<T>(path: string): Promise<T> {
@@ -414,6 +528,34 @@ interface RawIssue {
     status?: { name?: string; statusCategory?: { key?: string } };
     assignee?: { displayName?: string } | null;
     parent?: { key?: string } | null;
+    duedate?: string | null;
+    timetracking?: {
+      originalEstimateSeconds?: number;
+      timeSpentSeconds?: number;
+      remainingEstimateSeconds?: number;
+    };
+  };
+}
+
+interface RawWorklog {
+  id: string;
+  author?: { displayName?: string };
+  started?: string;
+  timeSpentSeconds?: number;
+  comment?: { content?: { content?: { text?: string }[] }[] };
+}
+
+function toWorklog(raw: RawWorklog): Worklog {
+  const comment = (raw.comment?.content ?? [])
+    .flatMap((block) => (block.content ?? []).map((part) => part.text ?? ''))
+    .join(' ')
+    .trim();
+  return {
+    id: raw.id,
+    author: raw.author?.displayName ?? 'Someone',
+    started: raw.started ?? '',
+    seconds: raw.timeSpentSeconds ?? 0,
+    comment: comment || null,
   };
 }
 

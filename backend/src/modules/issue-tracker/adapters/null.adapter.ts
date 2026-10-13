@@ -3,6 +3,8 @@ import {
   Assignee,
   IssueTracker,
   TrackedIssue,
+  Transition,
+  Worklog,
 } from '../ports/issue-tracker.port';
 
 @Injectable()
@@ -36,6 +38,26 @@ export class NullIssueTracker implements IssueTracker {
   }
 
   getAssignees(): Promise<Assignee[]> {
+    return Promise.reject(new Error('No issue tracker is configured.'));
+  }
+
+  updateIssue(): Promise<TrackedIssue> {
+    return Promise.reject(new Error('No issue tracker is configured.'));
+  }
+
+  getTransitions(): Promise<Transition[]> {
+    return Promise.reject(new Error('No issue tracker is configured.'));
+  }
+
+  transition(): Promise<TrackedIssue> {
+    return Promise.reject(new Error('No issue tracker is configured.'));
+  }
+
+  getWorklogs(): Promise<Worklog[]> {
+    return Promise.reject(new Error('No issue tracker is configured.'));
+  }
+
+  addWorklog(): Promise<Worklog> {
     return Promise.reject(new Error('No issue tracker is configured.'));
   }
 }

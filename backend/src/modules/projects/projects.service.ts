@@ -67,6 +67,9 @@ export class ProjectsService {
         startedAt: project.startedAt
           ? project.startedAt.toISOString().slice(0, 10)
           : null,
+        jiraIntegrationId: project.jiraIntegrationId,
+        jiraProjectKey: project.jiraProjectKey,
+        teamsIntegrationId: project.teamsIntegrationId,
         engineers: project.engineers.map((link) => ({
           id: link.user.id,
           name: link.user.displayName ?? link.user.email,
@@ -234,6 +237,12 @@ export class ProjectsService {
           ? new Date(`${input.startedAt}T00:00:00.000Z`)
           : undefined,
         notes: input.notes,
+        jiraIntegrationId: input.jiraIntegrationId,
+        jiraProjectKey:
+          input.jiraProjectKey === undefined
+            ? undefined
+            : input.jiraProjectKey?.trim().toUpperCase() || null,
+        teamsIntegrationId: input.teamsIntegrationId,
       },
     });
 

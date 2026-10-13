@@ -25,19 +25,25 @@ export class ReportsService {
     const token = this.auth.reportToken(userId);
     const url = `${env.REPORT_BASE_URL.replace(/\/$/, '')}/report/${kind}/${id}#token=${encodeURIComponent(token)}`;
 
+    const side = 0.7;
+
     const form = new FormData();
     form.append('url', url);
     form.append('paperWidth', '8.27');
     form.append('paperHeight', '11.7');
-    form.append('marginTop', '0.45');
-    form.append('marginBottom', '0.6');
-    form.append('marginLeft', '0.45');
-    form.append('marginRight', '0.45');
+    form.append('marginTop', '0.6');
+    form.append('marginBottom', '0.7');
+    form.append('marginLeft', String(side));
+    form.append('marginRight', String(side));
     form.append('printBackground', 'true');
-    form.append('scale', '0.7');
+    form.append('scale', '1');
     form.append('emulatedMediaType', 'print');
     form.append('waitForExpression', 'window.limeReportReady === true');
-    form.append('files', new Blob([footer(subject.title)], { type: 'text/html' }), 'footer.html');
+    form.append(
+      'files',
+      new Blob([footer(`Technology End-of-Life Report · ${subject.title}`, side)], { type: 'text/html' }),
+      'footer.html',
+    );
 
     let response: Response;
     try {
@@ -60,7 +66,7 @@ export class ReportsService {
     const date = new Date().toISOString().slice(0, 10);
     return {
       file: Buffer.from(await response.arrayBuffer()),
-      name: `Lime-Lifecycle-${slug(subject.title)}-${date}.pdf`,
+      name: `Lime-EOL-Report-${slug(subject.title)}-${date}.pdf`,
     };
   }
 
@@ -88,24 +94,25 @@ function escape(value: string): string {
   return value.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }
 
-function footer(title: string): string {
+function footer(title: string, inset: number): string {
   return `<!doctype html>
 <html>
   <head>
     <style>
       html, body { margin: 0; padding: 0; }
-      table { width: calc(100% - 0.9in); margin: 0 0.45in; border-collapse: collapse; border-top: 1px solid #e4e4e7; font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 8px; color: #71717a; }
+      table { width: calc(100% - ${inset * 2}in); margin: 0 ${inset}in; border-collapse: collapse; border-top: 1px solid #d0d5dd; font-family: 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif; font-size: 8px; color: #667085; }
       td { padding-top: 5px; }
-      td.right { text-align: right; }
+      td.right { text-align: right; white-space: nowrap; }
     </style>
   </head>
   <body>
     <table>
       <tr>
-        <td>Lime · Technology lifecycle · ${escape(title)}</td>
+        <td>${escape(title)}</td>
         <td class="right">Page <span class="pageNumber"></span> of <span class="totalPages"></span></td>
       </tr>
     </table>
   </body>
 </html>`;
 }
+

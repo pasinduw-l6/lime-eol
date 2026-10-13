@@ -6,10 +6,11 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { ActionStatus, CommStatus } from '@prisma/client';
+import { ActionStatus, CommStatus, CustomerAgreement } from '@prisma/client';
+import { coverageOf, currentAgreement, termsFor } from '../customers/agreement.util';
 import { can, Permission } from '../auth/permissions';
 import { jiraConfig, JiraConfig } from '../../config';
-import { IssueTrackerService } from '../issue-tracker/issue-tracker.service';
+import { IssueTrackerService, toSubtask } from '../issue-tracker/issue-tracker.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CompleteEnvironmentDto,
@@ -71,6 +72,7 @@ export class UpgradeActionsService {
         targetVersion: input.targetVersion ?? null,
         assigneeId: input.assigneeId ?? null,
         teamId: input.teamId ?? null,
+        startDate: toDate(input.startDate),
         plannedDate: toDate(input.plannedDate),
         status: (input.status ?? 'PLANNED') as ActionStatus,
         customerComm: (input.customerComm ?? 'NOT_REQUIRED') as CommStatus,
@@ -139,6 +141,7 @@ export class UpgradeActionsService {
         targetVersion: input.targetVersion,
         assigneeId: input.assigneeId,
         teamId: input.teamId,
+        startDate: input.startDate ? toDate(input.startDate) : undefined,
         plannedDate: input.plannedDate ? toDate(input.plannedDate) : undefined,
         completedDate: input.completedDate ? toDate(input.completedDate) : undefined,
         status: input.status as ActionStatus | undefined,
@@ -259,6 +262,7 @@ export class UpgradeActionsService {
       targetVersion: action.targetVersion,
       status: action.status,
       derivedStatus: deriveStatus(action.status, done, environments.length, plannedDate),
+      startDate: isoDate(action.startDate),
       plannedDate: isoDate(plannedDate),
       completedDate: isoDate(action.completedDate),
       assignee: action.assignee
@@ -269,6 +273,9 @@ export class UpgradeActionsService {
         : null,
       team: action.team ? { id: action.team.id, name: action.team.name } : null,
       jiraKey: action.jiraKey,
+      jiraUrl: action.jiraUrl,
+      jiraSyncError: action.jiraSyncError,
+      subtasks: (action.jiraSubtasks ?? []).map(toSubtask),
       jiraStatusCategory: action.jiraStatusCategory,
       jiraSubtaskDone: action.jiraSubtaskDone,
       jiraSubtaskTotal: action.jiraSubtaskTotal,
@@ -288,6 +295,11 @@ export class UpgradeActionsService {
         plannedDate !== null &&
         eolDate !== null &&
         plannedDate.getTime() > eolDate.getTime(),
+      scope: action.cycle.technology.scope,
+      terms: termsFor(
+        action.cycle.technology.scope,
+        coverageOf(currentAgreement(action.deployments[0]?.deployment.customer.agreements ?? [])),
+      ),
       createdAt: action.createdAt.toISOString(),
     };
   }
@@ -298,16 +310,18 @@ const ACTION_INCLUDE = {
   assignee: true,
   team: true,
   deployments: {
-    include: { deployment: { include: { project: true, customer: true } } },
+    include: { deployment: { include: { project: true, customer: { include: { agreements: true } } } } },
   },
+  jiraSubtasks: { orderBy: { position: 'asc' } },
 } as const;
 
 type ActionRow = Awaited<
   ReturnType<PrismaService['upgradeAction']['findUniqueOrThrow']>
 > & {
-  cycle: { technologyId: string; technology: { name: string }; cycle: string; eolDate: Date | null; id: string };
+  cycle: { technologyId: string; technology: { name: string; scope: 'INFRASTRUCTURE' | 'APPLICATION' }; cycle: string; eolDate: Date | null; id: string };
   assignee: { id: string; displayName: string | null; email: string } | null;
   team: { id: string; name: string } | null;
+  jiraSubtasks: Parameters<typeof toSubtask>[0][];
   deployments: {
     deploymentId: string;
     completedAt: Date | null;
@@ -315,7 +329,7 @@ type ActionRow = Awaited<
       environment: string;
       projectId: string | null;
       project: { name: string } | null;
-      customer: { name: string };
+      customer: { name: string; agreements: CustomerAgreement[] };
     };
   }[];
 };

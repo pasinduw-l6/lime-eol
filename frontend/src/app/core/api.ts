@@ -41,9 +41,49 @@ export interface ApiProject {
   limeVersion: string | null;
   status: 'ACTIVE' | 'ONBOARDING' | 'PAUSED';
   startedAt: string | null;
+  jiraIntegrationId: string | null;
+  jiraProjectKey: string | null;
+  teamsIntegrationId: string | null;
+  access?: 'VIEW' | 'EDIT' | null;
   engineers: ApiEngineer[];
   environments: ApiEnvironment[];
   risk: { eol: number; near: number };
+}
+
+export type IntegrationKind = 'JIRA' | 'TEAMS';
+
+export interface ApiIntegration {
+  id: string;
+  kind: IntegrationKind;
+  name: string;
+  source: 'env' | 'ui';
+  enabled: boolean;
+  baseUrl: string | null;
+  email: string | null;
+  projectKey: string | null;
+  tokenType: 'scoped' | 'classic' | null;
+  secretHint: string | null;
+  lastCheckedAt: string | null;
+  lastOk: boolean | null;
+  lastDetail: string | null;
+  projects: number;
+}
+
+export interface ApiIntegrationOption {
+  id: string;
+  kind: IntegrationKind;
+  name: string;
+  projectKey: string | null;
+}
+
+export interface IntegrationInput {
+  name?: string;
+  baseUrl?: string;
+  email?: string;
+  projectKey?: string;
+  tokenType?: 'scoped' | 'classic';
+  secret?: string;
+  enabled?: boolean;
 }
 
 export interface ApiCycle {
@@ -90,7 +130,62 @@ export interface ApiCustomer {
   contractStart: string | null;
   contractEnd: string | null;
   projectCount: number;
+  agreement?: ApiAgreementSummary | null;
+  agreementStatus?: AgreementStatus;
+  agreementCount?: number;
+  primaryContact?: ApiContact | null;
 }
+
+export type AgreementType = 'SUBSCRIPTION' | 'LICENSE';
+export type AgreementStatus = 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'UPCOMING' | 'NONE';
+export type InfraTerms = 'INCLUDED' | 'QUOTED' | 'ENDED';
+export type ApplicationTerms = 'VIA_LIME' | 'SEPARATE';
+export interface Coverage {
+  infrastructure: InfraTerms;
+  application: ApplicationTerms;
+}
+export type UpgradeTerms = 'INCLUDED' | 'VIA_LIME' | 'QUOTE' | 'TERM_ENDED';
+
+export interface ApiAgreementSummary {
+  id: string;
+  type: AgreementType;
+  status: AgreementStatus;
+  startDate: string | null;
+  endDate: string | null;
+  renewalDate: string | null;
+  noticeDays: number | null;
+  autoRenew: boolean;
+  infrastructure: 'INCLUDED' | 'QUOTED' | null;
+  licensedUsers: number | null;
+  coverage: Coverage;
+}
+
+export interface ApiAgreement extends ApiAgreementSummary {
+  upgradesPerYear: number | null;
+  supportLevel: string | null;
+  reference: string | null;
+  documentUrl: string | null;
+  notes: string | null;
+  updatedAt: string;
+}
+
+export interface ApiContact {
+  id: string;
+  name: string;
+  role: string | null;
+  email: string | null;
+  phone: string | null;
+  isPrimary: boolean;
+}
+
+export interface ApiCustomerDetail extends ApiCustomer {
+  currentAgreementId: string | null;
+  agreements: ApiAgreement[];
+  contacts: ApiContact[];
+}
+
+export type AgreementInput = Partial<Omit<ApiAgreement, 'id' | 'status' | 'updatedAt'>>;
+export type ContactInput = Partial<Omit<ApiContact, 'id'>>;
 
 export interface ApiTeam {
   id: string;
@@ -185,7 +280,31 @@ export interface ApiUser {
   teams: { id: string; name: string }[];
   canEdit: boolean;
   projectCount: number;
+  allProjects: AccessLevel | null;
+  accessCount: number;
   lastLoginAt: string | null;
+}
+
+export type AccessLevel = 'VIEW' | 'EDIT';
+
+export interface ApiAccessMatrix {
+  projects: { id: string; name: string; code: string; customerId: string; customer: string }[];
+  users: {
+    id: string;
+    name: string;
+    email: string;
+    role: RoleName;
+    isActive: boolean;
+    allProjects: AccessLevel | null;
+    access: Record<string, AccessLevel>;
+    staffed: Record<string, 'lead' | 'engineer'>;
+  }[];
+}
+
+export interface AccessChange {
+  userId: string;
+  projectId?: string;
+  level: AccessLevel | null;
 }
 
 export interface ApiNotificationStatus {
@@ -227,11 +346,15 @@ export interface ApiUpgradeAction {
   targetVersion: string | null;
   status: string;
   derivedStatus: string;
+  startDate: string | null;
   plannedDate: string | null;
   completedDate: string | null;
   assignee: { id: string; name: string } | null;
   team: { id: string; name: string } | null;
   jiraKey: string | null;
+  jiraUrl: string | null;
+  jiraSyncError: string | null;
+  subtasks: ApiJiraSubtask[];
   jiraStatusCategory: JiraStatusCategory | null;
   jiraSubtaskDone: number | null;
   jiraSubtaskTotal: number | null;
@@ -247,6 +370,8 @@ export interface ApiUpgradeAction {
   progress: { done: number; total: number };
   unverifiedCompletion: boolean;
   planTooLate: boolean;
+  scope: 'INFRASTRUCTURE' | 'APPLICATION';
+  terms: UpgradeTerms;
   createdAt: string;
 }
 
@@ -259,6 +384,41 @@ export interface ApiJiraSubtask {
   statusCategory: JiraStatusCategory;
   assignee: string | null;
   url: string;
+  startDate: string | null;
+  dueDate: string | null;
+  estimateSeconds: number | null;
+  spentSeconds: number | null;
+  remainingSeconds: number | null;
+}
+
+export interface ApiJiraTransition {
+  id: string;
+  name: string;
+  to: string;
+  category: JiraStatusCategory;
+}
+
+export interface ApiTimeLog {
+  id: string;
+  planId: string;
+  technology: string;
+  cycle: string;
+  targetVersion: string | null;
+  issueKey: string;
+  summary: string;
+  url: string | null;
+  author: string;
+  started: string;
+  seconds: number;
+  comment: string | null;
+}
+
+export interface ApiJiraWorklog {
+  id: string;
+  author: string;
+  started: string;
+  seconds: number;
+  comment: string | null;
 }
 
 export interface ApiJiraLink {
@@ -435,6 +595,9 @@ export class Api {
       status?: string;
       startedAt?: string;
       notes?: string;
+      jiraIntegrationId?: string | null;
+      jiraProjectKey?: string | null;
+      teamsIntegrationId?: string | null;
     },
   ) {
     return this.http.patch<ApiProject>(
@@ -531,6 +694,34 @@ export class Api {
     return this.http.get<ApiCustomer[]>('/api/v1/customers/archived');
   }
 
+  customer(id: string) {
+    return this.http.get<ApiCustomerDetail>(`/api/v1/customers/${id}`);
+  }
+
+  createAgreement(customerId: string, body: AgreementInput) {
+    return this.http.post<ApiAgreement>(`/api/v1/customers/${customerId}/agreements`, body);
+  }
+
+  updateAgreement(customerId: string, id: string, body: AgreementInput) {
+    return this.http.patch<ApiAgreement>(`/api/v1/customers/${customerId}/agreements/${id}`, body);
+  }
+
+  deleteAgreement(customerId: string, id: string) {
+    return this.http.delete<void>(`/api/v1/customers/${customerId}/agreements/${id}`);
+  }
+
+  createContact(customerId: string, body: ContactInput) {
+    return this.http.post<ApiContact>(`/api/v1/customers/${customerId}/contacts`, body);
+  }
+
+  updateContact(customerId: string, id: string, body: ContactInput) {
+    return this.http.patch<ApiContact>(`/api/v1/customers/${customerId}/contacts/${id}`, body);
+  }
+
+  deleteContact(customerId: string, id: string) {
+    return this.http.delete<void>(`/api/v1/customers/${customerId}/contacts/${id}`);
+  }
+
   limeReleases() {
     return this.http.get<ApiLimeRelease[]>('/api/v1/lime-releases');
   }
@@ -570,8 +761,22 @@ export class Api {
     return this.http.get<ApiUser[]>('/api/v1/users?all=true');
   }
 
-  inviteUser(body: { email: string; displayName?: string; role: RoleName }) {
+  inviteUser(body: {
+    email: string;
+    displayName?: string;
+    role: RoleName;
+    allProjects?: AccessLevel | null;
+    projects?: { projectId: string; level: AccessLevel }[];
+  }) {
     return this.http.post<ApiUser>('/api/v1/users', body);
+  }
+
+  accessMatrix() {
+    return this.http.get<ApiAccessMatrix>('/api/v1/access');
+  }
+
+  saveAccess(changes: AccessChange[]) {
+    return this.http.put<ApiAccessMatrix>('/api/v1/access', { changes });
   }
 
   updateUser(id: string, body: { displayName?: string; role?: RoleName; isActive?: boolean }) {
@@ -583,6 +788,29 @@ export class Api {
 
   archivedTeams() {
     return this.http.get<ApiTeam[]>('/api/v1/teams/archived');
+  }
+
+  integrations() {
+    return this.http.get<ApiIntegration[]>('/api/v1/integrations');
+  }
+
+  readonly integrationOptionsResource = httpResource<ApiIntegrationOption[]>(() => '/api/v1/integrations/options');
+  readonly integrationOptions = computed(() => this.integrationOptionsResource.value() ?? []);
+
+  createIntegration(body: IntegrationInput & { kind: IntegrationKind }) {
+    return this.http.post<ApiIntegration>('/api/v1/integrations', body);
+  }
+
+  updateIntegration(id: string, body: IntegrationInput) {
+    return this.http.patch<ApiIntegration>(`/api/v1/integrations/${id}`, body);
+  }
+
+  testIntegration(id: string) {
+    return this.http.post<ApiIntegration>(`/api/v1/integrations/${id}/test`, {});
+  }
+
+  deleteIntegration(id: string) {
+    return this.http.delete<void>(`/api/v1/integrations/${id}`);
   }
 
   createTeam(body: { name: string; email?: string | null; memberIds?: string[] }) {
@@ -691,14 +919,59 @@ export class Api {
     body: {
       summary: string;
       description?: string;
+      startDate?: string;
       dueDate?: string;
       assigneeId?: string;
+      estimate?: string;
     },
   ) {
     return this.http.post<ApiJiraLink>(
       `/api/v1/upgrade-actions/${actionId}/jira/subtasks`,
       body,
     );
+  }
+
+  timeLog(from: string, to: string) {
+    return this.http.get<ApiTimeLog[]>(`/api/v1/jira/time-log?from=${from}&to=${to}`);
+  }
+
+  createJiraIssue(actionId: string) {
+    return this.http.post<ApiJiraLink>(`/api/v1/upgrade-actions/${actionId}/jira/create`, {});
+  }
+
+  updateJiraSubtask(
+    actionId: string,
+    key: string,
+    body: {
+      summary?: string;
+      assigneeId?: string | null;
+      startDate?: string | null;
+      dueDate?: string | null;
+      estimate?: string;
+    },
+  ) {
+    return this.http.patch<ApiJiraLink>(`/api/v1/upgrade-actions/${actionId}/jira/subtasks/${key}`, body);
+  }
+
+  subtaskTransitions(actionId: string, key: string) {
+    return this.http.get<ApiJiraTransition[]>(
+      `/api/v1/upgrade-actions/${actionId}/jira/subtasks/${key}/transitions`,
+    );
+  }
+
+  transitionSubtask(actionId: string, key: string, transitionId: string) {
+    return this.http.post<ApiJiraLink>(
+      `/api/v1/upgrade-actions/${actionId}/jira/subtasks/${key}/transitions`,
+      { transitionId },
+    );
+  }
+
+  subtaskWorklogs(actionId: string, key: string) {
+    return this.http.get<ApiJiraWorklog[]>(`/api/v1/upgrade-actions/${actionId}/jira/subtasks/${key}/worklogs`);
+  }
+
+  logSubtaskWork(actionId: string, key: string, body: { time: string; date: string; comment?: string }) {
+    return this.http.post<ApiJiraLink>(`/api/v1/upgrade-actions/${actionId}/jira/subtasks/${key}/worklogs`, body);
   }
 
   readonly jiraStatusResource = httpResource<ApiJiraStatus>(
@@ -720,6 +993,16 @@ export class Api {
   );
 
   readonly projects = computed(() => this.projectsResource.value() ?? []);
+
+  readonly editableEverywhere = computed(() => {
+    const list = this.projects();
+    return list.length > 0 && list.every((p) => p.access !== 'VIEW');
+  });
+
+  canEditProject(projectId: string | null | undefined): boolean {
+    if (!projectId) return this.editableEverywhere();
+    return this.projects().find((p) => p.id === projectId)?.access !== 'VIEW';
+  }
   readonly technologies = computed(() => this.technologiesResource.value() ?? []);
 
   readonly isLoading = computed(

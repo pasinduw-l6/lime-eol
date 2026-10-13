@@ -1,6 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Customer } from '@prisma/client';
+import { Customer, CustomerAgreement, CustomerContact } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  agreementDto,
+  contactDto,
+  coverageOf,
+  currentAgreement,
+  statusOf,
+} from './agreement.util';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/update-customer.dto';
 
 @Injectable()
@@ -11,10 +18,64 @@ export class CustomersService {
     const customers = await this.prisma.customer.findMany({
       where: { archivedAt: null },
       orderBy: { name: 'asc' },
-      include: { _count: { select: { projects: { where: { archivedAt: null } } } } },
+      include: {
+        _count: { select: { projects: { where: { archivedAt: null } } } },
+        agreements: true,
+        contacts: { where: { isPrimary: true }, take: 1 },
+      },
     });
 
-    return customers.map((customer) => this.toDto(customer, customer._count.projects));
+    return customers.map((customer) => ({
+      ...this.toDto(customer, customer._count.projects),
+      ...this.summary(customer.agreements, customer.contacts[0] ?? null),
+    }));
+  }
+
+  async findOne(id: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, archivedAt: null },
+      include: {
+        _count: { select: { projects: { where: { archivedAt: null } } } },
+        agreements: { orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }] },
+        contacts: { orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }] },
+      },
+    });
+    if (!customer) {
+      throw new NotFoundException(`No customer "${id}"`);
+    }
+
+    const current = currentAgreement(customer.agreements);
+    return {
+      ...this.toDto(customer, customer._count.projects),
+      ...this.summary(customer.agreements, customer.contacts.find((c) => c.isPrimary) ?? null),
+      currentAgreementId: current?.id ?? null,
+      agreements: customer.agreements.map((a) => agreementDto(a)),
+      contacts: customer.contacts.map(contactDto),
+    };
+  }
+
+  private summary(agreements: CustomerAgreement[], primary: CustomerContact | null) {
+    const current = currentAgreement(agreements);
+    return {
+      agreement: current
+        ? {
+            id: current.id,
+            type: current.type,
+            status: statusOf(current),
+            startDate: isoDate(current.startDate),
+            endDate: isoDate(current.endDate),
+            renewalDate: isoDate(current.renewalDate),
+            noticeDays: current.noticeDays,
+            autoRenew: current.autoRenew,
+            infrastructure: current.infrastructure,
+            licensedUsers: current.licensedUsers,
+            coverage: coverageOf(current),
+          }
+        : null,
+      agreementStatus: statusOf(current),
+      agreementCount: agreements.length,
+      primaryContact: primary ? contactDto(primary) : null,
+    };
   }
 
   async findArchived() {

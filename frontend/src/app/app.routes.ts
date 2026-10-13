@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { canOpenSettings, isAdmin, signedIn, signedOut } from './core/auth.guard';
+import { canOpenOps, canOpenSettings, notViewer, signedIn, signedOut } from './core/auth.guard';
 import { Shell } from './shell';
 
 export const routes: Routes = [
@@ -36,11 +36,20 @@ export const routes: Routes = [
       {
         path: 'customers',
         title: 'Customers · Lime Lifecycle',
+        canActivate: [notViewer],
         loadComponent: () => import('./features/customers/customers').then((m) => m.Customers),
+      },
+      {
+        path: 'customers/:id',
+        title: 'Customer · Lime Lifecycle',
+        canActivate: [notViewer],
+        loadComponent: () =>
+          import('./features/customers/customer-detail').then((m) => m.CustomerDetail),
       },
       {
         path: 'projects',
         title: 'Projects · Lime Lifecycle',
+        canActivate: [notViewer],
         loadComponent: () =>
           import('./features/projects/projects').then((m) => m.Projects),
       },
@@ -57,6 +66,11 @@ export const routes: Routes = [
           import('./features/actions/actions').then((m) => m.Actions),
       },
       {
+        path: 'manager',
+        title: 'Manager view · Lime Lifecycle',
+        loadComponent: () => import('./features/manager/manager').then((m) => m.Manager),
+      },
+      {
         path: 'calendar',
         title: 'Calendar · Lime Lifecycle',
         loadComponent: () =>
@@ -66,7 +80,7 @@ export const routes: Routes = [
       {
         path: 'ops',
         title: 'Operations · Lime Lifecycle',
-        canActivate: [isAdmin],
+        canActivate: [canOpenOps],
         loadComponent: () => import('./features/ops/ops').then((m) => m.Ops),
       },
 

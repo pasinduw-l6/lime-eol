@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { isViewer } from './permissions';
 import { SessionStore } from './session';
 
 export const signedIn: CanActivateFn = (_route, state) => {
@@ -22,6 +23,20 @@ export const isAdmin: CanActivateFn = () => {
   return session.user()?.role === 'ADMIN'
     ? true
     : router.createUrlTree(['/overview']);
+};
+
+export const notViewer: CanActivateFn = () => {
+  const session = inject(SessionStore);
+  const router = inject(Router);
+
+  return isViewer(session.user()?.role) ? router.createUrlTree(['/overview']) : true;
+};
+
+export const canOpenOps: CanActivateFn = () => {
+  const session = inject(SessionStore);
+  const router = inject(Router);
+
+  return session.can('integration:write') ? true : router.createUrlTree(['/overview']);
 };
 
 export const canOpenSettings: CanActivateFn = () => {

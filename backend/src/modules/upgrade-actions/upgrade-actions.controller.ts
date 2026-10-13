@@ -1,3 +1,5 @@
+import { AccessService } from '../access/access.service';
+import { Scope } from '../access/scope.decorator';
 import {
   Body,
   Controller,
@@ -28,7 +30,10 @@ import { AuthenticatedUser, CurrentUser } from '../auth/current-user.decorator';
 @ApiTags('upgrade-actions')
 @Controller('upgrade-actions')
 export class UpgradeActionsController {
-  constructor(private readonly actions: UpgradeActionsService) {}
+  constructor(
+    private readonly actions: UpgradeActionsService,
+    private readonly access: AccessService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -38,20 +43,28 @@ export class UpgradeActionsController {
   })
   @ApiQuery({ name: 'projectId', required: false })
   @ApiQuery({ name: 'assigneeId', required: false })
-  findAll(
+  async findAll(
+    @CurrentUser() user: AuthenticatedUser,
     @Query('projectId') projectId?: string,
     @Query('assigneeId') assigneeId?: string,
   ) {
-    return this.actions.findAll({ projectId, assigneeId });
+    const [visible, list] = await Promise.all([
+      this.access.visibleProjectIds(user.id),
+      this.actions.findAll({ projectId, assigneeId }),
+    ]);
+    if (visible === null) return list;
+    return list.filter((action) => action.environments.some((e) => e.projectId && visible.includes(e.projectId)));
   }
 
   @Get(':id')
+  @Scope('action')
   @ApiOperation({ summary: 'One upgrade action' })
   findOne(@Param('id') id: string) {
     return this.actions.findOne(id);
   }
 
   @Post()
+  @Scope('deployments', 'body.deploymentIds')
   @ApiOperation({ summary: 'Plan an upgrade against a cycle running out' })
   @ApiCreatedResponse({ description: 'The action, with its environments' })
   create(@Body() body: CreateUpgradeActionDto) {
@@ -59,6 +72,7 @@ export class UpgradeActionsController {
   }
 
   @Patch(':id')
+  @Scope('action')
   @Can('estate:write', 'plan:notice', 'plan:decision', 'plan:assess')
   @ApiOperation({
     summary: 'Change a plan',
@@ -74,6 +88,7 @@ export class UpgradeActionsController {
   }
 
   @Post(':id/environments/complete')
+  @Scope('action')
   @ApiOperation({
     summary: 'Mark one environment done',
     description:
@@ -88,6 +103,7 @@ export class UpgradeActionsController {
   }
 
   @Delete(':id')
+  @Scope('action')
   @HttpCode(204)
   @ApiOperation({ summary: 'Drop a plan' })
   remove(@Param('id') id: string) {

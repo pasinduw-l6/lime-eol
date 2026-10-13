@@ -7,6 +7,19 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { NOTICE_DAYS, parseDate, today } from '../../core/lifecycle';
+import {
+  SCOPES,
+  STATUS_INFO,
+  TERMS_INFO,
+  TYPE_COLOURS,
+  applicationText,
+  infraText,
+  termNote,
+  termsFor,
+  typeHint,
+  typeLabel,
+} from '../../core/agreements';
+import { AgreementStatus, AgreementType, Api } from '../../core/api';
 import { Cycle, EnvironmentName, Project } from '../../core/models';
 import { Feedback } from '../../core/feedback';
 import { RegistryStore } from '../../core/registry.store';
@@ -197,6 +210,78 @@ function addMonths(date: Date, months: number): Date {
         </section>
       }
 
+      <section hlmCard class="mb-5 gap-0 py-0" aria-labelledby="agreement">
+        @if (agreement(); as a) {
+          <div class="grid lg:grid-cols-[1fr_1.15fr]">
+            <div class="border-b px-6 py-5 lg:border-r lg:border-b-0">
+              <p class="m-0 text-xs tracking-wide text-muted-foreground uppercase">Support agreement</p>
+              <h2 id="agreement" class="m-0 mt-1 flex items-center gap-2 text-lg font-semibold">
+                <span class="size-2.5 rounded-full" [style.background]="typeColour(a.type)"></span>
+                {{ typeLabel(a.type) }}
+              </h2>
+              <p class="m-0 mt-1 text-[13px] text-muted-foreground">{{ typeHint(a.type) }}</p>
+
+              <dl class="m-0 mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <dt class="text-xs text-muted-foreground">Term</dt>
+                  <dd class="tabular m-0">
+                    @if (a.startDate || a.endDate) {
+                      {{ longDate(parse(a.startDate)) }} – {{ longDate(parse(a.endDate)) }}
+                    } @else {
+                      Not dated
+                    }
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-muted-foreground">Status</dt>
+                  <dd class="m-0 font-medium" [style.color]="statusColour(a.status)">
+                    {{ statusLabel(a.status) }}
+                    @if (a.endDate) {
+                      <span class="font-normal text-muted-foreground">· {{ termNote(a.endDate) }}</span>
+                    }
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-muted-foreground">Renews</dt>
+                  <dd class="tabular m-0">{{ a.renewalDate || a.endDate ? longDate(parse(a.renewalDate || a.endDate)) : '—' }}{{ a.autoRenew ? ' · automatically' : '' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-muted-foreground">Notice period</dt>
+                  <dd class="m-0">{{ a.noticeDays !== null ? a.noticeDays + ' days' : '—' }}</dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="px-6 py-5">
+              <p class="m-0 mb-2 text-xs text-muted-foreground">How upgrades are handled</p>
+              <ul class="m-0 grid list-none gap-2 p-0 text-sm">
+                @for (s of scopes; track s.key) {
+                  @let t = terms(s.key, a.coverage);
+                  <li class="rounded-lg border px-3 py-2.5">
+                    <span class="flex items-center justify-between gap-3">
+                      <span class="font-medium">{{ s.label }}</span>
+                      <span class="rounded-full border px-2 py-0.5 text-[11px]" [style.color]="termsInfo[t].colour" [style.border-color]="'color-mix(in oklab, ' + termsInfo[t].colour + ' 40%, transparent)'">{{ termsInfo[t].label }}</span>
+                    </span>
+                    <span class="mt-0.5 block text-[13px]">{{ s.key === 'INFRASTRUCTURE' ? infraText(a.coverage) : applicationText(a.coverage) }}</span>
+                    <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ s.examples }}</span>
+                  </li>
+                }
+              </ul>
+              @if (a.type === 'LICENSE' && a.licensedUsers) {
+                <p class="m-0 mt-2 text-xs text-muted-foreground">Licensed for {{ a.licensedUsers }} users</p>
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+            <div>
+              <h2 id="agreement" class="m-0 text-base font-semibold">Support agreement</h2>
+              <p class="m-0 mt-0.5 text-[13px] text-muted-foreground">No agreement is recorded, so every upgrade is assessed and quoted separately.</p>
+            </div>
+          </div>
+        }
+      </section>
+
       <section class="mb-5" aria-labelledby="stack">
         <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="stack" class="m-0 text-lg font-semibold">Technology stack</h2>
@@ -217,9 +302,18 @@ function addMonths(date: Date, months: number): Date {
                     </p>
                   </div>
                 </div>
-                @if (c.lts) {
-                  <span hlmBadge variant="outline">LTS</span>
-                }
+                <span class="flex shrink-0 items-center gap-1.5">
+                  @if (c.lts) {
+                    <span hlmBadge variant="outline">LTS</span>
+                  }
+                  @let cover = coverageOf(c);
+                  <span
+                    class="rounded-full border px-2 py-0.5 text-[11px]"
+                    [title]="cover.detail"
+                    [style.color]="cover.colour"
+                    [style.border-color]="'color-mix(in oklab, ' + cover.colour + ' 40%, transparent)'"
+                  >{{ cover.label }}</span>
+                </span>
               </div>
 
               <div class="px-5">
@@ -430,6 +524,7 @@ export class Overview {
   ];
 
   private readonly http = inject(HttpClient);
+  private readonly api = inject(Api);
   private readonly feedback = inject(Feedback);
 
   readonly projectId = input<string | null>(null);
@@ -450,6 +545,51 @@ export class Overview {
     const project = this.project();
     return project ? this.store.deploymentsOf(project.id) : [];
   });
+
+  protected readonly agreement = computed(() => {
+    const id = this.customerId();
+    return id ? (this.api.customers().find((c) => c.id === id)?.agreement ?? null) : null;
+  });
+
+  private readonly scopeOf = computed(
+    () => new Map(this.api.technologies().map((t) => [t.name, t.scope as 'INFRASTRUCTURE' | 'APPLICATION'])),
+  );
+
+  protected readonly scopes = SCOPES;
+  protected readonly termsInfo = TERMS_INFO;
+  protected readonly terms = termsFor;
+  protected readonly infraText = infraText;
+  protected readonly applicationText = applicationText;
+  protected readonly termNote = termNote;
+  protected readonly typeLabel = typeLabel;
+  protected readonly typeHint = typeHint;
+
+  protected typeColour(type: AgreementType): string {
+    return TYPE_COLOURS[type];
+  }
+
+  protected statusLabel(status: AgreementStatus): string {
+    return STATUS_INFO[status].label;
+  }
+
+  protected statusColour(status: AgreementStatus): string {
+    return STATUS_INFO[status].colour;
+  }
+
+  protected parse(value: string | null): Date | null {
+    return parseDate(value);
+  }
+
+  protected coverageOf(card: DetailCard): { label: string; colour: string; detail: string } {
+    const scope = this.scopeOf().get(card.technology) ?? 'INFRASTRUCTURE';
+    const info = TERMS_INFO[termsFor(scope, this.agreement()?.coverage)];
+    const kind = scope === 'INFRASTRUCTURE' ? 'Infrastructure' : 'Application dependency';
+    return {
+      label: info.label,
+      colour: info.colour,
+      detail: this.agreement() ? `${kind}. ${info.long}` : `${kind}. No agreement recorded, so the upgrade is quoted.`,
+    };
+  }
 
   protected readonly envList = computed<EnvironmentName[]>(() => {
     const present = new Set(this.deployments().map((d) => d.environment));

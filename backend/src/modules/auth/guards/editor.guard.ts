@@ -27,7 +27,9 @@ export class EditorGuard implements CanActivate {
       user?: { role?: string };
     }>();
 
-    if (READ_ONLY.has(request.method)) {
+    const explicit = this.reflector.getAllAndOverride<Permission[]>(CAN, targets);
+
+    if (READ_ONLY.has(request.method) && !explicit) {
       return true;
     }
 
@@ -36,9 +38,7 @@ export class EditorGuard implements CanActivate {
       throw new ForbiddenException('Not signed in.');
     }
 
-    const required = this.reflector.getAllAndOverride<Permission[]>(CAN, targets) ?? [
-      'estate:write',
-    ];
+    const required = explicit ?? ['estate:write'];
 
     if (!required.some((permission) => can(role, permission))) {
       throw new ForbiddenException('Your role does not allow that change.');

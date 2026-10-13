@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButton } from '@spartan-ng/helm/button';
+import { SessionStore } from '../../core/session';
+import { Integrations } from './integrations';
 
 type Severity = 'critical' | 'warning' | 'info' | 'good';
 
@@ -37,18 +39,28 @@ const ICONS: Record<Severity, string> = {
 
 @Component({
   selector: 'lime-ops',
-  imports: [HlmCardImports, HlmButton],
+  imports: [HlmCardImports, HlmButton, Integrations],
   host: { class: 'block' },
   template: `
     <header class="mb-6">
       <h1 class="m-0 text-3xl font-semibold tracking-tight">Operations</h1>
+      <p class="mt-1 mb-0 text-sm text-muted-foreground">
+        Connect Jira boards and Teams channels. The server .env connection stays the default.
+      </p>
+    </header>
+
+    <lime-integrations />
+
+    @if (session.isAdmin()) {
+    <header class="mt-8 mb-4">
+      <h2 class="m-0 text-xl font-semibold tracking-tight">Notifications</h2>
       <p class="mt-1 mb-0 text-sm text-muted-foreground">
         Send any notification, as often as you like. Nothing here is recorded,
         so it never silences the scheduled messages.
       </p>
     </header>
 
-    <section hlmCard class="mb-5 flex flex-wrap items-center gap-2 p-4">
+    <section hlmCard class="mb-5 flex-row flex-wrap items-center gap-2 p-4">
       <button hlmBtn variant="outline" (click)="resync()" [disabled]="busy()">
         {{ busy() === 'resync' ? 'Syncing…' : 'Resync end-of-life dates' }}
       </button>
@@ -115,10 +127,12 @@ const ICONS: Record<Severity, string> = {
         }
       </section>
     }
+    }
   `,
 })
 export class Ops {
   private readonly http = inject(HttpClient);
+  protected readonly session = inject(SessionStore);
 
   protected readonly ICONS = ICONS;
   protected readonly items = signal<Sendable[]>([]);
@@ -131,7 +145,7 @@ export class Ops {
   ]);
 
   constructor() {
-    this.load();
+    if (this.session.isAdmin()) this.load();
   }
 
   protected inGroup(group: string): Sendable[] {

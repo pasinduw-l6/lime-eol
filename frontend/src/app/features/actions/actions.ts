@@ -6,15 +6,30 @@ import {
   input,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Api, ApiUpgradeAction, Decision } from '../../core/api';
+import { Api, ApiJiraSubtask, ApiUpgradeAction, Decision } from '../../core/api';
 import { DECISIONS } from '../../core/process';
 import { Permission } from '../../core/permissions';
 import { SessionStore } from '../../core/session';
 import { formatDate, formatDays, statusFill, SupportStatus } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
+import { TERMS_INFO } from '../../core/agreements';
+import { Feedback } from '../../core/feedback';
+import {
+  Gantt,
+  GanttGroup,
+  GanttItem,
+  GanttMenu,
+  GanttReschedule,
+  GanttSub,
+  GanttZoom,
+  shiftDays,
+  todayIso,
+} from '../../shared/gantt';
+import { SubtaskDialogs } from './subtask-dialogs';
 import { Modal } from '../../shared/modal';
 import { PlanBoard } from '../../shared/plan-board';
 import { PlanCard } from '../../shared/plan-card';
@@ -33,6 +48,7 @@ interface Draft {
   technologyCycleId: string;
   targetVersion: string;
   status: string;
+  startDate: string;
   plannedDate: string;
   assigneeId: string;
   deploymentIds: string[];
@@ -47,12 +63,17 @@ interface Draft {
 
 @Component({
   selector: 'lime-actions',
-  imports: [HlmAlertImports, HlmCardImports, HlmButton, HlmInput, HlmLabel, FormsModule, Modal, PlanCard, PlanBoard, PlanDetail],
+  imports: [HlmAlertImports, HlmCardImports, HlmButton, HlmInput, HlmLabel, FormsModule, Gantt, Modal, SubtaskDialogs, PlanCard, PlanBoard, PlanDetail],
   host: { class: 'block' },
   template: `
-    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <header class="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="m-0 text-3xl font-semibold tracking-tight">Upgrade actions</h1>
+        <h1 class="m-0 text-3xl font-semibold tracking-tight">
+          Upgrade plans
+          @if (activeProject(); as project) {
+            <span class="text-muted-foreground font-normal">· {{ project.customer }} {{ project.name }}</span>
+          }
+        </h1>
         <p class="m-0 mt-1 text-sm text-muted-foreground">
           {{ open().length }} open · {{ overdue().length }} overdue ·
           {{ done().length }} completed
@@ -64,57 +85,90 @@ interface Draft {
           }
         </p>
       </div>
-      @if (session.can('estate:write')) {
-        <button type="button" hlmBtn (click)="create()">New action</button>
-      }
+      <div class="segmented" role="tablist" aria-label="View">
+        @for (mode of views; track mode) {
+          <button
+            type="button"
+            role="tab"
+            class="px-3.5 py-1 text-[13px] capitalize"
+            [attr.aria-selected]="view() === mode"
+            [class.bg-background]="view() === mode" [class.shadow-sm]="view() === mode"
+            [class.text-foreground]="view() === mode"
+            [class.text-ink-soft]="view() !== mode"
+            (click)="view.set(mode)"
+          >
+            {{ mode }}
+          </button>
+        }
+      </div>
     </header>
 
     @if (api.actionsResource.error()) {
       <p hlmAlert variant="destructive" class="mb-5">
-        Could not load upgrade actions from the API.
+        Could not load upgrade plans from the API.
       </p>
     }
 
-    <section hlmCard class="mb-5 flex flex-wrap items-center gap-3 px-6 py-4">
+    <section class="mb-3 flex flex-wrap items-center gap-2">
+      @if (view() === 'timeline') {
+        <button type="button" hlmBtn variant="outline" size="sm" (click)="goToday()">Today</button>
+        <select hlmInput class="h-8 w-auto py-0 text-[13px]" aria-label="Zoom" [ngModel]="zoom()" (ngModelChange)="zoom.set($event)">
+          <option value="week">Week</option>
+          <option value="month">Month</option>
+          <option value="quarter">Quarter</option>
+        </select>
+        <button type="button" hlmBtn variant="ghost" size="sm" aria-label="Previous" (click)="shift(-1)">‹</button>
+        <button type="button" hlmBtn variant="ghost" size="sm" aria-label="Next" (click)="shift(1)">›</button>
+        <span class="mr-2 text-[15px] font-semibold">{{ period() }}</span>
+      }
       <input
         type="search"
         [(ngModel)]="query"
         placeholder="Search technology, ticket or assignee"
-        aria-label="Search actions"
-        hlmInput class="min-w-[240px] flex-1"
+        aria-label="Search plans"
+        hlmInput class="h-8 min-w-[200px] flex-1 text-[13px]"
       />
-      <div class="segmented flex-wrap">
+      @if (!activeProject()) {
+        <select hlmInput class="h-8 w-auto py-0 text-[13px]" aria-label="Customer" [ngModel]="customer()" (ngModelChange)="customer.set($event)">
+          <option value="">All customers</option>
+          @for (c of customers(); track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
+      }
+      <select hlmInput class="h-8 w-auto py-0 text-[13px]" aria-label="Status" [ngModel]="filter()" (ngModelChange)="filter.set($event)">
         @for (f of filters; track f) {
-          <button
-            type="button"
-            class="px-3.5 py-1 text-[13px] capitalize"
-            [class.bg-background]="filter() === f" [class.shadow-sm]="filter() === f"
-            [class.text-foreground]="filter() === f"
-            [class.text-ink-soft]="filter() !== f"
-            (click)="filter.set(f)"
-          >
-            {{ f.toLowerCase() }}
-          </button>
+          <option [value]="f">{{ f === 'ALL' ? 'All statuses' : f.charAt(0) + f.slice(1).toLowerCase() }}</option>
         }
-      </div>
+      </select>
+      @if (canEditPlans()) {
+        <button type="button" hlmBtn size="sm" class="ml-auto" (click)="create()">+ New plan</button>
+      }
     </section>
 
-    <div class="mb-3 flex items-center gap-1">
-      @for (mode of views; track mode) {
-        <button
-          type="button"
-          class="glass rounded-md border border-rule px-3 py-1 text-[12px] capitalize"
-          [class.bg-ink]="view() === mode"
-          [style.color]="view() === mode ? 'var(--primary)' : null"
-          [style.border-color]="view() === mode ? 'var(--primary)' : null"
-          (click)="view.set(mode)"
-        >
-          {{ mode }}
-        </button>
-      }
-    </div>
-
-    @if (filtered().length === 0) {
+    @if (view() === 'timeline' && filtered().length > 0) {
+      <lime-gantt
+        [groups]="ganttGroups()"
+        [zoom]="zoom()"
+        [anchor]="anchor()"
+        [editable]="canEditPlans()"
+        (zoomChange)="zoom.set($event)"
+        (reschedule)="reschedule($event)"
+        (menu)="onMenu($event)"
+        (subMenu)="dialogs.onSub($event)"
+        (subReschedule)="dialogs.reschedule($event)"
+        (jira)="dialogs.onJira($event)"
+      />
+      <lime-subtask-dialogs #dialogs />
+      <p class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+        <span class="flex items-center gap-1.5"><span class="size-2 rotate-45" style="background: var(--color-overdue)"></span>End of life</span>
+        <span class="flex items-center gap-1.5"><span class="size-2 rotate-45" style="background: var(--color-soon)"></span>Risk acceptance expires</span>
+        <span class="flex items-center gap-1.5"><span class="h-2.5 w-4 rounded-sm" style="box-shadow: 0 0 0 1.5px var(--color-overdue)"></span>Finishes after end of life</span>
+        @if (canEditPlans()) {
+          <span>Drag a bar to move it, drag its ends to change dates.</span>
+        }
+      </p>
+    } @else if (filtered().length === 0) {
       <p hlmCard class="block px-6 py-10 text-center text-[14px] text-ink-soft">
         @if (api.actionsResource.isLoading()) {
           Loading…
@@ -175,7 +229,7 @@ interface Draft {
             </label>
           </div>
 
-          <div class="grid gap-3 sm:grid-cols-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Target version
               <select hlmInput class="tabular" [(ngModel)]="form.targetVersion" name="target">
@@ -193,13 +247,17 @@ interface Draft {
                 }
               </select>
             </label>
-            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-              Planned date
-              <input type="date" hlmInput [(ngModel)]="form.plannedDate" name="planned" />
-            </label>
           </div>
 
-          <div class="grid gap-3 sm:grid-cols-2">
+          <div class="grid gap-3 sm:grid-cols-3">
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+              Start date
+              <input type="date" hlmInput [(ngModel)]="form.startDate" name="start" />
+            </label>
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+              Due date
+              <input type="date" hlmInput [(ngModel)]="form.plannedDate" name="planned" />
+            </label>
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Assignee
               <select hlmInput [(ngModel)]="form.assigneeId" name="assignee">
@@ -364,8 +422,123 @@ export class Actions {
   protected readonly confirmDelete = signal<ApiUpgradeAction | null>(null);
   protected readonly detail = signal<ApiUpgradeAction | null>(null);
 
-  protected readonly views = ['board', 'list'] as const;
-  protected readonly view = signal<(typeof this.views)[number]>('board');
+  protected readonly views = ['timeline', 'list', 'board'] as const;
+  protected readonly view = signal<(typeof this.views)[number]>('timeline');
+  protected readonly zoom = signal<GanttZoom>('month');
+  protected readonly anchor = signal(todayIso());
+  protected readonly customer = signal('');
+  private readonly feedback = inject(Feedback);
+  private readonly gantt = viewChild(Gantt);
+
+  protected readonly period = computed(() => {
+    const date = new Date(`${this.anchor()}T00:00:00Z`);
+    const month = date.toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
+    const year = date.getUTCFullYear();
+    switch (this.zoom()) {
+      case 'week':
+        return `${date.getUTCDate()} ${month} ${year}`;
+      case 'quarter':
+        return `Q${Math.floor(date.getUTCMonth() / 3) + 1} ${year}`;
+      default:
+        return `${month} ${year}`;
+    }
+  });
+
+  private readonly projectIndex = computed(
+    () => new Map(this.api.projects().map((p) => [p.id, p])),
+  );
+
+  protected readonly customers = computed(() =>
+    [...new Set(this.api.projects().map((p) => p.customer))].sort((a, b) => a.localeCompare(b)),
+  );
+
+  protected readonly ganttGroups = computed<GanttGroup[]>(() => {
+    const projects = this.projectIndex();
+    const groups = new Map<string, GanttGroup>();
+    const customer = this.customer();
+    const active = this.activeProject();
+
+    for (const action of this.filtered()) {
+      const ids = [...new Set(action.environments.map((e) => e.projectId ?? ''))];
+      for (const id of ids.length ? ids : ['']) {
+        const project = projects.get(id);
+        if (active && id !== active.id) continue;
+        if (!active && customer && project?.customer !== customer) continue;
+        const key = id || 'unassigned';
+        if (!groups.has(key)) {
+          groups.set(key, {
+            id: key,
+            title: project?.customer ?? 'No project',
+            subtitle: project?.name ?? 'Environments not linked',
+            items: [],
+          });
+        }
+        groups.get(key)!.items.push(toItem(action));
+      }
+    }
+
+    return [...groups.values()]
+      .map((g) => ({ ...g, items: g.items.sort((a, b) => a.start.localeCompare(b.start)) }))
+      .sort((a, b) => `${a.title} ${a.subtitle}`.localeCompare(`${b.title} ${b.subtitle}`));
+  });
+
+  protected shift(direction: number): void {
+    const step = { week: 7, month: 28, quarter: 91 }[this.zoom()];
+    this.anchor.set(shiftDays(this.anchor(), step * direction));
+  }
+
+  protected goToday(): void {
+    this.anchor.set(todayIso());
+    setTimeout(() => this.gantt()?.scrollToToday());
+  }
+
+  protected reschedule(change: GanttReschedule): void {
+    const action = this.api.actions().find((a) => a.id === change.id);
+    if (!action) return;
+    const before = { startDate: toItem(action).start, plannedDate: toItem(action).end };
+
+    this.api.updateAction(change.id, { startDate: change.start, plannedDate: change.end }).subscribe({
+      next: () => {
+        this.api.actionsResource.reload();
+        this.feedback.success(`${action.technology} ${action.cycle} moved to ${formatDate(change.start)} – ${formatDate(change.end)}.`, {
+          label: 'Undo',
+          run: () =>
+            this.api.updateAction(change.id, before).subscribe({
+              next: () => this.api.actionsResource.reload(),
+            }),
+        });
+      },
+      error: (err) => this.feedback.failed(err, 'Could not move that plan.'),
+    });
+  }
+
+  protected onMenu(event: GanttMenu): void {
+    const action = this.api.actions().find((a) => a.id === event.id);
+    if (!action) return;
+
+    switch (event.action) {
+      case 'open':
+        this.detail.set(action);
+        break;
+      case 'edit':
+        this.edit(action);
+        break;
+      case 'delete':
+        this.confirmDelete.set(action);
+        break;
+      case 'complete':
+        this.api
+          .updateAction(action.id, { status: 'COMPLETED', completedDate: todayIso() })
+          .subscribe({
+            next: () => {
+              this.api.actionsResource.reload();
+              this.feedback.success(`${action.technology} ${action.cycle} marked completed.`);
+            },
+            error: (err) => this.feedback.failed(err, 'Could not update that plan.'),
+          });
+        break;
+    }
+  }
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
 
@@ -373,24 +546,36 @@ export class Actions {
   protected readonly engineers = this.store.engineers;
   protected readonly deployments = this.store.deployments;
 
+  protected readonly activeProject = this.store.activeProject;
+
+  protected readonly canEditPlans = computed(
+    () => this.session.can('estate:write') && this.api.canEditProject(this.activeProject()?.id),
+  );
+
+  protected readonly scoped = computed(() => {
+    const project = this.activeProject();
+    const all = this.api.actions();
+    return project ? all.filter((a) => a.environments.some((e) => e.projectId === project.id)) : all;
+  });
+
   protected readonly open = computed(() =>
-    this.api.actions().filter((a) => a.derivedStatus !== 'COMPLETED'),
+    this.scoped().filter((a) => a.derivedStatus !== 'COMPLETED'),
   );
   protected readonly overdue = computed(() =>
-    this.api.actions().filter((a) => a.derivedStatus === 'OVERDUE'),
+    this.scoped().filter((a) => a.derivedStatus === 'OVERDUE'),
   );
   protected readonly done = computed(() =>
-    this.api.actions().filter((a) => a.derivedStatus === 'COMPLETED'),
+    this.scoped().filter((a) => a.derivedStatus === 'COMPLETED'),
   );
   protected readonly unverified = computed(() =>
-    this.api.actions().filter((a) => a.unverifiedCompletion),
+    this.scoped().filter((a) => a.unverifiedCompletion),
   );
 
   protected readonly filtered = computed(() => {
     const needle = this.query().trim().toLowerCase();
     const filter = this.filter();
 
-    return this.api.actions().filter((action) => {
+    return this.scoped().filter((action) => {
       const matches =
         !needle ||
         `${action.technology} ${action.cycle} ${action.jiraKey ?? ''} ${action.assignee?.name ?? ''}`
@@ -398,6 +583,14 @@ export class Actions {
           .includes(needle);
 
       if (!matches) {
+        return false;
+      }
+
+      const customer = this.activeProject() ? '' : this.customer();
+      if (
+        customer &&
+        !action.environments.some((e) => this.projectIndex().get(e.projectId ?? '')?.customer === customer)
+      ) {
         return false;
       }
 
@@ -455,6 +648,7 @@ export class Actions {
       technologyCycleId: action.technologyCycleId,
       targetVersion: action.targetVersion ?? '',
       status: action.status,
+      startDate: action.startDate ?? '',
       plannedDate: action.plannedDate ?? '',
       assigneeId: action.assignee?.id ?? '',
       deploymentIds: action.environments.map((e) => e.deploymentId),
@@ -506,6 +700,7 @@ export class Actions {
       targetVersion: form.targetVersion || undefined,
       deploymentIds: form.deploymentIds,
       assigneeId: form.assigneeId || undefined,
+      startDate: form.startDate || undefined,
       plannedDate: form.plannedDate || undefined,
       status: form.status,
       decision: form.decision || null,
@@ -611,12 +806,89 @@ export class Actions {
   protected fill = statusFill;
 }
 
+const STATUS_COLOURS: Record<string, string> = {
+  NOT_STARTED: 'oklch(0.6 0.01 286)',
+  PLANNED: 'oklch(0.62 0.17 255)',
+  IN_PROGRESS: 'oklch(0.58 0.2 292)',
+  COMPLETED: 'oklch(0.65 0.15 160)',
+  DEFERRED: 'oklch(0.75 0.15 75)',
+  OVERDUE: 'oklch(0.6 0.21 25)',
+};
+
+function toItem(action: ApiUpgradeAction): GanttItem {
+  const completed = action.status === 'COMPLETED' || action.derivedStatus === 'COMPLETED';
+  const overdue = action.derivedStatus === 'OVERDUE';
+  const key = completed ? 'COMPLETED' : overdue ? 'OVERDUE' : action.status;
+  const subs = action.subtasks ?? [];
+  const subStarts = subs.map((s) => s.startDate ?? s.dueDate).filter((d): d is string => !!d).sort();
+  const subEnds = subs.map((s) => s.dueDate ?? s.startDate).filter((d): d is string => !!d).sort();
+  const end = action.plannedDate ?? subEnds.at(-1) ?? shiftDays(action.startDate ?? action.createdAt.slice(0, 10), 14);
+  const start = action.startDate ?? subStarts[0] ?? shiftDays(end, -14);
+
+  const estimate = subs.reduce((sum, s) => sum + (s.estimateSeconds ?? 0), 0);
+  const spent = subs.reduce((sum, s) => sum + Math.min(s.spentSeconds ?? 0, s.estimateSeconds ?? Infinity), 0);
+  const jira = estimate
+    ? spent / estimate
+    : action.jiraSubtaskTotal
+      ? (action.jiraSubtaskDone ?? 0) / action.jiraSubtaskTotal
+      : null;
+  const envs = action.progress.total ? action.progress.done / action.progress.total : 0;
+
+  return {
+    id: action.id,
+    name: action.targetVersion
+      ? `${action.technology} ${action.cycle} → ${action.targetVersion}`
+      : `${action.technology} ${action.cycle}`,
+    technology: action.technology,
+    statusLabel: key === 'OVERDUE' ? 'Overdue' : key.charAt(0) + key.slice(1).toLowerCase().replace('_', ' '),
+    colour: STATUS_COLOURS[key] ?? STATUS_COLOURS['NOT_STARTED']!,
+    people: action.assignee ? [action.assignee.name] : action.team ? [action.team.name] : [],
+    start: start <= end ? start : end,
+    end,
+    due: action.plannedDate,
+    overdue,
+    progress: completed ? 1 : Math.max(jira ?? 0, envs),
+    eol: action.eolDate,
+    riskExpiry: action.decision === 'ACCEPT_RISK' ? action.riskExpiresAt : null,
+    jiraKey: action.jiraKey,
+    jiraUrl: action.jiraUrl,
+    jiraError: action.jiraSyncError,
+    subs: (action.subtasks ?? []).map(toSub),
+    terms: action.terms ? TERMS_INFO[action.terms] : null,
+  };
+}
+
+const CATEGORY_COLOURS: Record<string, string> = {
+  'to-do': STATUS_COLOURS['NOT_STARTED']!,
+  'in-progress': STATUS_COLOURS['IN_PROGRESS']!,
+  done: STATUS_COLOURS['COMPLETED']!,
+};
+
+function toSub(task: ApiJiraSubtask): GanttSub {
+  const done = task.statusCategory === 'done';
+  const logged = task.estimateSeconds ? Math.min(1, (task.spentSeconds ?? 0) / task.estimateSeconds) : 0;
+  return {
+    key: task.key,
+    summary: task.summary,
+    status: task.status,
+    colour: CATEGORY_COLOURS[task.statusCategory] ?? STATUS_COLOURS['NOT_STARTED']!,
+    assignee: task.assignee,
+    start: task.startDate,
+    end: task.dueDate,
+    estimate: task.estimateSeconds,
+    spent: task.spentSeconds,
+    progress: done ? 1 : logged,
+    url: task.url,
+  };
+}
+
 function blank(): Draft {
   return {
     technology: '',
     technologyCycleId: '',
     targetVersion: '',
     status: 'PLANNED',
+    startDate: '',
     plannedDate: '',
     assigneeId: '',
     deploymentIds: [],

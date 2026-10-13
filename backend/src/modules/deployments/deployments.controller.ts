@@ -1,3 +1,4 @@
+import { Scope } from '../access/scope.decorator';
 import {
   Body,
   Controller,
@@ -30,6 +31,7 @@ export class DeploymentsController {
   constructor(private readonly deployments: DeploymentsService) {}
 
   @Patch(':id/components')
+  @Scope('deployment')
   @ApiOperation({
     summary: 'Record the version an environment now runs',
     description:
@@ -46,6 +48,7 @@ export class DeploymentsController {
   }
 
   @Get(':id/history')
+  @Scope('deployment')
   @ApiOperation({
     summary: 'Everything that changed in this environment',
     description: 'Newest first, by the date the change took effect.',
@@ -67,6 +70,7 @@ export class DeploymentsController {
   }
 
   @Get(':id/history/verify')
+  @Scope('deployment')
   @ApiOperation({
     summary: 'Check the change log has not been altered',
     description:
@@ -77,6 +81,7 @@ export class DeploymentsController {
   }
 
   @Get(':id/history.csv')
+  @Scope('deployment')
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @Header('Content-Disposition', 'attachment; filename="change-history.csv"')
   @ApiOperation({ summary: 'The change log as CSV, for auditors' })
@@ -104,6 +109,7 @@ export class DeploymentsController {
   }
 
   @Patch(':id/owners')
+  @Scope('deployment')
   @ApiOperation({ summary: 'Set which teams own an environment', description: 'The first team is the primary owner.' })
   @ApiParam({ name: 'id', description: 'Environment (deployment) id' })
   setOwners(@Param('id') id: string, @Body() body: SetOwnersDto) {
@@ -111,6 +117,7 @@ export class DeploymentsController {
   }
 
   @Delete(':id')
+  @Scope('deployment')
   @HttpCode(204)
   @ApiOperation({
     summary: 'Archive an environment',

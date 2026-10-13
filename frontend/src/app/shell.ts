@@ -6,7 +6,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { RegistryStore } from './core/registry.store';
 import { SessionStore } from './core/session';
-import { ROLE_INFO, RoleName } from './core/permissions';
+import { isViewer, ROLE_INFO, RoleName } from './core/permissions';
 import { Theme } from './core/theme';
 import { Celebrate } from './shared/celebrate';
 import { FeedbackHost } from './shared/feedback-host';
@@ -108,7 +108,7 @@ import { NotificationMenu } from './shared/notification-menu';
         </div>
 
         <nav class="flex flex-1 items-center gap-1 overflow-x-auto" aria-label="Sections">
-          @for (item of nav; track item.path) {
+          @for (item of nav(); track item.path) {
             <a [routerLink]="item.path" routerLinkActive="pill-active" class="pill">
               {{ item.label }}
               @if (item.badge && needsYou() > 0) {
@@ -120,9 +120,9 @@ import { NotificationMenu } from './shared/notification-menu';
 
         <lime-notification-menu />
 
-        @if (session.isAdmin() || session.can('lime:write')) {
+        @if (session.isAdmin() || session.can('lime:write') || session.can('integration:write')) {
           <a
-            routerLink="/settings"
+            [routerLink]="session.isAdmin() || session.can('lime:write') ? '/settings' : '/ops'"
             routerLinkActive="bg-muted"
             hlmBtn
             variant="ghost"
@@ -197,14 +197,17 @@ export class Shell {
     void this.router.navigateByUrl('/login');
   }
 
-  protected readonly nav = [
-    { path: '/overview', label: 'Overview', badge: false },
-    { path: '/projects', label: 'Projects', badge: false },
-    { path: '/customers', label: 'Customers', badge: false },
-    { path: '/lifecycle', label: 'Lifecycle', badge: true },
-    { path: '/plan', label: 'Plan', badge: false },
-    { path: '/calendar', label: 'Calendar', badge: false },
-  ];
+  protected readonly nav = computed(() =>
+    [
+      { path: '/overview', label: 'Overview', badge: false, viewer: true },
+      { path: '/manager', label: 'Manager view', badge: false, viewer: true },
+      { path: '/projects', label: 'Projects', badge: false, viewer: false },
+      { path: '/customers', label: 'Customers', badge: false, viewer: false },
+      { path: '/lifecycle', label: 'Lifecycle', badge: true, viewer: true },
+      { path: '/plan', label: 'Plan', badge: false, viewer: true },
+      { path: '/calendar', label: 'Calendar', badge: false, viewer: true },
+    ].filter((item) => item.viewer || !isViewer(this.session.user()?.role)),
+  );
 
   protected readonly projects = this.store.projects;
   protected readonly scope = this.store.scope;

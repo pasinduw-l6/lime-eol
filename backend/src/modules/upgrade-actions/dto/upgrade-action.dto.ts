@@ -94,6 +94,11 @@ export class CreateUpgradeActionDto extends ProcessFieldsDto {
   @IsUUID()
   teamId?: string;
 
+  @ApiPropertyOptional({ example: '2026-10-01' })
+  @IsOptional()
+  @IsISO8601()
+  startDate?: string;
+
   @ApiPropertyOptional({ example: '2026-10-15' })
   @IsOptional()
   @IsISO8601()

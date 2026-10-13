@@ -9,7 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { InviteUserDto, UpdateUserDto } from './dto/user.dto';
 
 const INCLUDE = {
-  _count: { select: { projects: true } },
+  _count: { select: { projects: true, projectAccess: true } },
   teams: { include: { team: true } },
 } satisfies Prisma.AppUserInclude;
 
@@ -46,6 +46,10 @@ export class UsersService {
         email,
         displayName: input.displayName?.trim() || null,
         role: input.role as Role,
+        allProjects: input.role === 'ADMIN' ? null : input.allProjects === undefined ? 'VIEW' : input.allProjects,
+        projectAccess: input.projects?.length
+          ? { create: input.projects.map((grant) => ({ projectId: grant.projectId, level: grant.level })) }
+          : undefined,
       },
       include: INCLUDE,
     });
@@ -99,6 +103,8 @@ export class UsersService {
       isActive: user.isActive,
       canEdit: user.role !== Role.VIEWER,
       projectCount: user._count.projects,
+      allProjects: user.role === Role.ADMIN ? 'EDIT' : user.allProjects,
+      accessCount: user._count.projectAccess,
       teams: user.teams.map((link) => ({ id: link.team.id, name: link.team.name })),
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     };

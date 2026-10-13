@@ -29,6 +29,7 @@ export const envSchema = z
       .min(1, 'OIDC_WEB_CLIENT_SECRET is required'),
     OIDC_WEB_REDIRECT_URI: blankable(z.string().url().optional()),
     SESSION_SECRET: z.string().min(1, 'SESSION_SECRET is required'),
+    SECRETS_KEY: blankable(z.string().min(16).optional()),
     BOOTSTRAP_ADMINS: blankable(z.string().optional()),
     PREVIEW_LOGIN: booleanish.default(false),
     GOTENBERG_URL: z.string().url().default('http://gotenberg:3000'),

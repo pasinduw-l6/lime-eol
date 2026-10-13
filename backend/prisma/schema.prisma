@@ -64,9 +64,6 @@ enum CommStatus {
 enum Role {
   ADMIN
   SRE
-  PRODUCT
-  BA
-  ACCOUNT
   VIEWER
 }
 
@@ -249,9 +246,63 @@ model Customer {
 
   projects    Project[]
   deployments Deployment[]
+  agreements  CustomerAgreement[]
+  contacts    CustomerContact[]
 
   @@index([archivedAt])
   @@map("customer")
+}
+
+enum AgreementType {
+  SUBSCRIPTION
+  LICENSE
+}
+
+enum InfraCoverage {
+  INCLUDED
+  QUOTED
+}
+
+model CustomerAgreement {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  customerId      String        @map("customer_id") @db.Uuid
+  type            AgreementType
+  startDate       DateTime?     @map("start_date") @db.Date
+  endDate         DateTime?     @map("end_date") @db.Date
+  renewalDate     DateTime?     @map("renewal_date") @db.Date
+  noticeDays      Int?          @map("notice_days")
+  autoRenew       Boolean       @default(false) @map("auto_renew")
+  upgradesPerYear Int?          @map("upgrades_per_year")
+  supportLevel    String?       @map("support_level")
+  reference       String?
+  documentUrl     String?       @map("document_url")
+  infrastructure  InfraCoverage?
+  licensedUsers   Int?          @map("licensed_users")
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, startDate])
+  @@map("customer_agreement")
+}
+
+model CustomerContact {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  name       String
+  role       String?
+  email      String?
+  phone      String?
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("customer_contact")
 }
 
 model Project {
@@ -263,6 +314,9 @@ model Project {
   status      ProjectStatus @default(ACTIVE)
   startedAt   DateTime?     @map("started_at") @db.Date
   notes       String?
+  jiraIntegrationId  String?   @map("jira_integration_id") @db.Uuid
+  jiraProjectKey     String?   @map("jira_project_key")
+  teamsIntegrationId String?   @map("teams_integration_id") @db.Uuid
   archivedAt  DateTime?     @map("archived_at") @db.Timestamptz(3)
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -270,9 +324,40 @@ model Project {
   customer    Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
   deployments Deployment[]
   engineers   ProjectEngineer[]
+  access      ProjectAccess[]
+  jiraIntegration  Integration? @relation("ProjectJira", fields: [jiraIntegrationId], references: [id], onDelete: SetNull)
+  teamsIntegration Integration? @relation("ProjectTeams", fields: [teamsIntegrationId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@map("project")
+}
+
+enum IntegrationKind {
+  JIRA
+  TEAMS
+}
+
+model Integration {
+  id            String          @id @default(uuid(7)) @db.Uuid
+  kind          IntegrationKind
+  name          String
+  settings      Json            @default("{}")
+  secret        String
+  secretHint    String          @map("secret_hint")
+  enabled       Boolean         @default(true)
+  lastCheckedAt DateTime?       @map("last_checked_at") @db.Timestamptz(3)
+  lastOk        Boolean?        @map("last_ok")
+  lastDetail    String?         @map("last_detail")
+  createdById   String?         @map("created_by_id") @db.Uuid
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  jiraProjects  Project[]       @relation("ProjectJira")
+  teamsProjects Project[]       @relation("ProjectTeams")
+  actions       UpgradeAction[]
+
+  @@unique([kind, name])
+  @@map("integration")
 }
 
 model ProjectEngineer {
@@ -399,6 +484,7 @@ model AppUser {
   email       String    @unique
   displayName String?   @map("display_name")
   role        Role      @default(VIEWER)
+  allProjects      AccessLevel? @map("all_projects")
   isActive    Boolean   @default(true) @map("is_active")
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -409,8 +495,29 @@ model AppUser {
   assignedActions UpgradeAction[]
   recordedChanges ComponentChange[]
   auditLogs       AuditLog[]
+  projectAccess   ProjectAccess[]
 
   @@map("app_user")
+}
+
+enum AccessLevel {
+  VIEW
+  EDIT
+}
+
+model ProjectAccess {
+  userId    String      @map("user_id") @db.Uuid
+  projectId String      @map("project_id") @db.Uuid
+  level     AccessLevel
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user    AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@index([projectId])
+  @@map("project_access")
 }
 
 model TeamMember {
@@ -431,9 +538,11 @@ model UpgradeAction {
   teamId            String?      @map("team_id") @db.Uuid
   assigneeId        String?      @map("assignee_id") @db.Uuid
   targetVersion     String?      @map("target_version")
+  startDate         DateTime?    @map("start_date") @db.Date
   plannedDate       DateTime?    @map("planned_date") @db.Date
   completedDate     DateTime?    @map("completed_date") @db.Date
   status            ActionStatus @default(NOT_STARTED)
+  jiraIntegrationId String?      @map("jira_integration_id") @db.Uuid
   jiraKey           String?      @map("jira_key")
   jiraIssueId       String?      @map("jira_issue_id")
   jiraUrl           String?      @map("jira_url")
@@ -458,6 +567,8 @@ model UpgradeAction {
   cycle         TechnologyCycle           @relation(fields: [technologyCycleId], references: [id], onDelete: Restrict)
   team          Team?                     @relation(fields: [teamId], references: [id], onDelete: Restrict)
   assignee      AppUser?                  @relation(fields: [assigneeId], references: [id], onDelete: Restrict)
+  jiraIntegration Integration?            @relation(fields: [jiraIntegrationId], references: [id], onDelete: SetNull)
+  jiraWorklogs  JiraWorklog[]
   deployments   UpgradeActionDeployment[]
   jiraSubtasks  JiraSubtask[]
   notifications NotificationLog[]
@@ -556,6 +667,11 @@ model JiraSubtask {
   statusCategory  String   @map("status_category")
   assignee        String?
   url             String
+  startDate       DateTime? @map("start_date") @db.Date
+  dueDate         DateTime? @map("due_date") @db.Date
+  estimateSeconds Int?      @map("estimate_seconds")
+  spentSeconds    Int?      @map("spent_seconds")
+  remainingSeconds Int?     @map("remaining_seconds")
   position        Int
   syncedAt        DateTime @default(now()) @map("synced_at") @db.Timestamptz(3)
 
@@ -564,6 +680,24 @@ model JiraSubtask {
   @@unique([upgradeActionId, issueId])
   @@index([upgradeActionId, position])
   @@map("jira_subtask")
+}
+
+model JiraWorklog {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  upgradeActionId String   @map("upgrade_action_id") @db.Uuid
+  issueKey        String   @map("issue_key")
+  worklogId       String   @map("worklog_id")
+  author          String
+  started         DateTime @db.Timestamptz(3)
+  seconds         Int
+  comment         String?
+  syncedAt        DateTime @default(now()) @map("synced_at") @db.Timestamptz(3)
+
+  upgradeAction UpgradeAction @relation(fields: [upgradeActionId], references: [id], onDelete: Cascade)
+
+  @@unique([upgradeActionId, issueKey, worklogId])
+  @@index([started])
+  @@map("jira_worklog")
 }
 
 model NotificationEvent {

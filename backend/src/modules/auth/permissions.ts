@@ -1,4 +1,4 @@
-export const ROLES = ['ADMIN', 'SRE', 'PRODUCT', 'BA', 'ACCOUNT', 'VIEWER'] as const;
+export const ROLES = ['VIEWER', 'SRE', 'ADMIN'] as const;
 export type RoleName = (typeof ROLES)[number];
 
 export type Permission =
@@ -8,6 +8,7 @@ export type Permission =
   | 'plan:decision'
   | 'plan:assess'
   | 'lime:write'
+  | 'integration:write'
   | 'admin';
 
 const GRANTS: Record<RoleName, Permission[]> = {
@@ -18,12 +19,17 @@ const GRANTS: Record<RoleName, Permission[]> = {
     'plan:decision',
     'plan:assess',
     'lime:write',
+    'integration:write',
     'admin',
   ],
-  SRE: ['estate:write', 'plan:notice', 'plan:decision', 'plan:assess'],
-  PRODUCT: ['lime:write', 'plan:assess'],
-  BA: ['customer:write', 'plan:notice'],
-  ACCOUNT: ['customer:write', 'plan:notice', 'plan:decision'],
+  SRE: [
+    'estate:write',
+    'customer:write',
+    'plan:notice',
+    'plan:decision',
+    'plan:assess',
+    'integration:write',
+  ],
   VIEWER: [],
 };
 

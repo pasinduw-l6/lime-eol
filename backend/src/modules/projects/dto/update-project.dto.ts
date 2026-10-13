@@ -1,5 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsISO8601, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateProjectDto {
   @ApiPropertyOptional({ example: 'DFCC' })
@@ -33,4 +43,22 @@ export class UpdateProjectDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  @ApiPropertyOptional({ nullable: true, description: 'A Jira connection id; null for the server default' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  jiraIntegrationId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, example: 'OPS', description: 'The board; null for the connection default' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== '')
+  @Matches(/^[A-Za-z][A-Za-z0-9_]{1,9}$/, { message: 'A Jira project key is letters and digits, like OPS.' })
+  jiraProjectKey?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'A Teams channel id; null for the server default' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  teamsIntegrationId?: string | null;
 }

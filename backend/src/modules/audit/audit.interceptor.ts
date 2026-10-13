@@ -10,6 +10,21 @@ const WRITES: Record<string, string> = {
   DELETE: 'archive',
 };
 
+const SECRET_FIELD = /secret|password|webhook|apiToken|accessToken|^token$/i;
+
+function redact(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redact);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [
+        key,
+        SECRET_FIELD.test(key) && inner ? '[redacted]' : redact(inner),
+      ]),
+    );
+  }
+  return value;
+}
+
 interface AuditedRequest {
   method: string;
   body?: unknown;
@@ -56,7 +71,7 @@ export class AuditInterceptor implements NestInterceptor {
           entity: entity || 'unknown',
           entityId: params['id'] ?? params['cycleId'] ?? responseId,
           action: tail ? `${verb} ${tail}` : verb,
-          afterData: (request.body ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+          afterData: (redact(request.body) ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         },
       });
     } catch (error) {

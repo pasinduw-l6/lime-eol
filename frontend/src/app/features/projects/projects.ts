@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Api, ApiArchived, CommercialModel } from '../../core/api';
 import { Feedback } from '../../core/feedback';
 import { SessionStore } from '../../core/session';
@@ -19,7 +19,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
 @Component({
   selector: 'lime-projects',
-  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, Environments],
+  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, Environments, RouterLink],
   host: { class: 'block' },
   template: `
     <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -35,7 +35,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
           <input type="checkbox" [checked]="showArchived()" (change)="toggleArchived()" />
           Show archived
         </label>
-        @if (canWrite()) {
+        @if (canWrite() && api.editableEverywhere()) {
           <button type="button" hlmBtn [variant]="showForm() ? 'outline' : 'default'" (click)="toggleForm()">
             {{ showForm() ? 'Cancel' : 'New project' }}
           </button>
@@ -367,7 +367,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                   >
                     {{ row.project.status.toLowerCase() }}
                   </span>
-                  @if (canManage()) {
+                  @if (canManage() && api.canEditProject(row.project.id)) {
                     <button type="button" class="text-[12px] text-primary" (click)="manage(row.project)">
                       Manage
                     </button>
@@ -445,6 +445,40 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
           </fieldset>
 
           <fieldset class="m-0 grid gap-3 rounded-lg border p-4">
+            <legend class="px-1 text-sm font-medium">Connections</legend>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                Jira connection
+                <select hlmInput [(ngModel)]="editForm.jiraIntegrationId" name="jira">
+                  <option value="">Server default (.env)</option>
+                  @for (o of jiraOptions(); track o.id) {
+                    <option [value]="o.id">{{ o.name }}</option>
+                  }
+                </select>
+              </label>
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                Board (project key)
+                <input hlmInput class="uppercase" [(ngModel)]="editForm.jiraProjectKey" name="jirakey"
+                  [placeholder]="boardHint(editForm.jiraIntegrationId)" />
+              </label>
+              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+                Teams channel
+                <select hlmInput [(ngModel)]="editForm.teamsIntegrationId" name="teams">
+                  <option value="">Server default (.env)</option>
+                  @for (o of teamsOptions(); track o.id) {
+                    <option [value]="o.id">{{ o.name }}</option>
+                  }
+                </select>
+              </label>
+            </div>
+            <p class="m-0 text-[12px] text-muted-foreground">
+              New Jira issues for this project's plans go to this board. End-of-life alerts also post to the
+              chosen channel. Add connections under
+              <a routerLink="/ops" class="text-primary">Ops</a>.
+            </p>
+          </fieldset>
+
+          <fieldset class="m-0 grid gap-3 rounded-lg border p-4">
             <legend class="px-1 text-sm font-medium">Customer agreement · {{ project.customer }}</legend>
             <div class="grid gap-3 sm:grid-cols-3">
               <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
@@ -487,7 +521,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                     hlmInput
                     class="h-8"
                     [value]="ownerOf(d)"
-                    [disabled]="busy() || !canWrite()"
+                    [disabled]="busy() || !canWrite() || !api.canEditProject(d.projectId)"
                     [attr.aria-label]="'Owning team for ' + d.environment"
                     (change)="setOwner(d, $any($event.target).value)"
                   >
@@ -496,7 +530,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
                       <option [value]="t.id">{{ t.name }}</option>
                     }
                   </select>
-                  @if (canWrite()) {
+                  @if (canWrite() && api.canEditProject(d.projectId)) {
                     <button type="button" class="text-[12px] text-overdue" [disabled]="busy()" (click)="removeEnvironment(d)">
                       Archive
                     </button>
@@ -692,9 +726,19 @@ export class Projects {
     commercialModel: '' as CommercialModel | '',
     contractStart: '',
     contractEnd: '',
+    jiraIntegrationId: '',
+    jiraProjectKey: '',
+    teamsIntegrationId: '',
   };
 
   protected readonly commercialModels = COMMERCIAL_MODELS;
+  protected readonly jiraOptions = computed(() => this.api.integrationOptions().filter((o) => o.kind === 'JIRA'));
+  protected readonly teamsOptions = computed(() => this.api.integrationOptions().filter((o) => o.kind === 'TEAMS'));
+
+  protected boardHint(integrationId: string): string {
+    const option = this.jiraOptions().find((o) => o.id === integrationId);
+    return option?.projectKey ? `Default: ${option.projectKey}` : 'Connection default';
+  }
 
   private customerOf(projectId: string) {
     const customerId = this.store.apiProject(projectId)?.customerId;
@@ -710,6 +754,9 @@ export class Projects {
       commercialModel: this.customerOf(project.id)?.commercialModel ?? '',
       contractStart: this.customerOf(project.id)?.contractStart ?? '',
       contractEnd: this.customerOf(project.id)?.contractEnd ?? '',
+      jiraIntegrationId: this.store.apiProject(project.id)?.jiraIntegrationId ?? '',
+      jiraProjectKey: this.store.apiProject(project.id)?.jiraProjectKey ?? '',
+      teamsIntegrationId: this.store.apiProject(project.id)?.teamsIntegrationId ?? '',
     };
     this.manageError.set(null);
     this.managed.set(project);
@@ -823,11 +870,16 @@ export class Projects {
     const { engineerIds, name, limeVersion, status, commercialModel, contractStart, contractEnd } =
       this.editForm;
     const customer = this.customerOf(id);
+    const connections = {
+      jiraIntegrationId: this.editForm.jiraIntegrationId || null,
+      jiraProjectKey: this.editForm.jiraProjectKey.trim().toUpperCase() || null,
+      teamsIntegrationId: this.editForm.teamsIntegrationId || null,
+    };
 
     this.store.updateProject(id, { name, limeVersion, status, engineerIds });
     this.managed.set(null);
 
-    this.api.updateProject(id, { name, limeVersion, status }).subscribe({
+    this.api.updateProject(id, { name, limeVersion, status, ...connections }).subscribe({
       next: () =>
         this.api.setEngineers(id, engineerIds).subscribe({
           next: () => {

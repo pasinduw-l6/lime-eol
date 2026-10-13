@@ -1,30 +1,36 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import { HlmTableImports } from '@spartan-ng/helm/table';
-import { Api, ApiCustomer, CommercialModel } from '../../core/api';
+import {
+  AGREEMENT_TYPES,
+  SCOPES,
+  TERMS_INFO,
+  termsFor,
+  STATUS_INFO,
+  TYPE_COLOURS,
+  termNote,
+  typeLabel,
+} from '../../core/agreements';
+import { AgreementStatus, AgreementType, Api, ApiCustomer } from '../../core/api';
 import { Feedback } from '../../core/feedback';
-import { parseDate, today } from '../../core/lifecycle';
-import { COMMERCIAL_MODELS } from '../../core/process';
-import { RegistryStore } from '../../core/registry.store';
+import { parseDate } from '../../core/lifecycle';
 import { SessionStore } from '../../core/session';
 import { Modal } from '../../shared/modal';
 
 interface Draft {
-  id?: string;
   name: string;
   code: string;
-  contact: string;
   notes: string;
-  commercialModel: CommercialModel | '';
-  contractStart: string;
-  contractEnd: string;
 }
+
+type StatusFilter = 'ALL' | AgreementStatus;
+type TypeFilter = 'ALL' | AgreementType;
 
 @Component({
   selector: 'lime-customers',
@@ -37,6 +43,7 @@ interface Draft {
     HlmLabel,
     HlmTableImports,
     Modal,
+    RouterLink,
   ],
   host: { class: 'block' },
   template: `
@@ -44,7 +51,7 @@ interface Draft {
       <div>
         <h1 class="m-0 text-3xl font-semibold tracking-tight">Customers</h1>
         <p class="m-0 mt-1 text-sm text-muted-foreground">
-          {{ api.customers().length }} customers · commercial model decides whether upgrades are included or quoted
+          {{ api.customers().length }} customers · the agreement decides whether an upgrade is included or quoted
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -58,16 +65,53 @@ interface Draft {
       </div>
     </header>
 
-    <div class="mb-4 flex flex-wrap items-center gap-3">
+    <section class="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      @for (card of cards(); track card.key) {
+        <button
+          type="button"
+          hlmCard
+          class="gap-1 px-5 py-4 text-left transition-colors hover:bg-muted/50"
+          [style.box-shadow]="statusFilter() === card.key ? '0 0 0 2px ' + card.colour : null"
+          (click)="statusFilter.set(statusFilter() === card.key ? 'ALL' : card.key)"
+        >
+          <span class="flex items-center gap-2 text-[13px] text-muted-foreground">
+            <span class="size-2 rounded-full" [style.background]="card.colour"></span>
+            {{ card.label }}
+          </span>
+          <span class="text-3xl font-semibold tabular">{{ card.count }}</span>
+          <span class="text-[12px] text-muted-foreground">{{ card.hint }}</span>
+        </button>
+      }
+    </section>
+
+    <div class="mb-4 flex flex-wrap items-center gap-2">
       <input
         hlmInput
         type="search"
-        class="max-w-sm"
+        class="h-9 max-w-xs"
         placeholder="Search name, code or contact"
         aria-label="Search customers"
         [ngModel]="query()"
         (ngModelChange)="query.set($event)"
       />
+      <div class="segmented" role="group" aria-label="Agreement type">
+        @for (t of typeFilters; track t.key) {
+          <button
+            type="button"
+            class="px-3 py-1 text-[13px]"
+            [class.bg-background]="typeFilter() === t.key"
+            [class.shadow-sm]="typeFilter() === t.key"
+            [class.text-foreground]="typeFilter() === t.key"
+            [class.text-ink-soft]="typeFilter() !== t.key"
+            (click)="typeFilter.set(t.key)"
+          >{{ t.label }}</button>
+        }
+      </div>
+      @if (statusFilter() !== 'ALL') {
+        <button type="button" hlmBtn variant="ghost" size="sm" (click)="statusFilter.set('ALL')">
+          {{ statusLabel(statusFilter()) }} only ✕
+        </button>
+      }
       <span class="ml-auto text-sm text-muted-foreground">{{ rows().length }} shown</span>
     </div>
 
@@ -77,61 +121,101 @@ interface Draft {
           <thead hlmTHead>
             <tr hlmTr>
               <th hlmTh class="pl-6">Customer</th>
-              <th hlmTh>Model</th>
-              <th hlmTh>Contract</th>
-              <th hlmTh>Contact</th>
+              <th hlmTh>Status</th>
+              <th hlmTh>Agreement</th>
+              <th hlmTh>Coverage</th>
+              <th hlmTh>
+                <button type="button" class="flex items-center gap-1" (click)="sortByRenewal.set(!sortByRenewal())">
+                  Term {{ sortByRenewal() ? '↑' : '' }}
+                </button>
+              </th>
+              <th hlmTh>Primary contact</th>
               <th hlmTh>Projects</th>
-              <th hlmTh class="pr-6"><span class="sr-only">Actions</span></th>
+              <th hlmTh class="pr-6"><span class="sr-only">Open</span></th>
             </tr>
           </thead>
           <tbody hlmTBody>
             @for (c of rows(); track c.id) {
-              <tr hlmTr>
+              @let status = c.agreementStatus ?? 'NONE';
+              <tr hlmTr class="cursor-pointer" (click)="open(c)">
                 <td hlmTd class="pl-6">
-                  <span class="block font-medium">{{ c.name }}</span>
+                  <a [routerLink]="['/customers', c.id]" class="block font-medium hover:underline" (click)="$event.stopPropagation()">{{ c.name }}</a>
                   <span class="tabular block text-xs text-muted-foreground">{{ c.code || 'no code' }}</span>
                 </td>
                 <td hlmTd>
-                  @if (c.commercialModel) {
-                    <span hlmBadge variant="outline">{{ modelLabel(c.commercialModel) }}</span>
+                  <span class="inline-flex items-center gap-1.5 text-[13px]" [style.color]="statusColour(status)">
+                    <span class="size-2 rounded-full" [style.background]="statusColour(status)"></span>
+                    {{ statusLabel(status) }}
+                  </span>
+                </td>
+                <td hlmTd>
+                  @if (c.agreement; as a) {
+                    <span
+                      hlmBadge
+                      class="border"
+                      [style.color]="typeColour(a.type)"
+                      [style.border-color]="tint(typeColour(a.type), 40)"
+                      [style.background]="tint(typeColour(a.type), 10)"
+                    >{{ typeLabel(a.type) }}</span>
                   } @else {
-                    <span class="text-muted-foreground">Not set</span>
+                    <span class="text-muted-foreground">—</span>
                   }
                 </td>
-                <td hlmTd class="tabular whitespace-normal">
-                  @if (c.contractStart || c.contractEnd) {
-                    <span class="block">{{ date(c.contractStart) }} – {{ date(c.contractEnd) }}</span>
-                    <span class="block text-xs" [class.text-destructive]="contractEnded(c)" [class.text-muted-foreground]="!contractEnded(c)">
-                      {{ contractNote(c) }}
+                <td hlmTd>
+                  @if (c.agreement; as a) {
+                    <span class="grid gap-0.5 text-[12px]">
+                      @for (s of scopes; track s.key) {
+                        @let t = terms(s.key, a.coverage);
+                        <span class="flex items-center gap-1.5" [title]="s.label + ': ' + termsInfo[t].long">
+                          <span class="size-1.5 rounded-full" [style.background]="termsInfo[t].colour"></span>
+                          <span class="text-muted-foreground">{{ s.key === 'INFRASTRUCTURE' ? 'Infra' : 'App' }}</span>
+                          <span [style.color]="termsInfo[t].colour">{{ termsInfo[t].label }}</span>
+                        </span>
+                      }
                     </span>
                   } @else {
                     <span class="text-muted-foreground">—</span>
                   }
                 </td>
-                <td hlmTd class="whitespace-normal">{{ c.contact || '—' }}</td>
+                <td hlmTd class="tabular whitespace-normal">
+                  @if (c.agreement && !c.agreement.startDate && !c.agreement.endDate) {
+                    <span class="text-muted-foreground">No dates set</span>
+                  } @else if (c.agreement; as a) {
+                    <span class="block text-[13px]">{{ date(a.startDate) }} – {{ date(a.endDate) }}</span>
+                    <span class="block text-xs" [style.color]="status === 'EXPIRED' ? 'var(--color-overdue)' : status === 'EXPIRING' ? 'var(--color-soon)' : null" [class.text-muted-foreground]="status === 'ACTIVE' || status === 'UPCOMING'">
+                      {{ termNote(a.endDate) }}{{ a.autoRenew ? ' · auto-renews' : '' }}
+                    </span>
+                  } @else {
+                    <span class="text-muted-foreground">—</span>
+                  }
+                </td>
+                <td hlmTd class="whitespace-normal">
+                  @if (c.primaryContact; as p) {
+                    <span class="block text-[13px]">{{ p.name }}</span>
+                    <span class="block text-xs text-muted-foreground">{{ p.role || p.email || p.phone || '' }}</span>
+                  } @else {
+                    <span class="text-muted-foreground">—</span>
+                  }
+                </td>
                 <td hlmTd class="whitespace-normal">
                   <span class="flex flex-wrap gap-1">
                     @for (p of projectsOf(c.id); track p.id) {
-                      <button type="button" class="rounded-md border px-1.5 text-xs hover:bg-muted" (click)="openProject(p.id)">
+                      <span class="inline-flex items-center gap-1 rounded-md border px-1.5 text-xs">
                         {{ p.name }}
-                      </button>
+                        @if (p.risk.eol > 0) {
+                          <span class="rounded bg-destructive/10 px-1 text-[10px] text-destructive tabular" title="Components past end of life">{{ p.risk.eol }}</span>
+                        }
+                      </span>
                     } @empty {
                       <span class="text-muted-foreground">None</span>
                     }
                   </span>
                 </td>
-                <td hlmTd class="pr-6 text-right">
-                  @if (canWrite()) {
-                    <span class="flex justify-end gap-1">
-                      <button type="button" hlmBtn variant="ghost" size="sm" (click)="edit(c)">Edit</button>
-                      <button type="button" hlmBtn variant="ghost" size="sm" class="text-destructive" (click)="archive(c)">Archive</button>
-                    </span>
-                  }
-                </td>
+                <td hlmTd class="pr-6 text-right text-muted-foreground">›</td>
               </tr>
             } @empty {
               <tr hlmTr>
-                <td hlmTd colspan="6" class="py-10 text-center text-muted-foreground">No customers match.</td>
+                <td hlmTd colspan="8" class="py-10 text-center text-muted-foreground">No customers match.</td>
               </tr>
             }
           </tbody>
@@ -162,7 +246,7 @@ interface Draft {
     }
 
     @if (draft(); as d) {
-      <lime-modal [title]="d.id ? 'Edit customer' : 'New customer'" (dismiss)="draft.set(null)">
+      <lime-modal title="New customer" subtitle="Add the agreement and contacts on the next page." (dismiss)="draft.set(null)">
         <form class="grid gap-4" (submit)="save($event)">
           <div class="grid gap-3 sm:grid-cols-[1fr_160px]">
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
@@ -175,39 +259,12 @@ interface Draft {
             </label>
           </div>
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-            Contact
-            <input hlmInput name="contact" [(ngModel)]="d.contact" placeholder="Name, email or phone of the customer contact" />
-          </label>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-              Commercial model
-              <select hlmInput name="model" [(ngModel)]="d.commercialModel">
-                <option value="">Not set</option>
-                @for (m of models; track m.key) {
-                  <option [value]="m.key">{{ m.label }}</option>
-                }
-              </select>
-            </label>
-            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-              Contract start
-              <input hlmInput type="date" name="start" [(ngModel)]="d.contractStart" (ngModelChange)="suggestEnd(d)" />
-            </label>
-            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-              Contract end
-              <input hlmInput type="date" name="end" [(ngModel)]="d.contractEnd" />
-            </label>
-          </div>
-          <p class="m-0 -mt-2 text-xs text-muted-foreground">
-            Subscription customers get infrastructure upgrade support for the agreed five-year period. The end date
-            is filled in five years after the start; change it if the agreement differs.
-          </p>
-          <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Notes
             <textarea hlmInput rows="3" class="h-auto py-2" name="notes" [(ngModel)]="d.notes"></textarea>
           </label>
           <div class="flex justify-end gap-2">
             <button type="button" hlmBtn variant="outline" (click)="draft.set(null)">Cancel</button>
-            <button type="submit" hlmBtn [disabled]="busy()">{{ d.id ? 'Save changes' : 'Create customer' }}</button>
+            <button type="submit" hlmBtn [disabled]="busy()">Create and continue</button>
           </div>
         </form>
       </lime-modal>
@@ -216,57 +273,81 @@ interface Draft {
 })
 export class Customers {
   protected readonly api = inject(Api);
-  private readonly store = inject(RegistryStore);
   private readonly router = inject(Router);
   private readonly feedback = inject(Feedback);
   private readonly session = inject(SessionStore);
 
-  protected readonly models = COMMERCIAL_MODELS;
+  protected readonly scopes = SCOPES;
+  protected readonly termsInfo = TERMS_INFO;
+  protected readonly terms = termsFor;
+  protected readonly typeLabel = typeLabel;
+  protected readonly termNote = termNote;
   protected readonly canWrite = computed(() => this.session.can('customer:write'));
   protected readonly query = signal('');
+  protected readonly statusFilter = signal<StatusFilter>('ALL');
+  protected readonly typeFilter = signal<TypeFilter>('ALL');
+  protected readonly sortByRenewal = signal(false);
   protected readonly busy = signal(false);
   protected readonly draft = signal<Draft | null>(null);
   protected readonly showArchived = signal(false);
   protected readonly archived = signal<ApiCustomer[]>([]);
 
+  protected readonly typeFilters: { key: TypeFilter; label: string }[] = [
+    { key: 'ALL', label: 'All types' },
+    ...AGREEMENT_TYPES.map((t) => ({ key: t.key as TypeFilter, label: t.label })),
+  ];
+
+  protected readonly cards = computed(() => {
+    const all = this.api.customers();
+    const count = (status: AgreementStatus) => all.filter((c) => (c.agreementStatus ?? 'NONE') === status).length;
+    return [
+      { key: 'ACTIVE' as const, label: 'Active', count: count('ACTIVE'), colour: STATUS_INFO.ACTIVE.colour, hint: 'Agreement running' },
+      { key: 'EXPIRING' as const, label: 'Expiring in 90 days', count: count('EXPIRING'), colour: STATUS_INFO.EXPIRING.colour, hint: 'Start the renewal' },
+      { key: 'EXPIRED' as const, label: 'Expired', count: count('EXPIRED'), colour: STATUS_INFO.EXPIRED.colour, hint: 'Upgrades are quoted until renewed' },
+      { key: 'NONE' as const, label: 'No agreement', count: count('NONE'), colour: STATUS_INFO.NONE.colour, hint: 'Add one to know what is covered' },
+    ];
+  });
+
   protected readonly rows = computed(() => {
     const needle = this.query().trim().toLowerCase();
-    return this.api
-      .customers()
-      .filter(
-        (c) =>
-          !needle ||
-          c.name.toLowerCase().includes(needle) ||
-          (c.code ?? '').toLowerCase().includes(needle) ||
-          (c.contact ?? '').toLowerCase().includes(needle),
-      );
+    const status = this.statusFilter();
+    const type = this.typeFilter();
+
+    const list = this.api.customers().filter((c) => {
+      const contact = c.primaryContact;
+      const text = [c.name, c.code, c.contact, contact?.name, contact?.email].filter(Boolean).join(' ').toLowerCase();
+      if (needle && !text.includes(needle)) return false;
+      if (status !== 'ALL' && (c.agreementStatus ?? 'NONE') !== status) return false;
+      if (type !== 'ALL' && c.agreement?.type !== type) return false;
+      return true;
+    });
+
+    if (!this.sortByRenewal()) return list;
+    return [...list].sort((a, b) => (a.agreement?.endDate ?? '9999').localeCompare(b.agreement?.endDate ?? '9999'));
   });
 
   protected projectsOf(customerId: string) {
     return this.api.projects().filter((p) => p.customerId === customerId);
   }
 
-  protected openProject(projectId: string): void {
-    this.store.scope.set(projectId);
-    void this.router.navigateByUrl('/overview');
+  protected open(c: ApiCustomer): void {
+    void this.router.navigate(['/customers', c.id]);
   }
 
-  protected modelLabel(model: CommercialModel): string {
-    return COMMERCIAL_MODELS.find((m) => m.key === model)?.label ?? model;
+  protected statusLabel(status: AgreementStatus | 'ALL'): string {
+    return status === 'ALL' ? 'All' : STATUS_INFO[status].label;
   }
 
-  protected contractEnded(c: ApiCustomer): boolean {
-    const end = parseDate(c.contractEnd);
-    return !!end && end.getTime() < today().getTime();
+  protected statusColour(status: AgreementStatus): string {
+    return STATUS_INFO[status].colour;
   }
 
-  protected contractNote(c: ApiCustomer): string {
-    const end = parseDate(c.contractEnd);
-    if (!end) return 'No end date';
-    const days = Math.round((end.getTime() - today().getTime()) / 86_400_000);
-    if (days < 0) return 'Ended';
-    const years = days / 365.25;
-    return years >= 1 ? `${years.toFixed(1)} years left` : `${days} days left`;
+  protected typeColour(type: AgreementType): string {
+    return TYPE_COLOURS[type];
+  }
+
+  protected tint(colour: string, percent: number): string {
+    return `color-mix(in oklab, ${colour} ${percent}%, transparent)`;
   }
 
   protected date(value: string | null): string {
@@ -275,36 +356,7 @@ export class Customers {
   }
 
   protected add(): void {
-    this.draft.set({
-      name: '',
-      code: '',
-      contact: '',
-      notes: '',
-      commercialModel: '',
-      contractStart: '',
-      contractEnd: '',
-    });
-  }
-
-  protected edit(c: ApiCustomer): void {
-    this.draft.set({
-      id: c.id,
-      name: c.name,
-      code: c.code ?? '',
-      contact: c.contact ?? '',
-      notes: c.notes ?? '',
-      commercialModel: c.commercialModel ?? '',
-      contractStart: c.contractStart ?? '',
-      contractEnd: c.contractEnd ?? '',
-    });
-  }
-
-  protected suggestEnd(d: Draft): void {
-    const start = parseDate(d.contractStart);
-    if (start && !d.contractEnd) {
-      const end = new Date(Date.UTC(start.getUTCFullYear() + 5, start.getUTCMonth(), start.getUTCDate()));
-      d.contractEnd = end.toISOString().slice(0, 10);
-    }
+    this.draft.set({ name: '', code: '', notes: '' });
   }
 
   protected save(event: Event): void {
@@ -315,48 +367,21 @@ export class Customers {
       return;
     }
 
-    const body = {
-      name: d.name.trim(),
-      code: d.code.trim() || null,
-      contact: d.contact.trim() || null,
-      notes: d.notes.trim() || null,
-      commercialModel: d.commercialModel || null,
-      contractStart: d.contractStart || null,
-      contractEnd: d.contractEnd || null,
-    };
-
     this.busy.set(true);
-    (d.id ? this.api.editCustomer(d.id, body) : this.api.createCustomer(body)).subscribe({
-      next: (customer) => {
-        this.busy.set(false);
-        this.draft.set(null);
-        this.feedback.success(`${customer.name} saved.`);
-        this.api.reload();
-      },
-      error: (err) => {
-        this.busy.set(false);
-        this.feedback.failed(err, 'Could not save that customer.');
-      },
-    });
-  }
-
-  protected async archive(c: ApiCustomer): Promise<void> {
-    const ok = await this.feedback.confirm({
-      title: `Archive ${c.name}?`,
-      message: 'Only possible when the customer has no active projects. It can be restored later.',
-      confirmLabel: 'Archive',
-      destructive: true,
-    });
-    if (!ok) return;
-
-    this.api.archiveCustomer(c.id).subscribe({
-      next: () => {
-        this.feedback.success(`${c.name} archived.`, { label: 'Undo', run: () => this.restore(c) });
-        this.api.reload();
-        this.loadArchived();
-      },
-      error: (err) => this.feedback.failed(err, `${c.name} could not be archived.`),
-    });
+    this.api
+      .createCustomer({ name: d.name.trim(), code: d.code.trim() || null, notes: d.notes.trim() || null })
+      .subscribe({
+        next: (customer) => {
+          this.busy.set(false);
+          this.draft.set(null);
+          this.api.reload();
+          void this.router.navigate(['/customers', customer.id]);
+        },
+        error: (err) => {
+          this.busy.set(false);
+          this.feedback.failed(err, 'Could not create that customer.');
+        },
+      });
   }
 
   protected restore(c: ApiCustomer): void {

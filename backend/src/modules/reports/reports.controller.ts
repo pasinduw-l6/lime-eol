@@ -1,3 +1,4 @@
+import { Scope } from '../access/scope.decorator';
 import { Controller, Get, Param, Res } from '@nestjs/common';
 import { ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -10,6 +11,7 @@ export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
   @Get('project/:id.pdf')
+  @Scope('project')
   @ApiProduces('application/pdf')
   @ApiOperation({ summary: 'The Overview of one project as a PDF' })
   project(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser, @Res() res: Response) {
@@ -17,6 +19,7 @@ export class ReportsController {
   }
 
   @Get('customer/:id.pdf')
+  @Scope('customer')
   @ApiProduces('application/pdf')
   @ApiOperation({ summary: 'A customer report: a summary page, then every project' })
   customer(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser, @Res() res: Response) {
