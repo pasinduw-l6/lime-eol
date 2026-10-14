@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -22,6 +23,7 @@ export class DeploymentsService {
     deploymentId: string,
     input: ChangeComponentDto,
     actorId?: string,
+    options: { fromVersionFile?: boolean } = {},
   ): Promise<ComponentChangeDto> {
     const deployment = await this.prisma.deployment.findUnique({
       where: { id: deploymentId },
@@ -38,6 +40,15 @@ export class DeploymentsService {
       throw new NotFoundException(
         `"${input.technology}" is not in the registry. Add it there first.`,
       );
+    }
+
+    if (!options.fromVersionFile) {
+      const sync = await this.prisma.versionSync.findUnique({ where: { id: 'default' } });
+      if (((sync?.managed as string[] | undefined) ?? []).includes(`${deploymentId}|${technology.id}`)) {
+        throw new ConflictException(
+          `${technology.name} on this environment comes from eol-versions.yml in GitHub. Change it there and the tool updates itself.`,
+        );
+      }
     }
 
     const toVersion = input.toVersion.trim();

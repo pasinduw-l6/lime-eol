@@ -412,8 +412,7 @@ function blankCycle(technology: string): Omit<Cycle, 'id'> & { id?: string } {
             </label>
           </div>
           <p class="m-0 -mt-2 text-[12px] text-muted-foreground">
-            Scope decides who covers an upgrade: infrastructure under the subscription,
-            application dependencies through Lime releases.
+            Scope groups the technology as infrastructure or an application dependency.
           </p>
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Cycle rule

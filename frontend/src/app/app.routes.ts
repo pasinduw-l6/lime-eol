@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { canOpenOps, canOpenSettings, notViewer, signedIn, signedOut } from './core/auth.guard';
+import { canOpenOps, canOpenSettings, canSeePage, signedIn, signedOut } from './core/auth.guard';
 import { Shell } from './shell';
 
 export const routes: Routes = [
@@ -34,44 +34,40 @@ export const routes: Routes = [
           import('./features/overview/overview').then((m) => m.Overview),
       },
       {
-        path: 'customers',
-        title: 'Customers · Lime Lifecycle',
-        canActivate: [notViewer],
-        loadComponent: () => import('./features/customers/customers').then((m) => m.Customers),
-      },
-      {
-        path: 'customers/:id',
-        title: 'Customer · Lime Lifecycle',
-        canActivate: [notViewer],
-        loadComponent: () =>
-          import('./features/customers/customer-detail').then((m) => m.CustomerDetail),
-      },
-      {
         path: 'projects',
+        canActivate: [canSeePage],
+        data: { page: 'projects' },
         title: 'Projects · Lime Lifecycle',
-        canActivate: [notViewer],
         loadComponent: () =>
           import('./features/projects/projects').then((m) => m.Projects),
       },
       {
         path: 'lifecycle',
+        canActivate: [canSeePage],
+        data: { page: 'lifecycle' },
         title: 'Lifecycle · Lime Lifecycle',
         loadComponent: () =>
           import('./features/lifecycle/lifecycle-page').then((m) => m.LifecyclePage),
       },
       {
         path: 'plan',
+        canActivate: [canSeePage],
+        data: { page: 'plan' },
         title: 'Plan · Lime Lifecycle',
         loadComponent: () =>
           import('./features/actions/actions').then((m) => m.Actions),
       },
       {
         path: 'manager',
+        canActivate: [canSeePage],
+        data: { page: 'manager' },
         title: 'Manager view · Lime Lifecycle',
         loadComponent: () => import('./features/manager/manager').then((m) => m.Manager),
       },
       {
         path: 'calendar',
+        canActivate: [canSeePage],
+        data: { page: 'calendar' },
         title: 'Calendar · Lime Lifecycle',
         loadComponent: () =>
           import('./features/calendar/calendar').then((m) => m.Calendar),

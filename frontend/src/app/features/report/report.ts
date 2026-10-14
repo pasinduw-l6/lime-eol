@@ -17,8 +17,8 @@ declare global {
   host: { class: 'block bg-background' },
   template: `
     <div>
-      @if (kind === 'customer') {
-        <lime-formal-report [customerId]="id" />
+      @if (kind === 'all') {
+        <lime-formal-report />
       } @else {
         @if (projectCustomer(); as customerId) {
           <lime-formal-report [customerId]="customerId" [projectId]="id" />
@@ -34,7 +34,7 @@ export class Report {
   private readonly adopted = this.adoptToken();
   private readonly api = inject(Api);
 
-  protected readonly kind = this.route.snapshot.paramMap.get('kind') === 'customer' ? 'customer' : 'project';
+  protected readonly kind = this.route.snapshot.paramMap.get('kind') === 'all' ? 'all' : 'project';
   protected readonly id = this.route.snapshot.paramMap.get('id') ?? '';
 
   protected readonly projectCustomer = computed(() => this.api.projects().find((p) => p.id === this.id)?.customerId ?? null);

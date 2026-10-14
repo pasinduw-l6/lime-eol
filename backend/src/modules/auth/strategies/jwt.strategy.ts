@@ -27,17 +27,29 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(claims: JwtClaims) {
     const user = await this.prisma.appUser.findUnique({
       where: { id: claims.sub },
-      select: { id: true, email: true, role: true, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        roleRef: { select: { permissions: true, pages: true } },
+      },
     });
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('That account is no longer active.');
     }
 
+    if (claims.purpose === 'report') {
+      return { id: user.id, email: user.email, role: 'VIEWER', permissions: [], pages: user.roleRef.pages };
+    }
+
     return {
       id: user.id,
       email: user.email,
-      role: claims.purpose === 'report' ? 'VIEWER' : user.role,
+      role: user.role,
+      permissions: user.roleRef.permissions,
+      pages: user.roleRef.pages,
     };
   }
 }

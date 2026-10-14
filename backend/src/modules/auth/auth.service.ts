@@ -1,6 +1,5 @@
 import { Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Role } from '@prisma/client';
 import { authConfig, AuthConfig } from '../../config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SessionDto } from './dto/auth.dto';
@@ -31,13 +30,13 @@ export class AuthService {
         data: {
           email: address,
           displayName: displayName ?? null,
-          role: Role.VIEWER,
+          role: 'VIEWER',
           allProjects: 'VIEW',
         },
       }));
 
     const promote =
-      user.role !== Role.ADMIN && this.config.bootstrapAdmins.includes(address);
+      user.role !== 'ADMIN' && this.config.bootstrapAdmins.includes(address);
 
     if (!user.isActive) {
       throw new UnauthorizedException(
@@ -49,7 +48,7 @@ export class AuthService {
       where: { id: user.id },
       data: {
         lastLoginAt: new Date(),
-        role: promote ? Role.ADMIN : undefined,
+        role: promote ? 'ADMIN' : undefined,
         displayName: user.displayName ?? displayName ?? null,
       },
     });
@@ -58,13 +57,14 @@ export class AuthService {
 
     return {
       token: this.jwt.sign(
-        { sub: user.id, email: user.email, role: promote ? Role.ADMIN : user.role },
+        { sub: user.id, email: user.email, role: promote ? 'ADMIN' : user.role },
         { expiresIn: TOKEN_TTL_SECONDS },
       ),
       id: user.id,
       email: user.email,
       displayName: name,
-      role: promote ? Role.ADMIN : user.role,
+      role: promote ? 'ADMIN' : user.role,
+      ...(await this.roleOf(promote ? 'ADMIN' : user.role)),
       initials: initialsOf(name),
       expiresAt: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString(),
     };
@@ -82,6 +82,7 @@ export class AuthService {
     const users = await this.prisma.appUser.findMany({
       where: { isActive: true },
       orderBy: [{ role: 'asc' }, { displayName: 'asc' }],
+      include: { roleRef: { select: { name: true } } },
     });
 
     return {
@@ -91,6 +92,7 @@ export class AuthService {
         name: u.displayName ?? u.email,
         email: u.email,
         role: u.role,
+        roleName: u.roleRef.name,
       })),
     };
   }
@@ -115,6 +117,7 @@ export class AuthService {
       email: user.email,
       displayName: name,
       role: user.role,
+      ...(await this.roleOf(user.role)),
       initials: initialsOf(name),
       expiresAt: new Date(Date.now() + TOKEN_TTL_SECONDS * 1000).toISOString(),
     };
@@ -133,8 +136,18 @@ export class AuthService {
       id: user.id,
       email: user.email,
       displayName,
-      role: user.role as Role,
+      role: user.role,
+      ...(await this.roleOf(user.role)),
       initials: initialsOf(displayName),
+    };
+  }
+
+  private async roleOf(key: string): Promise<{ roleName: string; permissions: string[]; pages: string[] }> {
+    const role = await this.prisma.appRole.findUnique({ where: { key } });
+    return {
+      roleName: role?.name ?? key,
+      permissions: role?.permissions ?? [],
+      pages: role?.pages ?? ['overview'],
     };
   }
 }

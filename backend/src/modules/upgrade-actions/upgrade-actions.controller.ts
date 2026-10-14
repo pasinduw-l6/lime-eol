@@ -84,7 +84,7 @@ export class UpgradeActionsController {
     @Body() body: UpdateUpgradeActionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.actions.update(id, body, user.role);
+    return this.actions.update(id, body, user.permissions ?? []);
   }
 
   @Post(':id/environments/complete')

@@ -13,7 +13,6 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { ROLES } from '../../auth/permissions';
 
 export class ProjectGrant {
   @ApiProperty()
@@ -37,9 +36,10 @@ export class InviteUserDto {
   @MaxLength(120)
   displayName?: string;
 
-  @ApiProperty({ enum: ROLES })
-  @IsIn(ROLES)
-  role!: (typeof ROLES)[number];
+  @ApiProperty({ example: 'SRE', description: 'A role key: VIEWER, SRE, ADMIN or a custom role' })
+  @IsString()
+  @MaxLength(60)
+  role!: string;
 
   @ApiPropertyOptional({ enum: ['VIEW', 'EDIT'], nullable: true, description: 'Access to every project, now and later' })
   @IsOptional()
@@ -63,10 +63,11 @@ export class UpdateUserDto {
   @MaxLength(120)
   displayName?: string;
 
-  @ApiPropertyOptional({ enum: ROLES })
+  @ApiPropertyOptional({ example: 'SRE', description: 'A role key' })
   @IsOptional()
-  @IsIn(ROLES)
-  role?: (typeof ROLES)[number];
+  @IsString()
+  @MaxLength(60)
+  role?: string;
 
   @ApiPropertyOptional({ description: 'False signs the person out on their next request' })
   @IsOptional()

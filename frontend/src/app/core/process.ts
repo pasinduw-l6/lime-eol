@@ -1,4 +1,4 @@
-import { ApiCustomer, ApiUpgradeAction, ComponentScope, Decision } from './api';
+import { ApiUpgradeAction, Decision } from './api';
 import { NOTICE_DAYS, parseDate, today } from './lifecycle';
 
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -68,53 +68,3 @@ export function decisionLabel(decision: Decision | null): string {
   return DECISIONS.find((d) => d.key === decision)?.label ?? 'No decision yet';
 }
 
-export type Tone = 'good' | 'warn' | 'bad' | 'neutral';
-
-export const TONE_CLASS: Record<Tone, string> = {
-  good: 'border-success/30 bg-success/10 text-success',
-  warn: 'border-warning/30 bg-warning/10 text-warning',
-  bad: 'border-destructive/30 bg-destructive/10 text-destructive',
-  neutral: 'text-muted-foreground',
-};
-
-export function coverOf(
-  customer: ApiCustomer | undefined,
-  scope: ComponentScope | undefined,
-): { label: string; tone: Tone; detail: string } {
-  if (!customer?.commercialModel) {
-    return {
-      label: 'Model not set',
-      tone: 'neutral',
-      detail: 'Set Subscription or License on the customer to know whether this is included.',
-    };
-  }
-
-  if (customer.commercialModel === 'SUBSCRIPTION') {
-    if (scope === 'APPLICATION') {
-      return { label: 'Via Lime release', tone: 'good', detail: 'Handled through an applicable Lime release.' };
-    }
-    const end = parseDate(customer.contractEnd);
-    if (end && end.getTime() < today().getTime()) {
-      return {
-        label: 'Outside contract',
-        tone: 'warn',
-        detail: 'The five-year support period has ended. Check the agreement.',
-      };
-    }
-    return { label: 'Included', tone: 'good', detail: 'Infrastructure upgrades are included in the subscription.' };
-  }
-
-  if (scope === 'APPLICATION') {
-    return {
-      label: 'Quote required',
-      tone: 'warn',
-      detail: 'License customer: application dependency upgrades are assessed and quoted separately.',
-    };
-  }
-  return { label: 'Per agreement', tone: 'neutral', detail: 'License customer: follow the customer agreement.' };
-}
-
-export const COMMERCIAL_MODELS: { key: 'SUBSCRIPTION' | 'LICENSE'; label: string }[] = [
-  { key: 'SUBSCRIPTION', label: 'Subscription' },
-  { key: 'LICENSE', label: 'License' },
-];

@@ -1,10 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Api, ApiArchived, CommercialModel } from '../../core/api';
+import { Api, ApiArchived } from '../../core/api';
 import { Feedback } from '../../core/feedback';
 import { SessionStore } from '../../core/session';
-import { COMMERCIAL_MODELS } from '../../core/process';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
 import { Deployment, EnvironmentName, Project, ProjectStatus } from '../../core/models';
@@ -478,34 +477,6 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
             </p>
           </fieldset>
 
-          <fieldset class="m-0 grid gap-3 rounded-lg border p-4">
-            <legend class="px-1 text-sm font-medium">Customer agreement · {{ project.customer }}</legend>
-            <div class="grid gap-3 sm:grid-cols-3">
-              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-                Commercial model
-                <select hlmInput [(ngModel)]="editForm.commercialModel" name="model">
-                  <option value="">Not set</option>
-                  @for (m of commercialModels; track m.key) {
-                    <option [value]="m.key">{{ m.label }}</option>
-                  }
-                </select>
-              </label>
-              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-                Contract start
-                <input type="date" hlmInput [(ngModel)]="editForm.contractStart" name="cstart" />
-              </label>
-              <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-                Contract end
-                <input type="date" hlmInput [(ngModel)]="editForm.contractEnd" name="cend" />
-              </label>
-            </div>
-            <p class="m-0 text-[12px] text-muted-foreground">
-              Subscription: infrastructure upgrades are included for the contract period, application
-              dependencies come with Lime releases. License: upgrades are assessed and quoted separately.
-              Shared by every project of this customer.
-            </p>
-          </fieldset>
-
           <div>
             <h3 class="m-0 mb-2 text-[13px] font-semibold">Environments</h3>
             <ul class="m-0 mb-3 flex list-none flex-col gap-2 p-0">
@@ -723,15 +694,11 @@ export class Projects {
     limeVersion: '',
     status: 'ACTIVE' as ProjectStatus,
     engineerIds: [] as string[],
-    commercialModel: '' as CommercialModel | '',
-    contractStart: '',
-    contractEnd: '',
     jiraIntegrationId: '',
     jiraProjectKey: '',
     teamsIntegrationId: '',
   };
 
-  protected readonly commercialModels = COMMERCIAL_MODELS;
   protected readonly jiraOptions = computed(() => this.api.integrationOptions().filter((o) => o.kind === 'JIRA'));
   protected readonly teamsOptions = computed(() => this.api.integrationOptions().filter((o) => o.kind === 'TEAMS'));
 
@@ -740,20 +707,12 @@ export class Projects {
     return option?.projectKey ? `Default: ${option.projectKey}` : 'Connection default';
   }
 
-  private customerOf(projectId: string) {
-    const customerId = this.store.apiProject(projectId)?.customerId;
-    return this.api.customers().find((c) => c.id === customerId);
-  }
-
   protected manage(project: Project): void {
     this.editForm = {
       name: project.name,
       limeVersion: project.limeVersion,
       status: project.status,
       engineerIds: [...project.engineerIds],
-      commercialModel: this.customerOf(project.id)?.commercialModel ?? '',
-      contractStart: this.customerOf(project.id)?.contractStart ?? '',
-      contractEnd: this.customerOf(project.id)?.contractEnd ?? '',
       jiraIntegrationId: this.store.apiProject(project.id)?.jiraIntegrationId ?? '',
       jiraProjectKey: this.store.apiProject(project.id)?.jiraProjectKey ?? '',
       teamsIntegrationId: this.store.apiProject(project.id)?.teamsIntegrationId ?? '',
@@ -867,9 +826,7 @@ export class Projects {
   }
 
   protected saveProject(id: string): void {
-    const { engineerIds, name, limeVersion, status, commercialModel, contractStart, contractEnd } =
-      this.editForm;
-    const customer = this.customerOf(id);
+    const { engineerIds, name, limeVersion, status } = this.editForm;
     const connections = {
       jiraIntegrationId: this.editForm.jiraIntegrationId || null,
       jiraProjectKey: this.editForm.jiraProjectKey.trim().toUpperCase() || null,
@@ -882,28 +839,7 @@ export class Projects {
     this.api.updateProject(id, { name, limeVersion, status, ...connections }).subscribe({
       next: () =>
         this.api.setEngineers(id, engineerIds).subscribe({
-          next: () => {
-            if (!customer) {
-              this.api.reload();
-              return;
-            }
-            this.api
-              .updateCustomer(customer.id, {
-                commercialModel: commercialModel || null,
-                contractStart: contractStart || null,
-                contractEnd: contractEnd || null,
-              })
-              .subscribe({
-                next: () => this.api.reload(),
-                error: (err: { error?: { message?: string | string[] } }) => {
-                  this.api.reload();
-                  const detail = err.error?.message;
-                  this.manageError.set(
-                    Array.isArray(detail) ? detail.join('. ') : (detail ?? 'The customer agreement could not be saved.'),
-                  );
-                },
-              });
-          },
+          next: () => this.api.reload(),
           error: () => {
             this.api.reload();
             this.manageError.set('The engineer list could not be saved.');

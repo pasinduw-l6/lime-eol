@@ -6,9 +6,16 @@ import {
 } from '@nestjs/common';
 import { getEnv } from '../../config/env.validation';
 import { PrismaService } from '../../prisma/prisma.service';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { AccessService } from '../access/access.service';
 import { AuthService } from '../auth/auth.service';
+import { ProjectsService } from '../projects/projects.service';
+import { CHART_SCALE, chartHtml } from './report-chart';
+import { axisFor, CycleFacts, rowsOf, sectionsFor } from './report-data';
+import { Chart, chartSize, fillTemplate, templateData } from './report-docx';
 
-export type ReportKind = 'project' | 'customer';
+export type ReportKind = 'project' | 'all';
 
 @Injectable()
 export class ReportsService {
@@ -17,6 +24,8 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
+    private readonly access: AccessService,
+    private readonly projects: ProjectsService,
   ) {}
 
   async render(kind: ReportKind, id: string, userId: string): Promise<{ file: Buffer; name: string }> {
@@ -70,11 +79,87 @@ export class ReportsService {
     };
   }
 
+
+  async renderDocx(kind: ReportKind, id: string, userId: string): Promise<{ file: Buffer; name: string }> {
+    const subject = await this.subject(kind, id);
+    const [scope, all, cycles] = await Promise.all([
+      this.access.scope(userId),
+      this.projects.findAll(),
+      this.prisma.technologyCycle.findMany({ include: { technology: { select: { name: true } } } }),
+    ]);
+
+    const everything = kind === 'all';
+    const projects = all
+      .filter((p) => this.access.levelIn(scope, p.id) !== null && (everything || p.id === id))
+      .sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name));
+    if (!everything && projects.length === 0) throw new NotFoundException(`No project "${id}"`);
+
+    const facts = new Map<string, CycleFacts>();
+    const newestCycle = new Map<string, { at: string; value: string }>();
+    for (const c of cycles) {
+      const released = c.releaseDate ? c.releaseDate.toISOString().slice(0, 10) : null;
+      facts.set(`${c.technology.name}|${c.cycle}`, { releaseDate: released });
+      const best = newestCycle.get(c.technology.name);
+      if (!best || (released ?? '') > best.at) {
+        newestCycle.set(c.technology.name, { at: released ?? '', value: c.latestPatch ?? c.cycle });
+      }
+    }
+    const newest = new Map([...newestCycle].map(([name, n]) => [name, n.value]));
+
+    const asOf = new Date();
+    const perProject = projects.map((p) => rowsOf(p, facts, newest));
+    const rows = perProject.flat();
+    const axis = axisFor(rows, asOf);
+    const sections = sectionsFor(projects, perProject, axis, everything);
+
+    const charts = new Map<string, Chart>();
+    await Promise.all(
+      sections.map(async (s) => {
+        const [width, height] = chartSize(s.bars.length);
+        const png = await this.screenshot(chartHtml(s.bars, axis), width * CHART_SCALE, height * CHART_SCALE);
+        charts.set(s.projectId, { png, width, height });
+      }),
+    );
+
+    const template = await readFile(join(process.cwd(), 'templates', 'eol-report.docx'));
+    const data = templateData({ title: subject.title, projects, rows, sections, axis, asOf, everything });
+    const date = asOf.toISOString().slice(0, 10);
+    return {
+      file: fillTemplate(template, data, charts),
+      name: `Lime-EOL-Report-${slug(subject.title)}-${date}.docx`,
+    };
+  }
+
+  private async screenshot(html: string, width: number, height: number): Promise<Buffer> {
+    const env = getEnv();
+    const form = new FormData();
+    form.append('files', new Blob([html], { type: 'text/html' }), 'index.html');
+    form.append('width', String(width));
+    form.append('height', String(height));
+    form.append('clip', 'true');
+    form.append('format', 'png');
+
+    let response: Response;
+    try {
+      response = await fetch(`${env.GOTENBERG_URL.replace(/\/$/, '')}/forms/chromium/screenshot/html`, {
+        method: 'POST',
+        body: form,
+        signal: AbortSignal.timeout(60_000),
+      });
+    } catch (error) {
+      this.logger.error(`PDF service unreachable: ${error instanceof Error ? error.message : error}`);
+      throw new ServiceUnavailableException('The document service is not reachable.');
+    }
+    if (!response.ok) {
+      this.logger.error(`Chart screenshot answered ${response.status}`);
+      throw new ServiceUnavailableException('The report chart could not be drawn.');
+    }
+    return Buffer.from(await response.arrayBuffer());
+  }
+
   private async subject(kind: ReportKind, id: string): Promise<{ title: string }> {
-    if (kind === 'customer') {
-      const customer = await this.prisma.customer.findFirst({ where: { id, archivedAt: null } });
-      if (!customer) throw new NotFoundException(`No customer "${id}"`);
-      return { title: customer.name };
+    if (kind === 'all') {
+      return { title: 'All projects' };
     }
 
     const project = await this.prisma.project.findFirst({

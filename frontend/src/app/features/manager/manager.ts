@@ -1,4 +1,3 @@
-import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -6,8 +5,9 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { Api, ApiProject } from '../../core/api';
-import { Feedback } from '../../core/feedback';
+import { ReportDownload } from '../../core/report-download';
 import { RegistryStore } from '../../core/registry.store';
+import { DownloadMenu } from '../../shared/download-menu';
 import { TechIcon } from '../../shared/tech-icon';
 
 type Status = 'EOL' | 'NEAR' | 'SUPPORTED' | 'UNKNOWN';
@@ -66,7 +66,7 @@ const STATUS_COLOUR: Record<Status, string> = {
 
 @Component({
   selector: 'lime-manager',
-  imports: [FormsModule, HlmButton, HlmCardImports, HlmInput, TechIcon],
+  imports: [FormsModule, HlmButton, HlmCardImports, HlmInput, TechIcon, DownloadMenu],
   host: { class: 'block' },
   template: `
     <header class="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -110,6 +110,7 @@ const STATUS_COLOUR: Record<Status, string> = {
             </button>
           }
         </div>
+        <lime-download-menu label="Full report download" [busy]="downloads.busy() === 'all'" (pick)="downloads.all($event)" />
       </div>
     </header>
 
@@ -229,9 +230,7 @@ const STATUS_COLOUR: Record<Status, string> = {
               }
             </span>
             <span class="flex gap-1.5">
-              <button type="button" hlmBtn variant="outline" size="sm" [disabled]="busy() === p.id" (click)="pdf(p)">
-                {{ busy() === p.id ? 'Preparing…' : 'PDF' }}
-              </button>
+              <lime-download-menu label="Report" variant="outline" size="sm" [busy]="downloads.busy() === p.id" (pick)="downloads.project(p.id, $event)" />
               <button type="button" hlmBtn size="sm" (click)="open(p)">Open</button>
             </span>
           </footer>
@@ -366,8 +365,7 @@ export class Manager {
   protected readonly api = inject(Api);
   private readonly store = inject(RegistryStore);
   private readonly router = inject(Router);
-  private readonly http = inject(HttpClient);
-  private readonly feedback = inject(Feedback);
+  protected readonly downloads = inject(ReportDownload);
 
   protected readonly healthInfo = HEALTH;
   protected readonly statusColour = STATUS_COLOUR;
@@ -407,7 +405,6 @@ export class Manager {
   protected readonly query = signal('');
   protected readonly customer = signal('');
   protected readonly health = signal<Health | 'all'>('all');
-  protected readonly busy = signal<string | null>(null);
 
   protected readonly customers = computed(() => [...new Set(this.api.projects().map((p) => p.customer))].sort());
 
@@ -573,26 +570,6 @@ export class Manager {
   protected open(card: ProjectCard): void {
     this.store.scope.set(card.id);
     void this.router.navigateByUrl('/overview');
-  }
-
-  protected pdf(card: ProjectCard): void {
-    this.busy.set(card.id);
-    this.http.get(`/api/v1/reports/project/${card.id}.pdf`, { responseType: 'blob', observe: 'response' }).subscribe({
-      next: (response) => {
-        this.busy.set(null);
-        const name = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? 'report.pdf';
-        const url = URL.createObjectURL(response.body!);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = name;
-        link.click();
-        URL.revokeObjectURL(url);
-      },
-      error: () => {
-        this.busy.set(null);
-        this.feedback.error('The PDF could not be generated. Check that the PDF service is running.');
-      },
-    });
   }
 
   protected date(value: string | null): string {

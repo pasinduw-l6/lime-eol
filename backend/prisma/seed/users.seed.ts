@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const ENGINEERS: { email: string; displayName: string }[] = [
   { email: 'dinith@lime-automation.com', displayName: 'Dinith' },
@@ -20,7 +20,7 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
       create: {
         email: engineer.email,
         displayName: engineer.displayName,
-        role: Role.SRE,
+        role: 'SRE',
       },
     });
   }

@@ -143,7 +143,7 @@ export class NotificationsService {
 
   private async attachMentions(dues: Due[]): Promise<void> {
     const team = await this.prisma.appUser.findMany({
-      where: { isActive: true, role: { not: 'VIEWER' } },
+      where: { isActive: true, roleRef: { permissions: { isEmpty: false } } },
       orderBy: { displayName: 'asc' },
     });
 

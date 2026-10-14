@@ -33,7 +33,6 @@ export interface GanttItem {
   jiraUrl: string | null;
   jiraError: string | null;
   subs: GanttSub[];
-  terms: { label: string; long: string; colour: string } | null;
 }
 
 export interface GanttSub {
@@ -273,14 +272,6 @@ const ROW = 40;
                         <span class="truncate">{{ item.name }}</span>
                         @if (item.jiraKey) {
                           <span class="shrink-0 rounded border px-1 text-[10.5px] text-muted-foreground tabular">{{ item.jiraKey }}</span>
-                        }
-                        @if (item.terms; as t) {
-                          <span
-                            class="shrink-0 rounded-full border px-1.5 text-[10.5px]"
-                            [title]="t.long"
-                            [style.color]="t.colour"
-                            [style.border-color]="tint(t.colour, 40)"
-                          >{{ t.label }}</span>
                         }
                       </button>
                       <span class="w-[118px] max-md:hidden">

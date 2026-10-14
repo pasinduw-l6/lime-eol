@@ -6,7 +6,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { RegistryStore } from './core/registry.store';
 import { SessionStore } from './core/session';
-import { isViewer, ROLE_INFO, RoleName } from './core/permissions';
+import { Page } from './core/permissions';
 import { Theme } from './core/theme';
 import { Celebrate } from './shared/celebrate';
 import { FeedbackHost } from './shared/feedback-host';
@@ -166,7 +166,7 @@ import { NotificationMenu } from './shared/notification-menu';
               <span hlmAvatarFallback class="bg-primary text-[10px] font-semibold text-primary-foreground">{{ me.initials }}</span>
             </hlm-avatar>
             <span class="hidden text-sm font-medium xl:inline">{{ me.displayName }}</span>
-            <span class="hidden rounded-md border px-1.5 text-xs text-muted-foreground lg:inline">{{ roleLabel(me.role) }}</span>
+            <span class="hidden rounded-md border px-1.5 text-xs text-muted-foreground lg:inline">{{ session.roleName() }}</span>
           </span>
         }
 
@@ -188,10 +188,6 @@ export class Shell {
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(Theme);
 
-  protected roleLabel(role: RoleName): string {
-    return ROLE_INFO[role]?.label ?? role;
-  }
-
   protected signOut(): void {
     this.session.signOut();
     void this.router.navigateByUrl('/login');
@@ -199,14 +195,13 @@ export class Shell {
 
   protected readonly nav = computed(() =>
     [
-      { path: '/overview', label: 'Overview', badge: false, viewer: true },
-      { path: '/manager', label: 'Manager view', badge: false, viewer: true },
-      { path: '/projects', label: 'Projects', badge: false, viewer: false },
-      { path: '/customers', label: 'Customers', badge: false, viewer: false },
-      { path: '/lifecycle', label: 'Lifecycle', badge: true, viewer: true },
-      { path: '/plan', label: 'Plan', badge: false, viewer: true },
-      { path: '/calendar', label: 'Calendar', badge: false, viewer: true },
-    ].filter((item) => item.viewer || !isViewer(this.session.user()?.role)),
+      { path: '/overview', label: 'Overview', badge: false, page: 'overview' as Page },
+      { path: '/manager', label: 'Manager view', badge: false, page: 'manager' as Page },
+      { path: '/projects', label: 'Projects', badge: false, page: 'projects' as Page },
+      { path: '/lifecycle', label: 'Lifecycle', badge: true, page: 'lifecycle' as Page },
+      { path: '/plan', label: 'Plan', badge: false, page: 'plan' as Page },
+      { path: '/calendar', label: 'Calendar', badge: false, page: 'calendar' as Page },
+    ].filter((item) => this.session.canSee(item.page)),
   );
 
   protected readonly projects = this.store.projects;

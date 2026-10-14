@@ -1089,6 +1089,34 @@ Legend: ⬜ Not started · 🟨 In progress · ✅ Done · ⛔ Blocked
 
 Add a short entry every session (newest on top).
 
+### 2026-10-14 — Custom roles, Word reports, GitHub versions file
+- **Calendar:** two lanes — a multi-year horizon of quarters with EOL deadlines and plan markers, and a
+  week/month detail lane — plus a "What's next" agenda bucketed Overdue → Later and the last 30 days of
+  time logs.
+- **Custom roles:** `app_role` table replaces the `Role` enum (migration `20261013090000_custom_roles`
+  keeps every user on their role). Admin edits roles in Settings → Roles: pages each role sees and the
+  changes it can make. Admin is locked; built-ins cannot be deleted; deleting a role in use moves people
+  to another. Session carries `permissions` and `pages`; routes and nav filter by page. Notifications go
+  to roles with any permission instead of "not VIEWER".
+- **Removed:** the Audit log screen (the backend still records changes), and everything about
+  subscriptions — Customers pages, agreements, contacts, Included/Quote terms, the `customer:write`
+  permission (migration `20261013120000_remove_subscriptions` drops the tables). Customers remain as the
+  name a project belongs to, created with the first project.
+- **Reports:** the per-customer PDF became a full report of every visible project, downloaded from the
+  Manager view. Every report is PDF or Word: the Word file fills `backend/templates/eol-report.docx`
+  (docxtemplater) with the same rows and wording, and embeds each project's timeline as a picture drawn
+  by Gotenberg. `node scripts/make-report-template.mjs` rebuilds the template; a company template only
+  needs the same tags.
+- **GitHub versions file:** `eol-versions.yml` in `pasinduw-l6/lime-eol` lists versions per project
+  code and environment. The worker reads new commits to it every 15 minutes (or Sync now on Ops),
+  oldest first, and records each change through the hash-chained component history with the commit as
+  evidence. Versions from the file cannot be edited by hand. Overview shows DEV against PROD with
+  "Awaiting release". Token from `GITHUB_TOKEN`; repo, file, branch and cron from `VERSIONS_*`.
+- **Verified:** backend 90 tests, frontend build clean; migrations applied with users unchanged; roles,
+  reports and the sync checked through the API and screenshots.
+- **Open:** the Word layout has not been checked visually; the GitHub ticket's branch-based variant
+  (reading Dockerfile and package.json from l6projects repos) waits for org access.
+
 ### 2026-09-18 — Frontend, mock-first
 - **Done:** Angular 22 app in `frontend/`: standalone components, zoneless change detection, signals,
   Tailwind v4, no NgModules. Three screens — **Schedule** (cycles on a time axis with a today rule and

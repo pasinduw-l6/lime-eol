@@ -61,21 +61,25 @@ enum CommStatus {
   ACKNOWLEDGED
 }
 
-enum Role {
-  ADMIN
-  SRE
-  VIEWER
+model AppRole {
+  key         String    @id
+  name        String    @unique
+  description String?
+  permissions String[]
+  pages       String[]
+  builtIn     Boolean   @default(false) @map("built_in")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  users AppUser[]
+
+  @@map("app_role")
 }
 
 enum ProjectStatus {
   ACTIVE
   ONBOARDING
   PAUSED
-}
-
-enum CommercialModel {
-  SUBSCRIPTION
-  LICENSE
 }
 
 enum ComponentScope {
@@ -236,9 +240,6 @@ model Customer {
   name       String    @unique
   code       String?   @unique
   contact    String?
-  commercialModel CommercialModel? @map("commercial_model")
-  contractStart   DateTime?        @map("contract_start") @db.Date
-  contractEnd     DateTime?        @map("contract_end") @db.Date
   notes      String?
   archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -246,63 +247,9 @@ model Customer {
 
   projects    Project[]
   deployments Deployment[]
-  agreements  CustomerAgreement[]
-  contacts    CustomerContact[]
 
   @@index([archivedAt])
   @@map("customer")
-}
-
-enum AgreementType {
-  SUBSCRIPTION
-  LICENSE
-}
-
-enum InfraCoverage {
-  INCLUDED
-  QUOTED
-}
-
-model CustomerAgreement {
-  id              String        @id @default(uuid(7)) @db.Uuid
-  customerId      String        @map("customer_id") @db.Uuid
-  type            AgreementType
-  startDate       DateTime?     @map("start_date") @db.Date
-  endDate         DateTime?     @map("end_date") @db.Date
-  renewalDate     DateTime?     @map("renewal_date") @db.Date
-  noticeDays      Int?          @map("notice_days")
-  autoRenew       Boolean       @default(false) @map("auto_renew")
-  upgradesPerYear Int?          @map("upgrades_per_year")
-  supportLevel    String?       @map("support_level")
-  reference       String?
-  documentUrl     String?       @map("document_url")
-  infrastructure  InfraCoverage?
-  licensedUsers   Int?          @map("licensed_users")
-  notes           String?
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId, startDate])
-  @@map("customer_agreement")
-}
-
-model CustomerContact {
-  id         String   @id @default(uuid(7)) @db.Uuid
-  customerId String   @map("customer_id") @db.Uuid
-  name       String
-  role       String?
-  email      String?
-  phone      String?
-  isPrimary  Boolean  @default(false) @map("is_primary")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@map("customer_contact")
 }
 
 model Project {
@@ -483,7 +430,7 @@ model AppUser {
   entraOid    String?   @unique @map("entra_oid")
   email       String    @unique
   displayName String?   @map("display_name")
-  role        Role      @default(VIEWER)
+  role        String    @default("VIEWER")
   allProjects      AccessLevel? @map("all_projects")
   isActive    Boolean   @default(true) @map("is_active")
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
@@ -496,6 +443,7 @@ model AppUser {
   recordedChanges ComponentChange[]
   auditLogs       AuditLog[]
   projectAccess   ProjectAccess[]
+  roleRef         AppRole         @relation(fields: [role], references: [key], onUpdate: Cascade, onDelete: Restrict)
 
   @@map("app_user")
 }
@@ -712,4 +660,24 @@ model NotificationEvent {
 
   @@index([kind, sentAt])
   @@map("notification_event")
+}
+
+/// State of the eol-versions.yml sync from GitHub. One row.
+model VersionSync {
+  id                String    @id @default("default")
+  lastCommitSha     String?   @map("last_commit_sha")
+  lastCommitAt      DateTime? @map("last_commit_at") @db.Timestamptz(3)
+  lastCommitMessage String?   @map("last_commit_message")
+  lastCommitAuthor  String?   @map("last_commit_author")
+  lastCommitUrl     String?   @map("last_commit_url")
+  lastCheckedAt     DateTime? @map("last_checked_at") @db.Timestamptz(3)
+  lastAppliedAt     DateTime? @map("last_applied_at") @db.Timestamptz(3)
+  status            String    @default("NEVER")
+  message           String?
+  warnings          Json      @default("[]")
+  /// "deploymentId|technologyId" pairs whose version comes from the file.
+  managed           Json      @default("[]")
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("version_sync")
 }

@@ -4,6 +4,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { SessionStore } from '../../core/session';
 import { Integrations } from './integrations';
+import { VersionFile } from './version-file';
 
 type Severity = 'critical' | 'warning' | 'info' | 'good';
 
@@ -39,17 +40,18 @@ const ICONS: Record<Severity, string> = {
 
 @Component({
   selector: 'lime-ops',
-  imports: [HlmCardImports, HlmButton, Integrations],
+  imports: [HlmCardImports, HlmButton, Integrations, VersionFile],
   host: { class: 'block' },
   template: `
     <header class="mb-6">
       <h1 class="m-0 text-3xl font-semibold tracking-tight">Operations</h1>
       <p class="mt-1 mb-0 text-sm text-muted-foreground">
-        Connect Jira boards and Teams channels. The server .env connection stays the default.
+        Connect Jira boards and Teams channels, and the GitHub versions file. The server .env connection stays the default.
       </p>
     </header>
 
     <lime-integrations />
+    <lime-version-file />
 
     @if (session.isAdmin()) {
     <header class="mt-8 mb-4">

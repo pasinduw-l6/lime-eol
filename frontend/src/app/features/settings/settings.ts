@@ -7,16 +7,16 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import { HlmTableImports } from '@spartan-ng/helm/table';
-import { Api, ApiTeam, ApiUser } from '../../core/api';
+import { Api, ApiRole, ApiTeam, ApiUser } from '../../core/api';
 import { Feedback } from '../../core/feedback';
-import { ROLES, ROLE_INFO, RoleName } from '../../core/permissions';
+import { RoleName } from '../../core/permissions';
 import { SessionStore } from '../../core/session';
 import { Modal } from '../../shared/modal';
 import { AccessGrid } from './access-grid';
-import { AuditLog } from './audit-log';
 import { LimeReleases } from './lime-releases';
+import { RolesEditor } from './roles-editor';
 
-type Tab = 'users' | 'access' | 'teams' | 'lime' | 'audit';
+type Tab = 'users' | 'roles' | 'access' | 'teams' | 'lime';
 
 interface TeamDraft {
   id?: string;
@@ -37,8 +37,8 @@ interface TeamDraft {
     HlmTableImports,
     Modal,
     LimeReleases,
-    AuditLog,
     AccessGrid,
+    RolesEditor,
     RouterLink,
   ],
   host: { class: 'block' },
@@ -46,7 +46,7 @@ interface TeamDraft {
     <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
         <h1 class="m-0 text-3xl font-semibold tracking-tight">Settings</h1>
-        <p class="m-0 mt-1 text-sm text-muted-foreground">People, teams, Lime releases and the record of every change.</p>
+        <p class="m-0 mt-1 text-sm text-muted-foreground">People, roles, teams and Lime releases.</p>
       </div>
       @if (canOpenOps()) {
         <a routerLink="/ops" hlmBtn variant="outline">Operations ›</a>
@@ -90,8 +90,8 @@ interface TeamDraft {
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Role
             <select hlmInput name="role" [(ngModel)]="inviteRole">
-              @for (r of roles; track r) {
-                <option [value]="r">{{ roleInfo[r].label }}</option>
+              @for (r of roles(); track r.key) {
+                <option [value]="r.key">{{ r.name }}</option>
               }
             </select>
           </label>
@@ -145,13 +145,12 @@ interface TeamDraft {
                     <select
                       hlmInput
                       class="h-8 w-[210px]"
-                      [value]="u.role"
                       [disabled]="!u.isActive || busy()"
                       [attr.aria-label]="'Role for ' + u.name"
                       (change)="changeRole(u, $any($event.target).value)"
                     >
-                      @for (r of roles; track r) {
-                        <option [value]="r">{{ roleInfo[r].label }}</option>
+                      @for (r of roles(); track r.key) {
+                        <option [value]="r.key" [selected]="r.key === u.role">{{ r.name }}</option>
                       }
                     </select>
                   </td>
@@ -204,22 +203,8 @@ interface TeamDraft {
         </div>
       </section>
 
-      <section hlmCard class="mt-5" aria-labelledby="roles">
-        <div hlmCardHeader>
-          <h2 hlmCardTitle id="roles">What each role can do</h2>
-          <p hlmCardDescription>From the end-of-life handling process. The role decides what kind of change a person can make; Project access decides on which projects.</p>
-        </div>
-        <div hlmCardContent>
-          <dl class="m-0 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            @for (r of roles; track r) {
-              <div class="rounded-lg border p-3">
-                <dt class="text-sm font-medium">{{ roleInfo[r].label }}</dt>
-                <dd class="m-0 mt-0.5 text-sm text-muted-foreground">{{ roleInfo[r].description }}</dd>
-              </div>
-            }
-          </dl>
-        </div>
-      </section>
+    } @else if (tab() === 'roles') {
+      <lime-roles-editor [roles]="roles()" (changed)="refresh()" />
     } @else if (tab() === 'access') {
       <lime-access-grid />
     } @else if (tab() === 'teams') {
@@ -289,10 +274,8 @@ interface TeamDraft {
           </div>
         </section>
       }
-    } @else if (tab() === 'lime') {
-      <lime-lime-releases />
     } @else {
-      <lime-audit-log />
+      <lime-lime-releases />
     }
 
     @if (teamDraft(); as draft) {
@@ -341,11 +324,11 @@ export class Settings {
 
   protected readonly tabs = computed(() => {
     const all: { key: Tab; label: string; allowed: boolean }[] = [
-      { key: 'users', label: 'Users & roles', allowed: this.session.isAdmin() },
+      { key: 'users', label: 'People', allowed: this.session.isAdmin() },
+      { key: 'roles', label: 'Roles', allowed: this.session.isAdmin() },
       { key: 'access', label: 'Project access', allowed: this.session.isAdmin() },
       { key: 'teams', label: 'Teams', allowed: this.session.isAdmin() },
       { key: 'lime', label: 'Lime releases', allowed: this.session.isAdmin() || this.session.can('lime:write') },
-      { key: 'audit', label: 'Audit log', allowed: this.session.isAdmin() },
     ];
     return all.filter((t) => t.allowed);
   });
@@ -355,8 +338,7 @@ export class Settings {
     const wanted = this.section() as Tab;
     if (wanted && this.tabs().some((t) => t.key === wanted)) this.tab.set(wanted);
   });
-  protected readonly roles = ROLES;
-  protected readonly roleInfo = ROLE_INFO;
+  protected readonly roles = signal<ApiRole[]>([]);
   protected readonly busy = signal(false);
   protected readonly me = computed(() => this.session.user()?.id);
   protected readonly canOpenOps = computed(() => this.session.can('integration:write'));
@@ -383,6 +365,10 @@ export class Settings {
   }
 
   private loadUsers(): void {
+    this.api.roles().subscribe({
+      next: (roles) => this.roles.set(roles),
+      error: (err) => this.feedback.failed(err, 'Could not load roles.'),
+    });
     this.api.allUsers().subscribe({
       next: (users) => this.users.set(users),
       error: (err) => this.feedback.failed(err, 'Could not load people.'),
@@ -409,7 +395,7 @@ export class Settings {
           this.inviteEmail = '';
           this.inviteName = '';
           this.inviteAccess = '';
-          this.feedback.success(`${user.name} added as ${ROLE_INFO[user.role].label}.`);
+          this.feedback.success(`${user.name} added as ${user.roleName}.`);
           this.refresh();
         },
         error: (err) => {
@@ -425,7 +411,7 @@ export class Settings {
     this.api.updateUser(user.id, { role }).subscribe({
       next: () => {
         this.busy.set(false);
-        this.feedback.success(`${user.name} is now ${ROLE_INFO[role].label}.`);
+        this.feedback.success(`${user.name} is now ${this.roleName(role)}.`);
         this.refresh();
       },
       error: (err) => {
@@ -549,10 +535,14 @@ export class Settings {
     });
   }
 
-  private refresh(): void {
+  protected refresh(): void {
     this.loadUsers();
     this.api.reload();
     if (this.showArchivedTeams()) this.loadArchivedTeams();
+  }
+
+  private roleName(key: string): string {
+    return this.roles().find((r) => r.key === key)?.name ?? key;
   }
 
   protected when(value: string | null): string {

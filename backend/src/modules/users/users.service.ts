@@ -4,12 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { InviteUserDto, UpdateUserDto } from './dto/user.dto';
 
 const INCLUDE = {
   _count: { select: { projects: true, projectAccess: true } },
+  roleRef: { select: { name: true, permissions: true } },
   teams: { include: { team: true } },
 } satisfies Prisma.AppUserInclude;
 
@@ -41,11 +42,12 @@ export class UsersService {
       );
     }
 
+    await this.mustRole(input.role);
     const user = await this.prisma.appUser.create({
       data: {
         email,
         displayName: input.displayName?.trim() || null,
-        role: input.role as Role,
+        role: input.role,
         allProjects: input.role === 'ADMIN' ? null : input.allProjects === undefined ? 'VIEW' : input.allProjects,
         projectAccess: input.projects?.length
           ? { create: input.projects.map((grant) => ({ projectId: grant.projectId, level: grant.level })) }
@@ -63,18 +65,20 @@ export class UsersService {
     }
 
     const losesAdmin =
-      user.role === Role.ADMIN &&
+      user.role === 'ADMIN' &&
       user.isActive &&
       ((input.role !== undefined && input.role !== 'ADMIN') || input.isActive === false);
 
     if (losesAdmin) {
       const admins = await this.prisma.appUser.count({
-        where: { role: Role.ADMIN, isActive: true },
+        where: { role: 'ADMIN', isActive: true },
       });
       if (admins <= 1) {
         throw new BadRequestException('There must always be at least one active admin.');
       }
     }
+
+    if (input.role !== undefined) await this.mustRole(input.role);
 
     if (id === actorId && input.isActive === false) {
       throw new BadRequestException('You cannot deactivate your own account.');
@@ -84,12 +88,17 @@ export class UsersService {
       where: { id },
       data: {
         displayName: input.displayName?.trim(),
-        role: input.role as Role | undefined,
+        role: input.role,
         isActive: input.isActive,
       },
       include: INCLUDE,
     });
     return this.toDto(updated);
+  }
+
+  private async mustRole(key: string): Promise<void> {
+    const role = await this.prisma.appRole.findUnique({ where: { key } });
+    if (!role) throw new BadRequestException(`There is no role "${key}".`);
   }
 
   private toDto(user: UserRow) {
@@ -101,9 +110,10 @@ export class UsersService {
       initials: initialsOf(displayName),
       role: user.role,
       isActive: user.isActive,
-      canEdit: user.role !== Role.VIEWER,
+      roleName: user.roleRef.name,
+      canEdit: user.roleRef.permissions.length > 0,
       projectCount: user._count.projects,
-      allProjects: user.role === Role.ADMIN ? 'EDIT' : user.allProjects,
+      allProjects: user.role === 'ADMIN' ? 'EDIT' : user.allProjects,
       accessCount: user._count.projectAccess,
       teams: user.teams.map((link) => ({ id: link.team.id, name: link.team.name })),
       lastLoginAt: user.lastLoginAt?.toISOString() ?? null,

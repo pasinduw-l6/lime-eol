@@ -2,7 +2,6 @@ import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, computed, inject } from '@angular/core';
 import { RoleName } from './permissions';
 
-
 export interface ApiComponent {
   technology: string;
   componentType: string;
@@ -117,75 +116,14 @@ export interface ApiTechnology {
 }
 
 export type ComponentScope = 'INFRASTRUCTURE' | 'APPLICATION';
-export type CommercialModel = 'SUBSCRIPTION' | 'LICENSE';
 export type Decision = 'UPGRADE' | 'EXTENDED_SUPPORT' | 'ACCEPT_RISK' | 'COMMERCIAL_QUOTE';
 
 export interface ApiCustomer {
   id: string;
   name: string;
   code: string | null;
-  contact: string | null;
-  notes: string | null;
-  commercialModel: CommercialModel | null;
-  contractStart: string | null;
-  contractEnd: string | null;
   projectCount: number;
-  agreement?: ApiAgreementSummary | null;
-  agreementStatus?: AgreementStatus;
-  agreementCount?: number;
-  primaryContact?: ApiContact | null;
 }
-
-export type AgreementType = 'SUBSCRIPTION' | 'LICENSE';
-export type AgreementStatus = 'ACTIVE' | 'EXPIRING' | 'EXPIRED' | 'UPCOMING' | 'NONE';
-export type InfraTerms = 'INCLUDED' | 'QUOTED' | 'ENDED';
-export type ApplicationTerms = 'VIA_LIME' | 'SEPARATE';
-export interface Coverage {
-  infrastructure: InfraTerms;
-  application: ApplicationTerms;
-}
-export type UpgradeTerms = 'INCLUDED' | 'VIA_LIME' | 'QUOTE' | 'TERM_ENDED';
-
-export interface ApiAgreementSummary {
-  id: string;
-  type: AgreementType;
-  status: AgreementStatus;
-  startDate: string | null;
-  endDate: string | null;
-  renewalDate: string | null;
-  noticeDays: number | null;
-  autoRenew: boolean;
-  infrastructure: 'INCLUDED' | 'QUOTED' | null;
-  licensedUsers: number | null;
-  coverage: Coverage;
-}
-
-export interface ApiAgreement extends ApiAgreementSummary {
-  upgradesPerYear: number | null;
-  supportLevel: string | null;
-  reference: string | null;
-  documentUrl: string | null;
-  notes: string | null;
-  updatedAt: string;
-}
-
-export interface ApiContact {
-  id: string;
-  name: string;
-  role: string | null;
-  email: string | null;
-  phone: string | null;
-  isPrimary: boolean;
-}
-
-export interface ApiCustomerDetail extends ApiCustomer {
-  currentAgreementId: string | null;
-  agreements: ApiAgreement[];
-  contacts: ApiContact[];
-}
-
-export type AgreementInput = Partial<Omit<ApiAgreement, 'id' | 'status' | 'updatedAt'>>;
-export type ContactInput = Partial<Omit<ApiContact, 'id'>>;
 
 export interface ApiTeam {
   id: string;
@@ -210,32 +148,6 @@ export interface ApiLimeRelease {
 export interface ApiCompatibilityOption {
   technology: string;
   versions: { id: string; version: string; cycle: string }[];
-}
-
-export interface ApiAuditRow {
-  id: string;
-  at: string;
-  user: { id: string; name: string } | null;
-  entity: string;
-  entityId: string | null;
-  action: string;
-  data: unknown;
-}
-
-export interface ApiAuditPage {
-  total: number;
-  entities: string[];
-  rows: ApiAuditRow[];
-}
-
-export interface CustomerInput {
-  name?: string;
-  code?: string | null;
-  contact?: string | null;
-  notes?: string | null;
-  commercialModel?: CommercialModel | null;
-  contractStart?: string | null;
-  contractEnd?: string | null;
 }
 
 export interface ApiArchived {
@@ -276,6 +188,7 @@ export interface ApiUser {
   name: string;
   initials: string;
   role: RoleName;
+  roleName: string;
   isActive: boolean;
   teams: { id: string; name: string }[];
   canEdit: boolean;
@@ -283,6 +196,24 @@ export interface ApiUser {
   allProjects: AccessLevel | null;
   accessCount: number;
   lastLoginAt: string | null;
+}
+
+export interface ApiRole {
+  key: string;
+  name: string;
+  description: string | null;
+  permissions: string[];
+  pages: string[];
+  builtIn: boolean;
+  editable: boolean;
+  users: number;
+}
+
+export interface ApiRoleInput {
+  name: string;
+  description?: string | null;
+  permissions: string[];
+  pages: string[];
 }
 
 export type AccessLevel = 'VIEW' | 'EDIT';
@@ -294,6 +225,8 @@ export interface ApiAccessMatrix {
     name: string;
     email: string;
     role: RoleName;
+    roleName: string;
+    canEdit: boolean;
     isActive: boolean;
     allProjects: AccessLevel | null;
     access: Record<string, AccessLevel>;
@@ -371,7 +304,6 @@ export interface ApiUpgradeAction {
   unverifiedCompletion: boolean;
   planTooLate: boolean;
   scope: 'INFRASTRUCTURE' | 'APPLICATION';
-  terms: UpgradeTerms;
   createdAt: string;
 }
 
@@ -661,67 +593,6 @@ export class Api {
     return this.http.delete<void>(`/api/v1/technologies/cycles/${cycleId}`);
   }
 
-  updateCustomer(
-    id: string,
-    body: {
-      contact?: string | null;
-      notes?: string | null;
-      commercialModel?: CommercialModel | null;
-      contractStart?: string | null;
-      contractEnd?: string | null;
-    },
-  ) {
-    return this.http.patch<ApiCustomer>(`/api/v1/customers/${id}`, body);
-  }
-
-  createCustomer(body: CustomerInput & { name: string }) {
-    return this.http.post<ApiCustomer>('/api/v1/customers', body);
-  }
-
-  editCustomer(id: string, body: CustomerInput) {
-    return this.http.patch<ApiCustomer>(`/api/v1/customers/${id}`, body);
-  }
-
-  archiveCustomer(id: string) {
-    return this.http.delete<void>(`/api/v1/customers/${id}`);
-  }
-
-  restoreCustomer(id: string) {
-    return this.http.post<ApiCustomer>(`/api/v1/customers/${id}/restore`, {});
-  }
-
-  archivedCustomers() {
-    return this.http.get<ApiCustomer[]>('/api/v1/customers/archived');
-  }
-
-  customer(id: string) {
-    return this.http.get<ApiCustomerDetail>(`/api/v1/customers/${id}`);
-  }
-
-  createAgreement(customerId: string, body: AgreementInput) {
-    return this.http.post<ApiAgreement>(`/api/v1/customers/${customerId}/agreements`, body);
-  }
-
-  updateAgreement(customerId: string, id: string, body: AgreementInput) {
-    return this.http.patch<ApiAgreement>(`/api/v1/customers/${customerId}/agreements/${id}`, body);
-  }
-
-  deleteAgreement(customerId: string, id: string) {
-    return this.http.delete<void>(`/api/v1/customers/${customerId}/agreements/${id}`);
-  }
-
-  createContact(customerId: string, body: ContactInput) {
-    return this.http.post<ApiContact>(`/api/v1/customers/${customerId}/contacts`, body);
-  }
-
-  updateContact(customerId: string, id: string, body: ContactInput) {
-    return this.http.patch<ApiContact>(`/api/v1/customers/${customerId}/contacts/${id}`, body);
-  }
-
-  deleteContact(customerId: string, id: string) {
-    return this.http.delete<void>(`/api/v1/customers/${customerId}/contacts/${id}`);
-  }
-
   limeReleases() {
     return this.http.get<ApiLimeRelease[]>('/api/v1/lime-releases');
   }
@@ -749,14 +620,6 @@ export class Api {
     return this.http.delete<void>(`/api/v1/lime-releases/${id}`);
   }
 
-  audit(filters: { entity?: string; userId?: string; from?: string; to?: string; limit?: number; offset?: number }) {
-    const params: Record<string, string> = {};
-    for (const [key, value] of Object.entries(filters)) {
-      if (value !== undefined && value !== '') params[key] = String(value);
-    }
-    return this.http.get<ApiAuditPage>('/api/v1/audit', { params });
-  }
-
   allUsers() {
     return this.http.get<ApiUser[]>('/api/v1/users?all=true');
   }
@@ -781,6 +644,24 @@ export class Api {
 
   updateUser(id: string, body: { displayName?: string; role?: RoleName; isActive?: boolean }) {
     return this.http.patch<ApiUser>(`/api/v1/users/${id}`, body);
+  }
+
+  roles() {
+    return this.http.get<ApiRole[]>('/api/v1/roles');
+  }
+
+  createRole(body: ApiRoleInput) {
+    return this.http.post<ApiRole>('/api/v1/roles', body);
+  }
+
+  updateRole(key: string, body: Partial<ApiRoleInput>) {
+    return this.http.patch<ApiRole>(`/api/v1/roles/${encodeURIComponent(key)}`, body);
+  }
+
+  deleteRole(key: string, moveTo?: string) {
+    return this.http.delete<void>(`/api/v1/roles/${encodeURIComponent(key)}`, {
+      params: moveTo ? { moveTo } : {},
+    });
   }
 
   readonly teamsResource = httpResource<ApiTeam[]>(() => '/api/v1/teams');
@@ -857,7 +738,6 @@ export class Api {
 
   readonly projectsResource = httpResource<ApiProject[]>(() => '/api/v1/projects');
   readonly usersResource = httpResource<ApiUser[]>(() => '/api/v1/users');
-
 
   readonly actionsResource = httpResource<ApiUpgradeAction[]>(
     () => '/api/v1/upgrade-actions',

@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { isViewer } from './permissions';
+import { Page } from './permissions';
 import { SessionStore } from './session';
 
 export const signedIn: CanActivateFn = (_route, state) => {
@@ -25,11 +25,12 @@ export const isAdmin: CanActivateFn = () => {
     : router.createUrlTree(['/overview']);
 };
 
-export const notViewer: CanActivateFn = () => {
+/** Lets the route through when the person's role shows `data.page`. */
+export const canSeePage: CanActivateFn = (route) => {
   const session = inject(SessionStore);
   const router = inject(Router);
 
-  return isViewer(session.user()?.role) ? router.createUrlTree(['/overview']) : true;
+  return session.canSee(route.data['page'] as Page) ? true : router.createUrlTree(['/overview']);
 };
 
 export const canOpenOps: CanActivateFn = () => {

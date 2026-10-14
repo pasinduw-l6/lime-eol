@@ -1,5 +1,4 @@
-import { HttpClient } from '@angular/common/http';
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { HlmBadgeImports } from '@spartan-ng/helm/badge';
@@ -7,23 +6,12 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { NOTICE_DAYS, parseDate, today } from '../../core/lifecycle';
-import {
-  SCOPES,
-  STATUS_INFO,
-  TERMS_INFO,
-  TYPE_COLOURS,
-  applicationText,
-  infraText,
-  termNote,
-  termsFor,
-  typeHint,
-  typeLabel,
-} from '../../core/agreements';
-import { AgreementStatus, AgreementType, Api } from '../../core/api';
+import { Api } from '../../core/api';
 import { Cycle, EnvironmentName, Project } from '../../core/models';
-import { Feedback } from '../../core/feedback';
+import { ReportDownload } from '../../core/report-download';
 import { RegistryStore } from '../../core/registry.store';
 import { humanGap } from '../../core/relative-time';
+import { DownloadMenu } from '../../shared/download-menu';
 import { TechIcon } from '../../shared/tech-icon';
 
 const DAY = 86_400_000;
@@ -35,6 +23,7 @@ const ENV_ORDER: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
 type Phase = 'ended' | 'ending' | 'security' | 'full' | 'unknown';
 type Shape = 'square' | 'triangle' | 'diamond' | 'circle' | 'ring';
+type ReleaseState = 'awaiting' | 'dev-only' | 'behind' | 'prod-only' | 'released';
 
 interface PhaseInfo {
   label: string;
@@ -103,6 +92,18 @@ interface OutlookItem {
   phase: Phase;
 }
 
+/** Compares dotted versions numerically: 1.10 is newer than 1.9. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(/[.-]/).map((n) => parseInt(n, 10));
+  const pb = b.split(/[.-]/).map((n) => parseInt(n, 10));
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = Number.isNaN(pa[i]) ? 0 : (pa[i] ?? 0);
+    const y = Number.isNaN(pb[i]) ? 0 : (pb[i] ?? 0);
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
 function phaseOf(cycle: Cycle | null, days: number | null): Phase {
   if (!cycle || days === null) return 'unknown';
   if (days <= 0) return 'ended';
@@ -118,7 +119,7 @@ function addMonths(date: Date, months: number): Date {
 
 @Component({
   selector: 'lime-overview',
-  imports: [NgTemplateOutlet, HlmBadgeImports, HlmButton, HlmCardImports, HlmEmptyImports, RouterLink, TechIcon],
+  imports: [NgTemplateOutlet, HlmBadgeImports, HlmButton, HlmCardImports, HlmEmptyImports, RouterLink, TechIcon, DownloadMenu],
   host: { class: 'block' },
   template: `
     <ng-template #shape let-shape="shape" let-colour="colour" let-size="size">
@@ -143,18 +144,7 @@ function addMonths(date: Date, months: number): Date {
         <div class="flex flex-wrap items-center gap-2">
           <span class="mr-1 text-sm text-muted-foreground">As of {{ longDate(asOf) }}</span>
           @if (!projectId()) {
-            <button type="button" hlmBtn variant="outline" size="sm" class="no-print gap-1.5" [disabled]="downloading()" (click)="download('project', p.id)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              Project PDF
-            </button>
-            <button type="button" hlmBtn size="sm" class="no-print gap-1.5" [disabled]="downloading() || !customerId()" (click)="download('customer', customerId()!)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              {{ downloading() ? 'Preparing PDF…' : p.customer + ' PDF' }}
-            </button>
+            <lime-download-menu class="no-print" label="Project report" size="sm" [busy]="downloads.busy() === p.id" (pick)="downloads.project(p.id, $event)" />
           }
         </div>
       </header>
@@ -210,77 +200,58 @@ function addMonths(date: Date, months: number): Date {
         </section>
       }
 
-      <section hlmCard class="mb-5 gap-0 py-0" aria-labelledby="agreement">
-        @if (agreement(); as a) {
-          <div class="grid lg:grid-cols-[1fr_1.15fr]">
-            <div class="border-b px-6 py-5 lg:border-r lg:border-b-0">
-              <p class="m-0 text-xs tracking-wide text-muted-foreground uppercase">Support agreement</p>
-              <h2 id="agreement" class="m-0 mt-1 flex items-center gap-2 text-lg font-semibold">
-                <span class="size-2.5 rounded-full" [style.background]="typeColour(a.type)"></span>
-                {{ typeLabel(a.type) }}
-              </h2>
-              <p class="m-0 mt-1 text-[13px] text-muted-foreground">{{ typeHint(a.type) }}</p>
-
-              <dl class="m-0 mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <div>
-                  <dt class="text-xs text-muted-foreground">Term</dt>
-                  <dd class="tabular m-0">
-                    @if (a.startDate || a.endDate) {
-                      {{ longDate(parse(a.startDate)) }} – {{ longDate(parse(a.endDate)) }}
-                    } @else {
-                      Not dated
-                    }
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs text-muted-foreground">Status</dt>
-                  <dd class="m-0 font-medium" [style.color]="statusColour(a.status)">
-                    {{ statusLabel(a.status) }}
-                    @if (a.endDate) {
-                      <span class="font-normal text-muted-foreground">· {{ termNote(a.endDate) }}</span>
-                    }
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs text-muted-foreground">Renews</dt>
-                  <dd class="tabular m-0">{{ a.renewalDate || a.endDate ? longDate(parse(a.renewalDate || a.endDate)) : '—' }}{{ a.autoRenew ? ' · automatically' : '' }}</dd>
-                </div>
-                <div>
-                  <dt class="text-xs text-muted-foreground">Notice period</dt>
-                  <dd class="m-0">{{ a.noticeDays !== null ? a.noticeDays + ' days' : '—' }}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div class="px-6 py-5">
-              <p class="m-0 mb-2 text-xs text-muted-foreground">How upgrades are handled</p>
-              <ul class="m-0 grid list-none gap-2 p-0 text-sm">
-                @for (s of scopes; track s.key) {
-                  @let t = terms(s.key, a.coverage);
-                  <li class="rounded-lg border px-3 py-2.5">
-                    <span class="flex items-center justify-between gap-3">
-                      <span class="font-medium">{{ s.label }}</span>
-                      <span class="rounded-full border px-2 py-0.5 text-[11px]" [style.color]="termsInfo[t].colour" [style.border-color]="'color-mix(in oklab, ' + termsInfo[t].colour + ' 40%, transparent)'">{{ termsInfo[t].label }}</span>
-                    </span>
-                    <span class="mt-0.5 block text-[13px]">{{ s.key === 'INFRASTRUCTURE' ? infraText(a.coverage) : applicationText(a.coverage) }}</span>
-                    <span class="mt-0.5 block text-[11px] text-muted-foreground">{{ s.examples }}</span>
-                  </li>
-                }
-              </ul>
-              @if (a.type === 'LICENSE' && a.licensedUsers) {
-                <p class="m-0 mt-2 text-xs text-muted-foreground">Licensed for {{ a.licensedUsers }} users</p>
-              }
-            </div>
-          </div>
-        } @else {
-          <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+      @if (releases(); as rel) {
+        <section hlmCard class="mb-5 gap-0 py-0" aria-labelledby="releases">
+          <header class="flex flex-wrap items-baseline justify-between gap-2 border-b px-6 py-4">
             <div>
-              <h2 id="agreement" class="m-0 text-base font-semibold">Support agreement</h2>
-              <p class="m-0 mt-0.5 text-[13px] text-muted-foreground">No agreement is recorded, so every upgrade is assessed and quoted separately.</p>
+              <h2 id="releases" class="m-0 text-base font-semibold">Development and production</h2>
+              <p class="m-0 mt-0.5 text-[13px] text-muted-foreground">What is upgraded in DEV and what has reached PROD.</p>
             </div>
+            <span class="text-[13px]" [style.color]="awaiting() ? releaseInfo.awaiting.colour : 'var(--success)'">
+              {{ awaiting() ? awaiting() + ' upgrade' + (awaiting() === 1 ? '' : 's') + ' awaiting release' : 'PROD matches DEV' }}
+            </span>
+          </header>
+          <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-sm">
+              <thead>
+                <tr class="text-left text-xs text-muted-foreground">
+                  <th class="px-6 py-2 font-normal">Technology</th>
+                  <th class="px-3 py-2 font-normal">Development · DEV</th>
+                  <th class="px-3 py-2 font-normal">Production · PROD</th>
+                  <th class="px-6 py-2 font-normal">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of rel; track r.technology) {
+                  <tr class="border-t">
+                    <td class="px-6 py-2.5">
+                      <span class="flex items-center gap-2"><lime-tech-icon [technology]="r.technology" [size]="18" />{{ r.technology }}</span>
+                    </td>
+                    @for (s of [r.dev, r.prod]; track $index) {
+                      <td class="px-3 py-2.5">
+                        @if (s) {
+                          <span class="tabular font-medium">{{ s.version }}</span>
+                          <span class="block text-[12px]" [style.color]="phaseInfo(s.phase).colour">
+                            {{ s.endsOn ? (s.phase === 'ended' ? 'ended ' : 'supported to ') + shortDate(s.endsOn) : phaseInfo(s.phase).label }}
+                          </span>
+                        } @else {
+                          <span class="text-muted-foreground">—</span>
+                        }
+                      </td>
+                    }
+                    <td class="px-6 py-2.5">
+                      <span class="inline-flex items-center gap-1.5 text-[13px] font-medium" [style.color]="releaseInfo[r.state].colour">
+                        <span class="size-2 rounded-full" [style.background]="releaseInfo[r.state].colour"></span>
+                        {{ releaseInfo[r.state].label }}
+                      </span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
-        }
-      </section>
+        </section>
+      }
 
       <section class="mb-5" aria-labelledby="stack">
         <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -306,13 +277,6 @@ function addMonths(date: Date, months: number): Date {
                   @if (c.lts) {
                     <span hlmBadge variant="outline">LTS</span>
                   }
-                  @let cover = coverageOf(c);
-                  <span
-                    class="rounded-full border px-2 py-0.5 text-[11px]"
-                    [title]="cover.detail"
-                    [style.color]="cover.colour"
-                    [style.border-color]="'color-mix(in oklab, ' + cover.colour + ' 40%, transparent)'"
-                  >{{ cover.label }}</span>
                 </span>
               </div>
 
@@ -523,22 +487,14 @@ export class Overview {
     { phase: 'ended', meaning: 'The vendor no longer releases any fixes, including security fixes.' },
   ];
 
-  private readonly http = inject(HttpClient);
   private readonly api = inject(Api);
-  private readonly feedback = inject(Feedback);
+  protected readonly downloads = inject(ReportDownload);
 
   readonly projectId = input<string | null>(null);
-
-  protected readonly downloading = signal(false);
 
   protected readonly project = computed<Project | null>(() => {
     const id = this.projectId();
     return id ? (this.store.projects().find((p) => p.id === id) ?? null) : this.store.activeProject();
-  });
-
-  protected readonly customerId = computed(() => {
-    const project = this.project();
-    return project ? (this.store.apiProject(project.id)?.customerId ?? null) : null;
   });
 
   private readonly deployments = computed(() => {
@@ -546,78 +502,44 @@ export class Overview {
     return project ? this.store.deploymentsOf(project.id) : [];
   });
 
-  protected readonly agreement = computed(() => {
-    const id = this.customerId();
-    return id ? (this.api.customers().find((c) => c.id === id)?.agreement ?? null) : null;
+  /** DEV against PROD per technology: what has been upgraded internally and is not released yet. */
+  protected readonly releases = computed(() => {
+    const dev = this.deployments().find((d) => d.environment === 'DEV');
+    const prod = this.deployments().find((d) => d.environment === 'PROD');
+    if (!dev || !prod) return null;
+
+    const side = (version: string | undefined, technology: string) => {
+      if (!version) return null;
+      const resolved = this.store.resolve(technology, version);
+      return { version, phase: phaseOf(resolved.cycle, resolved.days), endsOn: parseDate(resolved.cycle?.eolDate ?? null) };
+    };
+
+    const names = [...new Set([...dev.components, ...prod.components].map((c) => c.technology))].filter((t) => t !== 'Lime');
+    const rows = names.map((technology) => {
+      const d = side(dev.components.find((c) => c.technology === technology)?.version, technology);
+      const p = side(prod.components.find((c) => c.technology === technology)?.version, technology);
+      const order = d && p ? compareVersions(d.version, p.version) : 0;
+      const state: ReleaseState = !p ? 'dev-only' : !d ? 'prod-only' : order > 0 ? 'awaiting' : order < 0 ? 'behind' : 'released';
+      return { technology, dev: d, prod: p, state };
+    });
+    const rank: Record<ReleaseState, number> = { awaiting: 0, 'dev-only': 1, behind: 2, 'prod-only': 3, released: 4 };
+    return rows.sort((a, b) => rank[a.state] - rank[b.state] || a.technology.localeCompare(b.technology));
   });
 
-  private readonly scopeOf = computed(
-    () => new Map(this.api.technologies().map((t) => [t.name, t.scope as 'INFRASTRUCTURE' | 'APPLICATION'])),
-  );
+  protected readonly awaiting = computed(() => (this.releases() ?? []).filter((r) => r.state === 'awaiting' || r.state === 'dev-only').length);
 
-  protected readonly scopes = SCOPES;
-  protected readonly termsInfo = TERMS_INFO;
-  protected readonly terms = termsFor;
-  protected readonly infraText = infraText;
-  protected readonly applicationText = applicationText;
-  protected readonly termNote = termNote;
-  protected readonly typeLabel = typeLabel;
-  protected readonly typeHint = typeHint;
-
-  protected typeColour(type: AgreementType): string {
-    return TYPE_COLOURS[type];
-  }
-
-  protected statusLabel(status: AgreementStatus): string {
-    return STATUS_INFO[status].label;
-  }
-
-  protected statusColour(status: AgreementStatus): string {
-    return STATUS_INFO[status].colour;
-  }
-
-  protected parse(value: string | null): Date | null {
-    return parseDate(value);
-  }
-
-  protected coverageOf(card: DetailCard): { label: string; colour: string; detail: string } {
-    const scope = this.scopeOf().get(card.technology) ?? 'INFRASTRUCTURE';
-    const info = TERMS_INFO[termsFor(scope, this.agreement()?.coverage)];
-    const kind = scope === 'INFRASTRUCTURE' ? 'Infrastructure' : 'Application dependency';
-    return {
-      label: info.label,
-      colour: info.colour,
-      detail: this.agreement() ? `${kind}. ${info.long}` : `${kind}. No agreement recorded, so the upgrade is quoted.`,
-    };
-  }
+  protected readonly releaseInfo: Record<ReleaseState, { label: string; colour: string }> = {
+    awaiting: { label: 'Awaiting release', colour: 'var(--chart-2, #2563eb)' },
+    'dev-only': { label: 'New in DEV, not released', colour: 'var(--chart-2, #2563eb)' },
+    behind: { label: 'DEV is behind PROD', colour: 'var(--warning)' },
+    'prod-only': { label: 'Only in PROD', colour: 'var(--muted-foreground)' },
+    released: { label: 'Released', colour: 'var(--success)' },
+  };
 
   protected readonly envList = computed<EnvironmentName[]>(() => {
     const present = new Set(this.deployments().map((d) => d.environment));
     return ENV_ORDER.filter((e) => present.has(e));
   });
-
-  protected download(kind: 'project' | 'customer', id: string): void {
-    this.downloading.set(true);
-    this.http
-      .get(`/api/v1/reports/${kind}/${id}.pdf`, { responseType: 'blob', observe: 'response' })
-      .subscribe({
-        next: (response) => {
-          this.downloading.set(false);
-          const disposition = response.headers.get('Content-Disposition') ?? '';
-          const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'Lime-Lifecycle.pdf';
-          const url = URL.createObjectURL(response.body!);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = name;
-          link.click();
-          URL.revokeObjectURL(url);
-        },
-        error: () => {
-          this.downloading.set(false);
-          this.feedback.error('The PDF could not be generated. Check that the PDF service is running.');
-        },
-      });
-  }
 
   protected readonly cards = computed<DetailCard[]>(() => {
     const now = today().getTime();

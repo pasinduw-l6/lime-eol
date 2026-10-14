@@ -13,8 +13,17 @@ export class SessionDto {
   @ApiProperty()
   displayName!: string;
 
-  @ApiProperty({ enum: ['VIEWER', 'SRE', 'ADMIN'] })
+  @ApiProperty({ example: 'SRE', description: 'The role key' })
   role!: string;
+
+  @ApiProperty({ example: 'SRE / DevOps' })
+  roleName!: string;
+
+  @ApiProperty({ type: [String], description: 'What this role can change' })
+  permissions!: string[];
+
+  @ApiProperty({ type: [String], description: 'Pages this role can open' })
+  pages!: string[];
 
   @ApiProperty({ description: 'Two letters, for the header avatar' })
   initials!: string;

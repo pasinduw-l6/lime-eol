@@ -66,6 +66,12 @@ export const envSchema = z
     JIRA_HTTP_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
     JIRA_DEMO: booleanish.default(false),
     JIRA_CREATE_ON_PLAN: booleanish.default(false),
+
+    GITHUB_TOKEN: blankable(z.string().optional()),
+    VERSIONS_REPO: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'VERSIONS_REPO must be owner/repo').default('pasinduw-l6/lime-eol'),
+    VERSIONS_FILE: z.string().default('eol-versions.yml'),
+    VERSIONS_BRANCH: z.string().default('main'),
+    VERSIONS_SYNC_CRON: z.string().default('*/15 * * * *'),
   })
   .refine(
     (env) => !(env.NODE_ENV === 'production' && env.JIRA_DEMO),

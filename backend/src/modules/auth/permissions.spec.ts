@@ -1,43 +1,24 @@
-import { can, Permission, ROLES } from './permissions';
+import { cleanPages, cleanPermissions, GRANTABLE, has, PERMISSIONS } from './permissions';
 
-const ALL: Permission[] = [
-  'estate:write',
-  'customer:write',
-  'plan:notice',
-  'plan:decision',
-  'plan:assess',
-  'lime:write',
-  'integration:write',
-  'admin',
-];
-
-describe('roles', () => {
-  it('has three roles, least access first', () => {
-    expect([...ROLES]).toEqual(['VIEWER', 'SRE', 'ADMIN']);
+describe('permissions', () => {
+  it('checks a permission against a role list', () => {
+    expect(has(['estate:write'], 'estate:write')).toBe(true);
+    expect(has(['estate:write'], 'admin')).toBe(false);
+    expect(has(undefined, 'estate:write')).toBe(false);
   });
 
-  it('gives a viewer no changes at all', () => {
-    for (const permission of ALL) expect(can('VIEWER', permission)).toBe(false);
+  it('never lets a custom role carry the admin permission', () => {
+    expect(GRANTABLE).not.toContain('admin');
+    expect(cleanPermissions([...PERMISSIONS])).not.toContain('admin');
   });
 
-  it('lets SRE / DevOps change the estate, plans, customers and connections, but not Lime or people', () => {
-    expect(ALL.filter((p) => can('SRE', p))).toEqual([
-      'estate:write',
-      'customer:write',
-      'plan:notice',
-      'plan:decision',
-      'plan:assess',
-      'integration:write',
-    ]);
+  it('drops unknown permissions and keeps the catalogue order', () => {
+    expect(cleanPermissions(['plan:notice', 'made:up', 'estate:write'])).toEqual(['estate:write', 'plan:notice']);
   });
 
-  it('gives an admin everything', () => {
-    for (const permission of ALL) expect(can('ADMIN', permission)).toBe(true);
-  });
-
-  it('treats removed or unknown roles as no access', () => {
-    for (const role of ['BA', 'ACCOUNT', 'PRODUCT', undefined]) {
-      for (const permission of ALL) expect(can(role, permission)).toBe(false);
-    }
+  it('always includes the overview page and drops unknown pages', () => {
+    expect(cleanPages(['plan', 'secret'])).toEqual(['overview', 'plan']);
+    expect(cleanPages([])).toEqual(['overview']);
+    expect(cleanPages(['overview', 'calendar'])).toEqual(['overview', 'calendar']);
   });
 });

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { CAN } from '../can.decorator';
-import { can, Permission } from '../permissions';
+import { has, Permission } from '../permissions';
 import { IS_PUBLIC } from '../public.decorator';
 
 const READ_ONLY = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -24,7 +24,7 @@ export class EditorGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<{
       method: string;
-      user?: { role?: string };
+      user?: { role?: string; permissions?: string[] };
     }>();
 
     const explicit = this.reflector.getAllAndOverride<Permission[]>(CAN, targets);
@@ -40,7 +40,7 @@ export class EditorGuard implements CanActivate {
 
     const required = explicit ?? ['estate:write'];
 
-    if (!required.some((permission) => can(role, permission))) {
+    if (!required.some((permission) => has(request.user?.permissions, permission))) {
       throw new ForbiddenException('Your role does not allow that change.');
     }
 

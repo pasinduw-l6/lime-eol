@@ -464,24 +464,32 @@ export class FormalReport {
   private readonly api = inject(Api);
   private readonly store = inject(RegistryStore);
 
-  readonly customerId = input.required<string>();
+  readonly customerId = input<string | null>(null);
   readonly projectId = input<string | null>(null);
 
   protected readonly asOf = new Date();
   protected readonly info = STATUS_INFO;
 
-  protected readonly customer = computed(() => this.api.customers().find((c) => c.id === this.customerId()) ?? null);
+  protected readonly customer = computed(() => {
+    const id = this.customerId();
+    if (!id) return this.api.customers().length ? { name: 'All projects' } : null;
+    return this.api.customers().find((c) => c.id === id) ?? null;
+  });
+
+  protected readonly everything = computed(() => !this.customerId() && !this.projectId());
 
   protected readonly projects = computed(() =>
     this.api
       .projects()
-      .filter((p) => p.customerId === this.customerId() && (!this.projectId() || p.id === this.projectId()))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+      .filter((p) => (!this.customerId() || p.customerId === this.customerId()) && (!this.projectId() || p.id === this.projectId()))
+      .sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
   );
 
   protected readonly single = computed(() => (this.projectId() ? (this.projects()[0] ?? null) : null));
 
-  protected readonly projectNames = computed(() => this.projects().map((p) => p.name).join(', '));
+  protected readonly projectNames = computed(() =>
+    this.projects().map((p) => (this.everything() ? p.customer + ' ' + p.name : p.name)).join(', '),
+  );
 
   private readonly newestOf = computed(() => {
     const map = new Map<string, string>();
@@ -568,7 +576,8 @@ export class FormalReport {
       const groups = STATUS_ORDER.map((status) => ({ status, rows: rows.filter((r) => r.status === status) })).filter(
         (g) => g.rows.length > 0,
       );
-      return { id: project.id, title: `${project.name} (${project.code})`, bars, groups };
+      const name = this.everything() ? `${project.customer} · ${project.name}` : project.name;
+      return { id: project.id, title: `${name} (${project.code})`, bars, groups };
     });
   });
 

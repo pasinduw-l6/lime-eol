@@ -5,7 +5,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { AccessChange, AccessLevel, Api, ApiAccessMatrix } from '../../core/api';
 import { Feedback } from '../../core/feedback';
-import { ROLE_INFO, ROLES, RoleName } from '../../core/permissions';
+import { RoleName } from '../../core/permissions';
 import { RegistryStore } from '../../core/registry.store';
 
 type Level = AccessLevel | null;
@@ -33,8 +33,8 @@ const RANK: Record<string, number> = { VIEW: 1, EDIT: 2 };
         <input hlmInput type="search" class="h-8 w-[200px] text-[13px]" placeholder="Search people" aria-label="Search people" [ngModel]="query()" (ngModelChange)="query.set($event)" />
         <select hlmInput class="h-8 w-auto py-0 text-[13px]" aria-label="Role" [ngModel]="role()" (ngModelChange)="role.set($event)">
           <option value="">All roles</option>
-          @for (r of roles; track r) {
-            <option [value]="r">{{ roleInfo[r].label }}</option>
+          @for (r of roles(); track r.key) {
+            <option [value]="r.key">{{ r.name }}</option>
           }
         </select>
         <label class="flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -79,14 +79,14 @@ const RANK: Record<string, number> = { VIEW: 1, EDIT: 2 };
                     <span class="block font-medium">{{ u.name }}</span>
                     <span class="block text-[11.5px] text-muted-foreground">{{ u.email }}</span>
                   </td>
-                  <td class="px-2 py-2 whitespace-nowrap">{{ roleInfo[u.role].label }}</td>
+                  <td class="px-2 py-2 whitespace-nowrap">{{ u.roleName }}</td>
                   @if (u.role === 'ADMIN') {
                     <td class="px-3 py-2 text-muted-foreground" [attr.colspan]="columns().length + 1">Admin · full access to everything</td>
                   } @else {
                     <td class="px-3 py-2" [class.changed]="isChanged(u.id, null)">
                       <span class="flex gap-4">
                         <span class="tick"><input type="checkbox" [attr.aria-label]="'View all projects: ' + u.name" [checked]="rank(allOf(u)) >= 1" (change)="toggle(u, null, 'VIEW')" /></span>
-                        <span class="tick" [title]="u.role === 'VIEWER' ? 'Viewers cannot edit. Change the role to SRE / DevOps first.' : ''"><input type="checkbox" [attr.aria-label]="'Edit all projects: ' + u.name" [checked]="rank(allOf(u)) >= 2" [disabled]="u.role === 'VIEWER'" (change)="toggle(u, null, 'EDIT')" /></span>
+                        <span class="tick" [title]="u.canEdit ? '' : u.roleName + ' cannot change anything. Give them a role that can first.'"><input type="checkbox" [attr.aria-label]="'Edit all projects: ' + u.name" [checked]="rank(allOf(u)) >= 2" [disabled]="!u.canEdit" (change)="toggle(u, null, 'EDIT')" /></span>
                       </span>
                     </td>
                     @for (p of columns(); track p.id) {
@@ -95,9 +95,9 @@ const RANK: Record<string, number> = { VIEW: 1, EDIT: 2 };
                       <td class="border-l px-3 py-2" [class.changed]="isChanged(u.id, p.id)">
                         <span class="flex gap-4">
                           @for (level of levels; track level) {
-                            @let roleBlocked = level === 'EDIT' && u.role === 'VIEWER';
+                            @let roleBlocked = level === 'EDIT' && !u.canEdit;
                             @let locked = rank(via?.level) >= rank(level);
-                            <span class="tick" [title]="roleBlocked ? 'Viewers cannot edit. Change the role to SRE / DevOps first.' : locked ? 'Given by ' + via?.from + '. Change it there.' : ''">
+                            <span class="tick" [title]="roleBlocked ? u.roleName + ' cannot change anything. Give them a role that can first.' : locked ? 'Given by ' + via?.from + '. Change it there.' : ''">
                               <input
                                 type="checkbox"
                                 [attr.aria-label]="(level === 'VIEW' ? 'View ' : 'Edit ') + p.name + ': ' + u.name"
@@ -164,8 +164,6 @@ export class AccessGrid {
   private readonly feedback = inject(Feedback);
   private readonly store = inject(RegistryStore);
 
-  protected readonly roles = ROLES;
-  protected readonly roleInfo = ROLE_INFO;
   protected readonly levels: AccessLevel[] = ['VIEW', 'EDIT'];
 
   protected readonly matrix = signal<ApiAccessMatrix | null>(null);
@@ -174,6 +172,11 @@ export class AccessGrid {
   protected readonly query = signal('');
   protected readonly role = signal<RoleName | ''>('');
   protected readonly showInactive = signal(false);
+  protected readonly roles = computed(() => {
+    const seen = new Map<string, string>();
+    for (const u of this.matrix()?.users ?? []) seen.set(u.role, u.roleName);
+    return [...seen].map(([key, name]) => ({ key, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   protected readonly scoped = computed(() => {
     const active = this.store.activeProject();
@@ -277,5 +280,4 @@ export class AccessGrid {
   protected rank(level: Level | undefined): number {
     return level ? RANK[level] ?? 0 : 0;
   }
-
 }

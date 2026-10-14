@@ -3,9 +3,6 @@ import { Api, ApiActionEnvironment, ApiUpgradeAction } from '../core/api';
 import {
   SEVERITY,
   STAGES,
-  TONE_CLASS,
-  Tone,
-  coverOf,
   decisionLabel,
   severityOf,
   stageIndex,
@@ -70,9 +67,6 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
             >{{ sev.label }}</span>
           }
           <span hlmBadge variant="outline" [class.text-muted-foreground]="!action().decision">{{ decision() }}</span>
-          @for (c of covers(); track c.customer) {
-            <span hlmBadge variant="outline" [class]="tone(c.tone)" [title]="c.detail">{{ c.customer }}: {{ c.label }}</span>
-          }
           @if (action().decision === 'ACCEPT_RISK') {
             <span class="text-[12px] text-muted-foreground">
               {{ action().riskApprover ? 'Accepted by ' + action().riskApprover : 'Awaiting sign-off' }}
@@ -216,28 +210,6 @@ export class PlanCard {
     const level = severityOf(action.daysToEol, cycle?.activeSupportEnd);
     return level ? SEVERITY[level] : null;
   });
-
-  protected readonly covers = computed(() => {
-    const action = this.action();
-    const scope = this.api.technologies().find((t) => t.name === action.technology)?.scope;
-    const projects = this.api.projects();
-    const customers = this.api.customers();
-    const seen = new Set<string>();
-    const out: { customer: string; label: string; tone: Tone; detail: string }[] = [];
-
-    for (const env of action.environments) {
-      const project = projects.find((p) => p.id === env.projectId);
-      if (!project || seen.has(project.customerId)) continue;
-      seen.add(project.customerId);
-      const customer = customers.find((c) => c.id === project.customerId);
-      out.push({ customer: project.customer, ...coverOf(customer, scope) });
-    }
-    return out;
-  });
-
-  protected tone(tone: Tone): string {
-    return TONE_CLASS[tone];
-  }
 
   readonly editing = output<void>();
   readonly removing = output<void>();

@@ -3,7 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { catchError, firstValueFrom, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Permission, RoleName, can } from './permissions';
+import { Page, Permission, RoleName } from './permissions';
 
 export interface Session {
   token: string;
@@ -11,8 +11,20 @@ export interface Session {
   email: string;
   displayName: string;
   role: RoleName;
+  roleName?: string;
+  permissions?: string[];
+  pages?: string[];
   initials: string;
   expiresAt: string;
+}
+
+interface Me {
+  role: RoleName;
+  roleName: string;
+  permissions: string[];
+  pages: string[];
+  displayName: string;
+  initials: string;
 }
 
 const STORAGE_KEY = 'lime.session';
@@ -25,11 +37,16 @@ export class SessionStore {
 
   readonly user = this.session.asReadonly();
   readonly isSignedIn = computed(() => this.session() !== null);
-  readonly canEdit = computed(() => this.session()?.role !== 'VIEWER');
+  readonly canEdit = computed(() => (this.session()?.permissions ?? []).length > 0);
   readonly isAdmin = computed(() => this.session()?.role === 'ADMIN');
+  readonly roleName = computed(() => this.session()?.roleName ?? this.session()?.role ?? '');
 
   can(permission: Permission): boolean {
-    return can(this.session()?.role, permission);
+    return (this.session()?.permissions ?? []).includes(permission);
+  }
+
+  canSee(page: Page): boolean {
+    return page === 'overview' || (this.session()?.pages ?? []).includes(page);
   }
 
   adopt(session: Session): void {
@@ -42,12 +59,18 @@ export class SessionStore {
     }
 
     try {
-      const me = await firstValueFrom(
-        this.http.get<{ role: RoleName; displayName: string; initials: string }>('/api/v1/auth/me'),
-      );
+      const me = await firstValueFrom(this.http.get<Me>('/api/v1/auth/me'));
       const current = this.session();
-      if (current && (current.role !== me.role || current.displayName !== me.displayName)) {
-        this.keep({ ...current, role: me.role, displayName: me.displayName, initials: me.initials });
+      if (current) {
+        this.keep({
+          ...current,
+          role: me.role,
+          roleName: me.roleName,
+          permissions: me.permissions,
+          pages: me.pages,
+          displayName: me.displayName,
+          initials: me.initials,
+        });
       }
     } catch {
       this.signOut();

@@ -16,7 +16,6 @@ import { Permission } from '../../core/permissions';
 import { SessionStore } from '../../core/session';
 import { formatDate, formatDays, statusFill, SupportStatus } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
-import { TERMS_INFO } from '../../core/agreements';
 import { Feedback } from '../../core/feedback';
 import {
   Gantt,
@@ -854,7 +853,6 @@ function toItem(action: ApiUpgradeAction): GanttItem {
     jiraUrl: action.jiraUrl,
     jiraError: action.jiraSyncError,
     subs: (action.subtasks ?? []).map(toSub),
-    terms: action.terms ? TERMS_INFO[action.terms] : null,
   };
 }
 

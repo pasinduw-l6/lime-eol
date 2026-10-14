@@ -338,7 +338,7 @@ export class OpsNotificationsService {
 
     const users = await this.prisma.appUser.findMany({
       where: everyone
-        ? { isActive: true, role: { not: 'VIEWER' } }
+        ? { isActive: true, roleRef: { permissions: { isEmpty: false } } }
         : { isActive: true, email: { in: requested.map((r) => r.toLowerCase()) } },
       orderBy: { displayName: 'asc' },
     });

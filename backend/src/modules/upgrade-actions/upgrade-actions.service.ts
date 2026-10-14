@@ -6,9 +6,8 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { ActionStatus, CommStatus, CustomerAgreement } from '@prisma/client';
-import { coverageOf, currentAgreement, termsFor } from '../customers/agreement.util';
-import { can, Permission } from '../auth/permissions';
+import { ActionStatus, CommStatus } from '@prisma/client';
+import { has, Permission } from '../auth/permissions';
 import { jiraConfig, JiraConfig } from '../../config';
 import { IssueTrackerService, toSubtask } from '../issue-tracker/issue-tracker.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -111,9 +110,9 @@ export class UpgradeActionsService {
     }
   }
 
-  async update(id: string, input: UpdateUpgradeActionDto, role?: string) {
+  async update(id: string, input: UpdateUpgradeActionDto, permissions?: string[]) {
     await this.findOne(id);
-    assertFieldsAllowed(input, role);
+    assertFieldsAllowed(input, permissions);
 
     if (input.deploymentIds) {
       await this.prisma.$transaction([
@@ -296,10 +295,6 @@ export class UpgradeActionsService {
         eolDate !== null &&
         plannedDate.getTime() > eolDate.getTime(),
       scope: action.cycle.technology.scope,
-      terms: termsFor(
-        action.cycle.technology.scope,
-        coverageOf(currentAgreement(action.deployments[0]?.deployment.customer.agreements ?? [])),
-      ),
       createdAt: action.createdAt.toISOString(),
     };
   }
@@ -310,7 +305,7 @@ const ACTION_INCLUDE = {
   assignee: true,
   team: true,
   deployments: {
-    include: { deployment: { include: { project: true, customer: { include: { agreements: true } } } } },
+    include: { deployment: { include: { project: true, customer: true } } },
   },
   jiraSubtasks: { orderBy: { position: 'asc' } },
 } as const;
@@ -329,7 +324,7 @@ type ActionRow = Awaited<
       environment: string;
       projectId: string | null;
       project: { name: string } | null;
-      customer: { name: string; agreements: CustomerAgreement[] };
+      customer: { name: string };
     };
   }[];
 };
@@ -376,12 +371,12 @@ const FIELD_PERMISSION: Partial<Record<keyof UpdateUpgradeActionDto, Permission>
   assessment: 'plan:assess',
 };
 
-function assertFieldsAllowed(input: UpdateUpgradeActionDto, role?: string): void {
-  if (role === undefined) return;
+function assertFieldsAllowed(input: UpdateUpgradeActionDto, permissions?: string[]): void {
+  if (permissions === undefined) return;
 
   const refused = (Object.keys(input) as (keyof UpdateUpgradeActionDto)[])
     .filter((field) => input[field] !== undefined)
-    .filter((field) => !can(role, FIELD_PERMISSION[field] ?? 'estate:write'));
+    .filter((field) => !has(permissions, FIELD_PERMISSION[field] ?? 'estate:write'));
 
   if (refused.length > 0) {
     throw new ForbiddenException(`Your role cannot change: ${refused.join(', ')}.`);

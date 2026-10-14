@@ -5,7 +5,7 @@ export async function everyEngineer(
   prisma: PrismaService,
 ): Promise<EventMention[]> {
   const users = await prisma.appUser.findMany({
-    where: { isActive: true, role: { not: 'VIEWER' } },
+    where: { isActive: true, roleRef: { permissions: { isEmpty: false } } },
     orderBy: { displayName: 'asc' },
   });
 

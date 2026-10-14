@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { HlmButton } from '@spartan-ng/helm/button';
-import { ROLE_INFO, RoleName } from '../../core/permissions';
+import { RoleName } from '../../core/permissions';
 import { Session, SessionStore } from '../../core/session';
 import { AuthLayout } from './auth-layout';
 
@@ -13,6 +13,7 @@ interface PreviewAccount {
   name: string;
   email: string;
   role: RoleName;
+  roleName?: string;
 }
 
 @Component({
@@ -77,7 +78,7 @@ interface PreviewAccount {
                       <span class="block truncate font-medium">{{ a.name }}</span>
                       <span class="block truncate text-xs text-muted-foreground">{{ a.email }}</span>
                     </span>
-                    <span class="shrink-0 rounded-md border px-1.5 text-xs text-muted-foreground">{{ roleLabel(a.role) }}</span>
+                    <span class="shrink-0 rounded-md border px-1.5 text-xs text-muted-foreground">{{ a.roleName ?? a.role }}</span>
                   </button>
                 </li>
               }
@@ -130,10 +131,6 @@ export class Login {
         this.previewError.set('That preview sign-in did not work.');
       },
     });
-  }
-
-  protected roleLabel(role: RoleName): string {
-    return ROLE_INFO[role]?.label ?? role;
   }
 }
 
