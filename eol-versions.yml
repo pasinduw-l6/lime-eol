@@ -1,0 +1,38 @@
+# Technology versions per project, read by the Lime EOL tool.
+#
+# Edit a version, commit and push to main: within 15 minutes the tool records the
+# change in the project's history, with the commit, the author and the date.
+#
+#   PROJECT-CODE:        code of the project in the EOL tool
+#     DEV / UAT / PROD:  environment
+#       Technology: version   (name as in Lifecycle → Registry, e.g. Node.js, Angular)
+#
+# DEV = upgraded internally, PROD = released to production.
+# When DEV is ahead of PROD, the Overview shows "Awaiting release".
+
+DBANK:
+  DEV:
+    Node.js: 22.11.0
+    Angular: 19.2.0
+  PROD:
+    Node.js: 20.18.0
+    Angular: 17.3.12
+
+DTELB:
+  DEV:
+    Node.js: 22.11.0
+    Angular: 19.2.0
+  PROD:
+    Node.js: 22.11.0
+    Angular: 19.2.0
+
+DBMOB:
+  UAT:
+    Angular: 19.2.0
+  PROD:
+    Angular: 18.2.14
+
+DTELP:
+  PROD:
+    Node.js: 18.20.4
+    Angular: 20.3.31
