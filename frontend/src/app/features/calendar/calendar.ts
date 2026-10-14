@@ -10,7 +10,8 @@ import { RegistryStore } from '../../core/registry.store';
 import { TechIcon } from '../../shared/tech-icon';
 
 type Kind = 'DEADLINE' | 'PLAN' | 'TASK' | 'DONE' | 'TIME';
-type View = 'month' | 'agenda';
+type View = 'calendar' | 'next';
+type Detail = 'month' | 'week';
 
 interface Entry {
   id: string;
@@ -80,37 +81,98 @@ const DAY = 86_400_000;
       </div>
     </header>
 
-    <section class="mb-4 flex flex-wrap items-center gap-2">
-      @if (view() === 'month') {
-        <button type="button" hlmBtn variant="ghost" size="sm" aria-label="Previous month" (click)="shift(-1)">‹</button>
-        <span class="min-w-[140px] text-center text-[15px] font-semibold">{{ monthLabel() }}</span>
-        <button type="button" hlmBtn variant="ghost" size="sm" aria-label="Next month" (click)="shift(1)">›</button>
-        <button type="button" hlmBtn variant="outline" size="sm" (click)="goToday()">Today</button>
+    <section class="mb-4 flex flex-wrap items-center gap-1.5">
+      @for (k of kinds; track k.key) {
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12.5px] transition-opacity"
+          [attr.aria-pressed]="enabled().has(k.key)"
+          [style.opacity]="enabled().has(k.key) ? 1 : 0.45"
+          [style.border-color]="enabled().has(k.key) ? tint(k.colour, 45) : null"
+          (click)="toggle(k.key)"
+        >
+          <span class="size-2 rounded-full" [style.background]="k.colour"></span>
+          {{ k.label }}
+        </button>
       }
-      <span class="ml-auto flex flex-wrap items-center gap-1.5">
-        @for (k of kinds; track k.key) {
-          <button
-            type="button"
-            class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12.5px] transition-opacity"
-            [attr.aria-pressed]="enabled().has(k.key)"
-            [style.opacity]="enabled().has(k.key) ? 1 : 0.45"
-            [style.border-color]="enabled().has(k.key) ? tint(k.colour, 45) : null"
-            (click)="toggle(k.key)"
-          >
-            <span class="size-2 rounded-full" [style.background]="k.colour"></span>
-            {{ k.label }}
-            <span class="tabular text-muted-foreground">{{ k.key === 'TIME' ? hours(scopeSeconds()) : scopeCount(k.key) }}</span>
-          </button>
-        }
-        <label class="ml-1 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-          <input type="checkbox" [checked]="showInitial()" (change)="showInitial.set(!showInitial())" />
-          Initial records
-        </label>
-      </span>
+      <label class="ml-1 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+        <input type="checkbox" [checked]="showInitial()" (change)="showInitial.set(!showInitial())" />
+        Initial records
+      </label>
     </section>
 
-    <div class="grid gap-4 lg:grid-cols-[1fr_300px]">
-      @if (view() === 'month') {
+    @if (view() === 'calendar') {
+      <section hlmCard class="mb-4 gap-0 py-0" aria-labelledby="horizon-title">
+        <header class="flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-3">
+          <h2 id="horizon-title" class="m-0 text-[14px] font-semibold">Horizon · {{ horizon().first }}–{{ horizon().last }}</h2>
+          <span class="text-[12px] text-muted-foreground">End of support ◆ and plan due ● across the years. Click a quarter to open it below.</span>
+        </header>
+        <div class="px-5 pt-3 pb-4">
+          <div class="relative" [style.height.px]="horizon().height">
+            @for (q of horizon().quarters; track q.key) {
+              <button
+                type="button"
+                class="absolute top-0 bottom-5 border-l border-dashed transition-colors hover:bg-muted/60"
+                [style.left.%]="q.left"
+                [style.width.%]="q.width"
+                [style.background]="q.active ? tint('var(--primary)', 10) : null"
+                [attr.aria-label]="'Open ' + q.label"
+                [title]="q.label + (q.count ? ' · ' + q.count + ' items' : '')"
+                (click)="jumpTo(q.start)"
+              ></button>
+            }
+            @for (y of horizon().years; track y.year) {
+              <span class="pointer-events-none absolute top-0 bottom-5 w-px bg-border" [style.left.%]="y.left"></span>
+              <span class="pointer-events-none absolute bottom-0 -translate-x-1/2 text-[11px] font-medium text-muted-foreground" [style.left.%]="y.mid">{{ y.year }}</span>
+            }
+            @for (m of horizon().markers; track m.id) {
+              <span
+                class="pointer-events-none absolute -translate-x-1/2"
+                [style.left.%]="m.at"
+                [style.top.px]="m.lane * 22 + 6"
+                [title]="m.title"
+              >
+                @if (m.kind === 'DEADLINE') {
+                  <span class="block size-2.5 rotate-45" [style.background]="m.colour"></span>
+                } @else {
+                  <span class="block size-2.5 rounded-full" [style.background]="m.colour"></span>
+                }
+              </span>
+              <span
+                class="pointer-events-none absolute pl-2.5 text-[10.5px] whitespace-nowrap"
+                [style.left.%]="m.at"
+                [style.top.px]="m.lane * 22 + 2"
+                [style.color]="m.colour"
+              >{{ m.short }}</span>
+            }
+            <span class="pointer-events-none absolute top-0 bottom-5 w-px" style="background: var(--foreground)" [style.left.%]="horizon().today">
+              <span class="absolute -top-1 left-1 text-[10px] font-semibold">Today</span>
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section class="mb-3 flex flex-wrap items-center gap-2">
+        <button type="button" hlmBtn variant="ghost" size="sm" aria-label="Previous" (click)="shift(-1)">‹</button>
+        <span class="min-w-[190px] text-center text-[15px] font-semibold">{{ periodLabel() }}</span>
+        <button type="button" hlmBtn variant="ghost" size="sm" aria-label="Next" (click)="shift(1)">›</button>
+        <button type="button" hlmBtn variant="outline" size="sm" (click)="goToday()">Today</button>
+        <span class="segmented ml-auto" role="group" aria-label="Detail">
+          @for (d of details; track d.key) {
+            <button
+              type="button"
+              class="px-3 py-1 text-[13px]"
+              [class.bg-background]="detail() === d.key"
+              [class.shadow-sm]="detail() === d.key"
+              [class.text-foreground]="detail() === d.key"
+              [class.text-ink-soft]="detail() !== d.key"
+              (click)="detail.set(d.key)"
+            >{{ d.label }}</button>
+          }
+        </span>
+      </section>
+
+      <div class="grid gap-4 lg:grid-cols-[1fr_300px]">
         <section hlmCard class="gap-0 overflow-hidden py-0">
           <div class="grid grid-cols-7 border-b bg-muted/40 text-center text-[12px] text-muted-foreground">
             @for (d of weekdays; track d) {
@@ -121,8 +183,9 @@ const DAY = 86_400_000;
             @for (d of grid(); track d.iso) {
               <button
                 type="button"
-                class="flex min-h-[104px] flex-col gap-1 border-r border-b p-1.5 text-left align-top transition-colors hover:bg-muted/50 [&:nth-child(7n)]:border-r-0"
-                [style.background]="d.weekend && d.inMonth ? 'color-mix(in oklab, var(--muted) 45%, transparent)' : null"
+                class="flex flex-col gap-1 border-r border-b p-1.5 text-left transition-colors hover:bg-muted/50 [&:nth-child(7n)]:border-r-0"
+                [style.min-height.px]="detail() === 'week' ? 340 : 104"
+                [style.background]="d.weekend && d.inMonth ? tint('var(--muted)', 45) : null"
                 [style.opacity]="d.inMonth ? 1 : 0.45"
                 [style.box-shadow]="selected() === d.iso ? 'inset 0 0 0 2px var(--primary)' : null"
                 [attr.aria-label]="dayLabel(d.iso) + ': ' + d.entries.length + ' entries'"
@@ -139,121 +202,127 @@ const DAY = 86_400_000;
                     <span class="rounded px-1 text-[10.5px] tabular" [style.color]="colour.TIME" [style.background]="tint(colour.TIME, 12)">⏱ {{ hours(d.seconds) }}</span>
                   }
                 </span>
-                @for (e of d.entries.slice(0, 3); track e.id) {
+                @for (e of d.entries.slice(0, perDay()); track e.id) {
                   <span
-                    class="block truncate rounded border-l-2 px-1.5 py-0.5 text-[11px] leading-tight"
+                    class="block rounded border-l-2 px-1.5 py-0.5 text-[11px] leading-tight"
+                    [class.truncate]="detail() === 'month'"
                     [style.border-color]="colour[e.kind]"
                     [style.background]="tint(colour[e.kind], 10)"
                     [title]="labels[e.kind] + ': ' + e.title"
                   >{{ e.title }}</span>
                 }
-                @if (d.entries.length > 3) {
-                  <span class="text-[11px] text-muted-foreground">+{{ d.entries.length - 3 }} more</span>
+                @if (d.entries.length > perDay()) {
+                  <span class="text-[11px] text-muted-foreground">+{{ d.entries.length - perDay() }} more</span>
                 }
               </button>
             }
           </div>
         </section>
-      } @else {
-        <section class="grid gap-4">
-          @for (g of upcoming(); track g.label) {
+
+        <aside class="grid content-start gap-4">
+          @if (selected(); as iso) {
             <section hlmCard class="gap-0 py-0">
-              <header class="flex items-baseline justify-between border-b px-5 py-3">
-                <h2 class="m-0 text-[14px] font-semibold">{{ g.label }}</h2>
-                <span class="text-[12px] text-muted-foreground">{{ g.entries.length }}</span>
+              <header class="flex items-center justify-between border-b px-4 py-3">
+                <h2 class="m-0 text-[14px] font-semibold">{{ dayLabel(iso) }}</h2>
+                <button type="button" class="text-[12px] text-muted-foreground hover:text-foreground" (click)="selected.set(null)">Close</button>
               </header>
               <ul class="m-0 list-none p-0">
-                @for (e of g.entries; track e.id) {
+                @for (e of entriesOn(iso); track e.id) {
+                  <ng-container [ngTemplateOutlet]="row" [ngTemplateOutletContext]="{ $implicit: e }" />
+                } @empty {
+                  <li class="px-4 py-6 text-center text-[13px] text-muted-foreground">Nothing on this day.</li>
+                }
+              </ul>
+            </section>
+          }
+
+          <section hlmCard class="gap-0 py-0">
+            <header class="border-b px-4 py-3">
+              <h2 class="m-0 text-[14px] font-semibold">Next 30 days</h2>
+            </header>
+            <ul class="m-0 list-none p-0">
+              @for (e of next30(); track e.id) {
+                <li class="flex items-start gap-2.5 border-b px-4 py-2.5 text-[12.5px] last:border-b-0">
+                  <span class="mt-1 size-2 shrink-0 rounded-full" [style.background]="colour[e.kind]"></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate font-medium">{{ e.title }}</span>
+                    <span class="block text-[11.5px] text-muted-foreground">{{ short(e.date) }} · {{ relative(e.date) }}</span>
+                  </span>
+                </li>
+              } @empty {
+                <li class="px-4 py-5 text-center text-[12.5px] text-muted-foreground">Nothing in the next 30 days.</li>
+              }
+            </ul>
+          </section>
+
+          <section hlmCard class="gap-0 py-0">
+            <header class="flex items-baseline justify-between border-b px-4 py-3">
+              <h2 class="m-0 text-[14px] font-semibold">Time logged · {{ monthName() }}</h2>
+              <span class="text-[12px] tabular" [style.color]="colour.TIME">{{ hours(monthSeconds()) }}</span>
+            </header>
+            <ul class="m-0 list-none p-0">
+              @for (p of people(); track p.name) {
+                <li class="flex items-center gap-2 border-b px-4 py-2 text-[12.5px] last:border-b-0">
+                  <span class="flex-1">{{ p.name }}</span>
+                  <span class="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
+                    <span class="block h-full rounded-full" [style.width.%]="(p.seconds / maxPerson()) * 100" [style.background]="colour.TIME"></span>
+                  </span>
+                  <span class="w-14 text-right tabular">{{ hours(p.seconds) }}</span>
+                </li>
+              } @empty {
+                <li class="px-4 py-5 text-center text-[12.5px] text-muted-foreground">No time logged this month.</li>
+              }
+            </ul>
+          </section>
+        </aside>
+      </div>
+    } @else {
+      <div class="grid gap-4 lg:grid-cols-[1fr_300px]">
+        <section class="grid content-start gap-3">
+          @for (b of buckets(); track b.key) {
+            <section hlmCard class="gap-0 overflow-hidden py-0">
+              <header class="flex items-baseline justify-between border-b px-5 py-3" [style.box-shadow]="'inset 4px 0 0 ' + b.colour">
+                <h2 class="m-0 text-[14px] font-semibold" [style.color]="b.key === 'overdue' ? colour.DEADLINE : null">{{ b.label }}</h2>
+                <span class="text-[12px] text-muted-foreground">{{ b.hint }} · {{ b.entries.length }}</span>
+              </header>
+              <ul class="m-0 list-none p-0">
+                @for (e of b.entries; track e.id) {
                   <ng-container [ngTemplateOutlet]="row" [ngTemplateOutletContext]="{ $implicit: e }" />
                 }
               </ul>
             </section>
           } @empty {
-            <p hlmCard class="block px-6 py-10 text-center text-muted-foreground">Nothing coming up.</p>
-          }
-
-          <button type="button" hlmBtn variant="outline" class="justify-self-start" (click)="showPast.set(!showPast())">
-            {{ showPast() ? 'Hide past' : 'Show past (' + past().length + ')' }}
-          </button>
-          @if (showPast()) {
-            @for (g of pastGroups(); track g.label) {
-              <section hlmCard class="gap-0 py-0 opacity-90">
-                <header class="flex items-baseline justify-between border-b px-5 py-3">
-                  <h2 class="m-0 text-[14px] font-semibold text-muted-foreground">{{ g.label }}</h2>
-                  <span class="text-[12px] text-muted-foreground">{{ g.entries.length }}</span>
-                </header>
-                <ul class="m-0 list-none p-0">
-                  @for (e of g.entries; track e.id) {
-                    <ng-container [ngTemplateOutlet]="row" [ngTemplateOutletContext]="{ $implicit: e }" />
-                  }
-                </ul>
-              </section>
-            }
+            <p hlmCard class="block px-6 py-10 text-center text-muted-foreground">Nothing to track.</p>
           }
         </section>
-      }
 
-      <aside class="grid content-start gap-4">
-        @if (selected(); as iso) {
+        <aside class="grid content-start gap-4">
           <section hlmCard class="gap-0 py-0">
-            <header class="flex items-center justify-between border-b px-4 py-3">
-              <h2 class="m-0 text-[14px] font-semibold">{{ dayLabel(iso) }}</h2>
-              <button type="button" class="text-[12px] text-muted-foreground hover:text-foreground" (click)="selected.set(null)">Close</button>
+            <header class="flex items-baseline justify-between border-b px-4 py-3">
+              <h2 class="m-0 text-[14px] font-semibold">Recent · last 30 days</h2>
+              <span class="text-[12px] tabular" [style.color]="colour.TIME">⏱ {{ hours(recentSeconds()) }}</span>
             </header>
             <ul class="m-0 list-none p-0">
-              @for (e of entriesOn(iso); track e.id) {
-                <ng-container [ngTemplateOutlet]="row" [ngTemplateOutletContext]="{ $implicit: e }" />
+              @for (e of recent(); track e.id) {
+                <li class="flex items-start gap-2.5 border-b px-4 py-2.5 text-[12.5px] last:border-b-0">
+                  <span class="mt-1 size-2 shrink-0 rounded-full" [style.background]="colour[e.kind]"></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block truncate font-medium">{{ e.title }}</span>
+                    <span class="block text-[11.5px] text-muted-foreground">{{ short(e.date) }}{{ e.meta ? ' · ' + e.meta : '' }}</span>
+                  </span>
+                </li>
               } @empty {
-                <li class="px-4 py-6 text-center text-[13px] text-muted-foreground">Nothing on this day.</li>
+                <li class="px-4 py-5 text-center text-[12.5px] text-muted-foreground">Nothing done or logged in the last 30 days.</li>
               }
             </ul>
           </section>
-        }
-
-        <section hlmCard class="gap-0 py-0">
-          <header class="border-b px-4 py-3">
-            <h2 class="m-0 text-[14px] font-semibold">Next 30 days</h2>
-          </header>
-          <ul class="m-0 list-none p-0">
-            @for (e of next30(); track e.id) {
-              <li class="flex items-start gap-2.5 border-b px-4 py-2.5 text-[12.5px] last:border-b-0">
-                <span class="mt-1 size-2 shrink-0 rounded-full" [style.background]="colour[e.kind]"></span>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate font-medium">{{ e.title }}</span>
-                  <span class="block text-[11.5px] text-muted-foreground">{{ short(e.date) }} · {{ relative(e.date) }}</span>
-                </span>
-              </li>
-            } @empty {
-              <li class="px-4 py-5 text-center text-[12.5px] text-muted-foreground">Nothing in the next 30 days.</li>
-            }
-          </ul>
-        </section>
-
-        <section hlmCard class="gap-0 py-0">
-          <header class="flex items-baseline justify-between border-b px-4 py-3">
-            <h2 class="m-0 text-[14px] font-semibold">Time logged · {{ monthName() }}</h2>
-            <span class="text-[12px] tabular" [style.color]="colour.TIME">{{ hours(monthSeconds()) }}</span>
-          </header>
-          <ul class="m-0 list-none p-0">
-            @for (p of people(); track p.name) {
-              <li class="flex items-center gap-2 border-b px-4 py-2 text-[12.5px] last:border-b-0">
-                <span class="flex-1">{{ p.name }}</span>
-                <span class="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
-                  <span class="block h-full rounded-full" [style.width.%]="(p.seconds / maxPerson()) * 100" [style.background]="colour.TIME"></span>
-                </span>
-                <span class="w-14 text-right tabular">{{ hours(p.seconds) }}</span>
-              </li>
-            } @empty {
-              <li class="px-4 py-5 text-center text-[12.5px] text-muted-foreground">No time logged this month.</li>
-            }
-          </ul>
-        </section>
-      </aside>
-    </div>
+        </aside>
+      </div>
+    }
 
     <ng-template #row let-e>
       <li class="flex items-start gap-3 border-b px-4 py-2.5 last:border-b-0">
-        <span class="w-[46px] shrink-0 pt-0.5 text-[11.5px] text-muted-foreground tabular">{{ short(e.date) }}</span>
+        <span class="w-[74px] shrink-0 pt-0.5 text-[11.5px] text-muted-foreground tabular">{{ medium(e.date) }}</span>
         <lime-tech-icon [technology]="e.technology" [size]="18" />
         <span class="min-w-0 flex-1">
           <span class="block text-[13px]">
@@ -279,19 +348,23 @@ export class Calendar {
   protected readonly labels = LABEL;
   protected readonly weekdays = WEEKDAYS;
   protected readonly views: { key: View; label: string }[] = [
+    { key: 'calendar', label: 'Calendar' },
+    { key: 'next', label: "What's next" },
+  ];
+  protected readonly details: { key: Detail; label: string }[] = [
+    { key: 'week', label: 'Week' },
     { key: 'month', label: 'Month' },
-    { key: 'agenda', label: 'Agenda' },
   ];
 
   readonly month = input<string>('');
   readonly start = input<string>('', { alias: 'view' });
 
-  protected readonly view = signal<View>('month');
+  protected readonly view = signal<View>('calendar');
+  protected readonly detail = signal<Detail>('month');
   protected readonly enabled = signal(new Set<Kind>(KINDS.map((k) => k.key)));
   protected readonly showInitial = signal(false);
-  protected readonly showPast = signal(false);
   protected readonly selected = signal<string | null>(null);
-  protected readonly anchor = signal(firstOfMonth(todayIso()));
+  protected readonly anchor = signal(todayIso());
 
   private readonly recorded = signal<ApiActivity[]>([]);
   private readonly logged = signal<ApiTimeLog[]>([]);
@@ -300,7 +373,12 @@ export class Calendar {
     effect(() => {
       const month = this.month();
       if (/^\d{4}-\d{2}$/.test(month)) this.anchor.set(`${month}-01`);
-      if (this.start() === 'agenda' || this.start() === 'month') this.view.set(this.start() as View);
+      const start = this.start();
+      if (start === 'next' || start === 'calendar') this.view.set(start);
+      if (start === 'week' || start === 'month') {
+        this.view.set('calendar');
+        this.detail.set(start);
+      }
     });
 
     const from = shiftIso(todayIso(), -365);
@@ -429,24 +507,46 @@ export class Calendar {
     this.all().filter((e) => this.enabled().has(e.kind) && (this.showInitial() || !e.initial)),
   );
 
-  protected readonly monthLabel = computed(() => {
-    const d = new Date(`${this.anchor()}T00:00:00Z`);
-    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  });
-
   protected readonly monthName = computed(() =>
-    new Date(`${this.anchor()}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' }),
+    new Date(`${firstOfMonth(this.anchor())}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', timeZone: 'UTC' }),
   );
 
   private inMonth(iso: string): boolean {
     return iso.slice(0, 7) === this.anchor().slice(0, 7);
   }
 
+  protected readonly perDay = computed(() => (this.detail() === 'week' ? 12 : 3));
+
+  protected readonly periodLabel = computed(() => {
+    const anchor = this.anchor();
+    if (this.detail() === 'month') {
+      return new Date(`${anchor}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    }
+    const monday = mondayOf(anchor);
+    const sunday = shiftIso(monday, 6);
+    const fmt = (iso: string, year: boolean) =>
+      new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        ...(year ? { year: 'numeric' } : {}),
+        timeZone: 'UTC',
+      });
+    return `${fmt(monday, false)} – ${fmt(sunday, true)}`;
+  });
+
   protected readonly grid = computed<Day[]>(() => {
-    const first = new Date(`${this.anchor()}T00:00:00Z`);
-    const start = first.getTime() - ((first.getUTCDay() + 6) % 7) * DAY;
-    const lastOfMonth = Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0);
-    const end = lastOfMonth + (6 - ((new Date(lastOfMonth).getUTCDay() + 6) % 7)) * DAY;
+    const anchor = this.anchor();
+    let start: number;
+    let end: number;
+    if (this.detail() === 'week') {
+      start = Date.parse(`${mondayOf(anchor)}T00:00:00Z`);
+      end = start + 6 * DAY;
+    } else {
+      const first = new Date(`${firstOfMonth(anchor)}T00:00:00Z`);
+      start = first.getTime() - ((first.getUTCDay() + 6) % 7) * DAY;
+      const last = Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0);
+      end = last + (6 - ((new Date(last).getUTCDay() + 6) % 7)) * DAY;
+    }
     const today = todayIso();
     const byDay = new Map<string, Entry[]>();
     for (const e of this.entries()) byDay.set(e.date, [...(byDay.get(e.date) ?? []), e]);
@@ -459,7 +559,7 @@ export class Calendar {
       days.push({
         iso,
         day: new Date(t).getUTCDate(),
-        inMonth: this.inMonth(iso),
+        inMonth: this.detail() === 'week' || this.inMonth(iso),
         today: iso === today,
         weekend: weekday === 0 || weekday === 6,
         entries: list.filter((e) => e.kind !== 'TIME'),
@@ -469,52 +569,117 @@ export class Calendar {
     return days;
   });
 
-  protected readonly scope = computed(() => {
-    if (this.view() === 'month') return this.all().filter((e) => this.inMonth(e.date));
+  protected readonly horizon = computed(() => {
     const today = todayIso();
-    return this.all().filter((e) => e.date >= today);
+    const thisYear = Number(today.slice(0, 4));
+    const longTerm = this.entries().filter((e) => e.kind === 'DEADLINE' || e.kind === 'PLAN');
+    const years = longTerm.map((e) => Number(e.date.slice(0, 4)));
+    const first = Math.max(thisYear - 2, Math.min(thisYear - 1, ...years));
+    const last = Math.min(thisYear + 6, Math.max(thisYear + 3, ...years));
+    const from = Date.UTC(first, 0, 1);
+    const to = Date.UTC(last + 1, 0, 1);
+    const at = (iso: string) => Math.min(100, Math.max(0, ((Date.parse(`${iso}T00:00:00Z`) - from) / (to - from)) * 100));
+    const anchor = this.anchor();
+
+    const quarters: { key: string; label: string; start: string; left: number; width: number; count: number; active: boolean }[] = [];
+    for (let y = first; y <= last; y++) {
+      for (let q = 0; q < 4; q++) {
+        const start = new Date(Date.UTC(y, q * 3, 1)).toISOString().slice(0, 10);
+        const end = new Date(Date.UTC(y, q * 3 + 3, 1)).toISOString().slice(0, 10);
+        quarters.push({
+          key: `${y}-${q}`,
+          label: `Q${q + 1} ${y}`,
+          start,
+          left: at(start),
+          width: at(end) - at(start),
+          count: longTerm.filter((e) => e.date >= start && e.date < end).length,
+          active: anchor >= start && anchor < end,
+        });
+      }
+    }
+
+    const lanes: number[] = [];
+    const markers = longTerm
+      .filter((e) => Number(e.date.slice(0, 4)) >= first && Number(e.date.slice(0, 4)) <= last)
+      .map((e) => {
+        const pos = at(e.date);
+        let lane = lanes.findIndex((end) => end < pos);
+        if (lane === -1) {
+          lane = lanes.length;
+          lanes.push(0);
+        }
+        lanes[lane] = pos + 11;
+        const ended = e.kind === 'DEADLINE' && e.date < today;
+        const soon = e.kind === 'DEADLINE' && !ended && Date.parse(`${e.date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`) <= 180 * DAY;
+        return {
+          id: e.id,
+          kind: e.kind,
+          at: pos,
+          lane,
+          colour: e.kind === 'PLAN' ? COLOUR.PLAN : ended ? COLOUR.DEADLINE : soon ? 'var(--color-soon)' : 'var(--color-good)',
+          short: e.kind === 'PLAN' ? `Plan · ${e.technology}` : e.title.replace(' support ends', ''),
+          title: `${LABEL[e.kind]}: ${e.title} · ${e.date}`,
+        };
+      });
+
+    const yearMarks = [];
+    for (let y = first; y <= last; y++) {
+      const left = at(`${y}-01-01`);
+      const next = y === last ? 100 : at(`${y + 1}-01-01`);
+      yearMarks.push({ year: y, left, mid: (left + next) / 2 });
+    }
+
+    return {
+      first,
+      last,
+      quarters,
+      markers,
+      years: yearMarks,
+      today: at(today),
+      height: Math.max(1, lanes.length) * 22 + 34,
+    };
   });
 
-  protected scopeCount(kind: Kind): number {
-    return this.scope().filter((e) => e.kind === kind && (this.showInitial() || !e.initial)).length;
-  }
-
-  protected readonly scopeSeconds = computed(() =>
-    this.scope().filter((e) => e.kind === 'TIME').reduce((s, e) => s + e.seconds, 0),
-  );
-
-  protected readonly upcoming = computed(() => {
+  protected readonly buckets = computed(() => {
     const today = todayIso();
-    const weekStart = mondayOf(today);
-    const thisWeekEnd = shiftIso(weekStart, 6);
-    const nextWeekEnd = shiftIso(weekStart, 13);
+    const weekEnd = shiftIso(mondayOf(today), 6);
     const monthEnd = lastOfMonth(today);
-    const groups = new Map<string, Entry[]>();
-    const order: string[] = [];
-    for (const e of this.entries().filter((x) => x.date >= today)) {
-      const label =
-        e.date <= thisWeekEnd
-          ? 'This week'
-          : e.date <= nextWeekEnd
-            ? 'Next week'
-            : e.date <= monthEnd
-              ? 'Later this month'
-              : new Date(`${e.date}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-      if (!groups.has(label)) order.push(label);
-      groups.set(label, [...(groups.get(label) ?? []), e]);
-    }
-    return order.map((label) => ({ label, entries: groups.get(label)! }));
+    const quarterEnd = lastOfQuarter(today);
+    const yearEnd = `${today.slice(0, 4)}-12-31`;
+    const nextYear = Number(today.slice(0, 4)) + 1;
+
+    const defs: { key: string; label: string; hint: string; colour: string; test: (e: Entry) => boolean }[] = [
+      { key: 'overdue', label: 'Overdue', hint: 'ended or past due', colour: COLOUR.DEADLINE, test: (e) => e.date < today },
+      { key: 'today', label: 'Today', hint: this.medium(today), colour: 'var(--primary)', test: (e) => e.date === today },
+      { key: 'week', label: 'This week', hint: `until ${this.short(weekEnd)}`, colour: 'var(--primary)', test: (e) => e.date > today && e.date <= weekEnd },
+      { key: 'month', label: 'This month', hint: `until ${this.short(monthEnd)}`, colour: 'var(--color-soon)', test: (e) => e.date > weekEnd && e.date <= monthEnd },
+      { key: 'quarter', label: 'This quarter', hint: `until ${this.short(quarterEnd)}`, colour: 'var(--color-soon)', test: (e) => e.date > monthEnd && e.date <= quarterEnd },
+      { key: 'year', label: 'Rest of this year', hint: `until ${this.short(yearEnd)}`, colour: 'var(--muted-foreground)', test: (e) => e.date > quarterEnd && e.date <= yearEnd },
+      { key: 'next-year', label: String(nextYear), hint: 'next year', colour: 'var(--muted-foreground)', test: (e) => e.date.startsWith(String(nextYear)) },
+      { key: 'later', label: 'Later', hint: `${nextYear + 1} and beyond`, colour: 'var(--muted-foreground)', test: (e) => Number(e.date.slice(0, 4)) > nextYear },
+    ];
+
+    const open = this.entries().filter((e) => e.kind !== 'DONE' && e.kind !== 'TIME');
+    return defs
+      .map((d) => ({ ...d, entries: open.filter(d.test) }))
+      .filter((b) => b.entries.length > 0);
   });
 
-  protected readonly past = computed(() => this.entries().filter((e) => e.date < todayIso()).reverse());
+  protected readonly recent = computed(() => {
+    const today = todayIso();
+    const since = shiftIso(today, -30);
+    return this.entries()
+      .filter((e) => (e.kind === 'DONE' || e.kind === 'TIME') && e.date >= since && e.date <= today)
+      .reverse()
+      .slice(0, 12);
+  });
 
-  protected readonly pastGroups = computed(() => {
-    const groups = new Map<string, Entry[]>();
-    for (const e of this.past()) {
-      const label = new Date(`${e.date}T00:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-      groups.set(label, [...(groups.get(label) ?? []), e]);
-    }
-    return [...groups.entries()].map(([label, entries]) => ({ label, entries }));
+  protected readonly recentSeconds = computed(() => {
+    const today = todayIso();
+    const since = shiftIso(today, -30);
+    return this.all()
+      .filter((e) => e.kind === 'TIME' && e.date >= since && e.date <= today)
+      .reduce((s, e) => s + e.seconds, 0);
   });
 
   protected readonly next30 = computed(() => {
@@ -553,20 +718,42 @@ export class Calendar {
     this.enabled.set(next);
   }
 
-  protected shift(months: number): void {
-    const d = new Date(`${this.anchor()}T00:00:00Z`);
-    this.anchor.set(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1)).toISOString().slice(0, 10));
+  protected shift(step: number): void {
+    if (this.detail() === 'week') {
+      this.anchor.set(shiftIso(this.anchor(), step * 7));
+    } else {
+      const d = new Date(`${this.anchor()}T00:00:00Z`);
+      this.anchor.set(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + step, 1)).toISOString().slice(0, 10));
+    }
     this.selected.set(null);
   }
 
   protected goToday(): void {
-    this.anchor.set(firstOfMonth(todayIso()));
+    this.anchor.set(todayIso());
     this.selected.set(todayIso());
+  }
+
+  protected jumpTo(iso: string): void {
+    const hit = this.entries().find((e) => e.date >= iso && (e.kind === 'DEADLINE' || e.kind === 'PLAN'));
+    const quarterEnd = lastOfQuarter(iso);
+    const target = hit && hit.date <= quarterEnd ? hit.date : iso;
+    this.detail.set('month');
+    this.anchor.set(target);
+    this.selected.set(hit && hit.date <= quarterEnd ? hit.date : null);
   }
 
   protected select(iso: string): void {
     this.selected.set(this.selected() === iso ? null : iso);
-    if (!this.inMonth(iso)) this.anchor.set(firstOfMonth(iso));
+    if (this.detail() === 'month' && !this.inMonth(iso)) this.anchor.set(iso);
+  }
+
+  protected medium(iso: string): string {
+    return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
   }
 
   protected kindColour(kind: string): string {
@@ -633,4 +820,10 @@ function lastOfMonth(iso: string): string {
 function mondayOf(iso: string): string {
   const d = new Date(`${iso}T00:00:00Z`);
   return shiftIso(iso, -((d.getUTCDay() + 6) % 7));
+}
+
+function lastOfQuarter(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const q = Math.floor(d.getUTCMonth() / 3);
+  return new Date(Date.UTC(d.getUTCFullYear(), q * 3 + 3, 0)).toISOString().slice(0, 10);
 }
