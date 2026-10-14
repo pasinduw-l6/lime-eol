@@ -35,3 +35,6 @@ logs/
 backups/
 
 temp/
+
+# Database migrations stay local; they are not kept in GitHub.
+backend/prisma/migrations/
