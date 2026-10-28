@@ -46,7 +46,7 @@ const ICONS: Record<Severity, string> = {
     <header class="mb-6">
       <h1 class="m-0 text-3xl font-semibold tracking-tight">Operations</h1>
       <p class="mt-1 mb-0 text-sm text-muted-foreground">
-        Connect Jira boards and Teams channels, and the GitHub versions file. The server .env connection stays the default.
+        Connect Jira boards and Teams channels, pick which one each project uses, and the GitHub versions file.
       </p>
     </header>
 

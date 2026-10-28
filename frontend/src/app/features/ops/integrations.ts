@@ -26,13 +26,13 @@ const SECTIONS: { kind: IntegrationKind; title: string; hint: string; add: strin
   {
     kind: 'JIRA',
     title: 'Jira boards',
-    hint: 'Each connection is a Jira site and a default board. Projects pick one; the rest use the server default.',
+    hint: 'Each connection is a Jira site and a board. Projects pick one below; the rest use the one marked Default.',
     add: 'Add Jira board',
   },
   {
     kind: 'TEAMS',
     title: 'Teams channels',
-    hint: 'An incoming webhook per channel. End-of-life alerts for a project also go to its channel.',
+    hint: 'An incoming webhook per channel. Projects pick one below; the rest use the one marked Default.',
     add: 'Add Teams channel',
   },
 ];
@@ -67,7 +67,10 @@ const SECTIONS: { kind: IntegrationKind; title: string; hint: string; add: strin
                     <span hlmBadge variant="outline">.env</span>
                   }
                   @if (!row.enabled && row.source === 'ui') {
-                    <span hlmBadge variant="secondary">Off</span>
+                    <span hlmBadge variant="secondary">Inactive</span>
+                  }
+                  @if (row.isDefault) {
+                    <span hlmBadge>Default</span>
                   }
                 </p>
                 <p class="m-0 mt-0.5 text-[12.5px] text-muted-foreground">
@@ -87,28 +90,108 @@ const SECTIONS: { kind: IntegrationKind; title: string; hint: string; add: strin
                   <p class="m-0 mt-0.5 max-w-[360px] truncate text-muted-foreground" [title]="row.lastDetail">{{ row.lastDetail }}</p>
                 }
               </div>
-              <span class="w-[92px] text-[12.5px] text-muted-foreground">
-                @if (row.source === 'env') {
-                  Default
-                } @else {
-                  {{ row.projects }} project{{ row.projects === 1 ? '' : 's' }}
+              <span class="w-[120px] text-[12.5px] text-muted-foreground">{{ usage(row) }}</span>
+              <div class="flex flex-wrap items-center gap-1.5">
+                @if (row.source === 'ui') {
+                  <label class="mr-1 flex items-center gap-1.5 text-[12.5px]" [title]="row.enabled ? 'Switch off' : 'Switch on'">
+                    <input type="checkbox" class="size-4" [checked]="row.enabled" [disabled]="busy() === row.id" (change)="toggle(row)" />
+                    Active
+                  </label>
                 }
-              </span>
-              <div class="flex gap-1.5">
+                @if (!row.isDefault) {
+                  <button type="button" hlmBtn variant="outline" size="sm" [disabled]="!row.enabled || busy() === row.id" (click)="makeDefault(row)">
+                    Make default
+                  </button>
+                }
                 @if (row.source === 'ui') {
                   <button type="button" hlmBtn variant="outline" size="sm" [disabled]="busy() === row.id" (click)="test(row)">
                     {{ busy() === row.id ? 'Testing…' : 'Test' }}
                   </button>
                   <button type="button" hlmBtn variant="outline" size="sm" (click)="edit(row)">Edit</button>
-                  <button type="button" hlmBtn variant="ghost" size="sm" class="text-destructive" (click)="remove(row)">Remove</button>
+                  <button type="button" hlmBtn variant="ghost" size="sm" class="text-destructive" (click)="askRemove(row)">Remove</button>
                 } @else {
-                  <span class="text-[12px] text-muted-foreground">Change it in the server .env</span>
+                  <span class="text-[12px] text-muted-foreground">Set in the server .env</span>
                 }
               </div>
             </li>
           }
         </ul>
       </section>
+    }
+
+    <section hlmCard class="mb-5 gap-0 p-0">
+      <header class="border-b px-5 py-4">
+        <h2 class="m-0 text-base font-semibold">Projects</h2>
+        <p class="m-0 mt-0.5 text-[13px] text-muted-foreground">
+          Pick the Jira board and Teams channel each project uses. "Default" follows whichever connection is marked Default above.
+        </p>
+      </header>
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-[13px]">
+          <thead>
+            <tr class="text-left text-[12px] text-muted-foreground">
+              <th class="px-5 py-2 font-normal">Project</th>
+              <th class="px-3 py-2 font-normal">Jira board</th>
+              <th class="px-3 py-2 font-normal">Teams channel</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of api.projects(); track p.id) {
+              <tr class="border-t">
+                <td class="px-5 py-2.5">
+                  <span class="block font-medium">{{ p.name }}</span>
+                  <span class="block text-[12px] text-muted-foreground">{{ p.customer }} · {{ p.code }}</span>
+                </td>
+                <td class="px-3 py-2.5">
+                  <select hlmInput class="h-8 min-w-[220px] py-0 text-[13px]" [attr.aria-label]="'Jira board for ' + p.name"
+                    [disabled]="assigning() === p.id + 'JIRA'" (change)="assign(p.id, 'JIRA', $any($event.target).value)">
+                    <option value="" [selected]="!p.jiraIntegrationId">Default ({{ defaultName('JIRA') }})</option>
+                    @for (o of choices('JIRA', p.jiraIntegrationId); track o.id) {
+                      <option [value]="o.id" [selected]="o.id === p.jiraIntegrationId">{{ o.name }}{{ o.enabled ? '' : ' (inactive)' }}</option>
+                    }
+                  </select>
+                </td>
+                <td class="px-3 py-2.5">
+                  <select hlmInput class="h-8 min-w-[220px] py-0 text-[13px]" [attr.aria-label]="'Teams channel for ' + p.name"
+                    [disabled]="assigning() === p.id + 'TEAMS'" (change)="assign(p.id, 'TEAMS', $any($event.target).value)">
+                    <option value="" [selected]="!p.teamsIntegrationId">Default ({{ defaultName('TEAMS') }})</option>
+                    @for (o of choices('TEAMS', p.teamsIntegrationId); track o.id) {
+                      <option [value]="o.id" [selected]="o.id === p.teamsIntegrationId">{{ o.name }}{{ o.enabled ? '' : ' (inactive)' }}</option>
+                    }
+                  </select>
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="3" class="px-5 py-6 text-center text-muted-foreground">No projects yet.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    @if (removing(); as r) {
+      <lime-modal [title]="'Remove ' + r.row.name + '?'" (dismiss)="removing.set(null)">
+        <form class="grid gap-4" (submit)="remove($event, r.row)">
+          <p class="m-0 text-sm">The stored credentials are deleted. Jira issues already linked to plans keep their link.</p>
+          @if (r.row.projects > 0) {
+            <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
+              {{ r.row.projects }} project{{ r.row.projects === 1 ? ' uses' : 's use' }} it. Move {{ r.row.projects === 1 ? 'it' : 'them' }} to
+              <select hlmInput [(ngModel)]="r.moveTo" name="moveTo">
+                <option value="default">Default ({{ defaultName(r.row.kind, r.row.id) }})</option>
+                @for (o of choices(r.row.kind, null); track o.id) {
+                  @if (o.id !== r.row.id && o.enabled) {
+                    <option [value]="o.id">{{ o.name }}</option>
+                  }
+                }
+              </select>
+            </label>
+          }
+          <div class="flex justify-end gap-2">
+            <button type="button" hlmBtn variant="outline" (click)="removing.set(null)">Cancel</button>
+            <button type="submit" hlmBtn variant="destructive">Remove</button>
+          </div>
+        </form>
+      </lime-modal>
     }
 
     @if (draft(); as form) {
@@ -182,7 +265,7 @@ const SECTIONS: { kind: IntegrationKind; title: string; hint: string; add: strin
   `,
 })
 export class Integrations {
-  private readonly api = inject(Api);
+  protected readonly api = inject(Api);
   private readonly feedback = inject(Feedback);
 
   protected readonly sections = SECTIONS;
@@ -190,6 +273,8 @@ export class Integrations {
   protected readonly draft = signal<Draft | null>(null);
   protected readonly busy = signal<string | null>(null);
   protected readonly saving = signal(false);
+  protected readonly removing = signal<{ row: ApiIntegration; moveTo: string } | null>(null);
+  protected readonly assigning = signal<string | null>(null);
 
   protected readonly byKind = (kind: IntegrationKind) => this.rows().filter((r) => r.kind === kind);
 
@@ -289,26 +374,102 @@ export class Integrations {
     });
   }
 
-  protected async remove(row: ApiIntegration): Promise<void> {
-    const ok = await this.feedback.confirm({
-      title: `Remove ${row.name}?`,
-      message:
-        row.projects > 0
-          ? `${row.projects} project(s) use it. They will fall back to the server default.`
-          : 'The stored credentials are deleted.',
-      confirmLabel: 'Remove',
-      destructive: true,
-    });
-    if (!ok) return;
+  protected askRemove(row: ApiIntegration): void {
+    this.removing.set({ row, moveTo: 'default' });
+  }
 
-    this.api.deleteIntegration(row.id).subscribe({
+  protected remove(event: Event, row: ApiIntegration): void {
+    event.preventDefault();
+    const moveTo = this.removing()?.moveTo;
+    this.removing.set(null);
+    this.api.deleteIntegration(row.id, row.projects > 0 ? moveTo : undefined).subscribe({
       next: () => {
-        this.load();
-        this.api.integrationOptionsResource.reload();
+        this.refresh();
         this.feedback.success(`${row.name} removed.`);
       },
       error: (err) => this.feedback.failed(err, 'Could not remove that connection.'),
     });
+  }
+
+  protected toggle(row: ApiIntegration): void {
+    this.busy.set(row.id);
+    this.api.updateIntegration(row.id, { enabled: !row.enabled }).subscribe({
+      next: (saved) => {
+        this.busy.set(null);
+        this.refresh();
+        this.feedback.success(
+          saved.enabled
+            ? `${saved.name} is active.`
+            : `${saved.name} is inactive. Its projects use the default until it is switched back on.`,
+        );
+      },
+      error: (err) => {
+        this.busy.set(null);
+        this.feedback.failed(err, 'Could not change that connection.');
+      },
+    });
+  }
+
+  protected makeDefault(row: ApiIntegration): void {
+    this.busy.set(row.id);
+    this.api.makeIntegrationDefault(row.id).subscribe({
+      next: (rows) => {
+        this.busy.set(null);
+        this.rows.set(rows);
+        this.api.integrationOptionsResource.reload();
+        this.feedback.success(`${row.name} is now the default ${row.kind === 'JIRA' ? 'Jira board' : 'Teams channel'}.`);
+      },
+      error: (err) => {
+        this.busy.set(null);
+        this.feedback.failed(err, 'Could not change the default.');
+      },
+    });
+  }
+
+  protected assign(projectId: string, kind: IntegrationKind, value: string): void {
+    this.assigning.set(projectId + kind);
+    const body = kind === 'JIRA' ? { jiraIntegrationId: value || null } : { teamsIntegrationId: value || null };
+    this.api.updateProject(projectId, body).subscribe({
+      next: (project) => {
+        this.assigning.set(null);
+        this.refresh();
+        const name = value ? this.rows().find((r) => r.id === value)?.name : `the default (${this.defaultName(kind)})`;
+        this.feedback.success(`${project.name} now uses ${name}.`);
+      },
+      error: (err) => {
+        this.assigning.set(null);
+        this.api.reload();
+        this.feedback.failed(err, 'Could not change that project.');
+      },
+    });
+  }
+
+  /** Connections a project can pick: the active ones, plus its current one even if inactive. */
+  protected choices(kind: IntegrationKind, current: string | null | undefined): ApiIntegration[] {
+    return this.rows().filter((r) => r.kind === kind && r.source === 'ui' && (r.enabled || r.id === current));
+  }
+
+  /** Name of the default connection; when `leaving` is the default, the one that takes over (.env). */
+  protected defaultName(kind: IntegrationKind, leaving?: string): string {
+    const current = this.rows().find((r) => r.kind === kind && r.isDefault);
+    if (!current || current.id === leaving) return 'server .env';
+    return current.source === 'env' ? 'server .env' : current.name;
+  }
+
+  protected usage(row: ApiIntegration): string {
+    const own = row.projects;
+    const via = row.viaDefault;
+    if (!own && !via) return 'Not used';
+    const parts = [];
+    if (own) parts.push(`${own} picked`);
+    if (via) parts.push(`${via} by default`);
+    return `${own + via} project${own + via === 1 ? '' : 's'} · ${parts.join(', ')}`;
+  }
+
+  private refresh(): void {
+    this.load();
+    this.api.integrationOptionsResource.reload();
+    this.api.reload();
   }
 
   protected state(row: ApiIntegration): string {

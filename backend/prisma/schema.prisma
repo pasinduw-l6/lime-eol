@@ -292,6 +292,8 @@ model Integration {
   secret        String
   secretHint    String          @map("secret_hint")
   enabled       Boolean         @default(true)
+  /// Used by projects that have not picked a connection. At most one per kind; none means the .env one.
+  isDefault     Boolean         @default(false) @map("is_default")
   lastCheckedAt DateTime?       @map("last_checked_at") @db.Timestamptz(3)
   lastOk        Boolean?        @map("last_ok")
   lastDetail    String?         @map("last_detail")

@@ -5,7 +5,7 @@ import { Feedback } from '../../core/feedback';
 import { SessionStore } from '../../core/session';
 import { formatDate, formatDays, statusFill } from '../../core/lifecycle';
 import { RegistryStore } from '../../core/registry.store';
-import { ComponentType, Cycle, CycleRule, Technology } from '../../core/models';
+import { ComponentType, Cycle, Technology } from '../../core/models';
 import { Modal } from '../../shared/modal';
 import { TechIcon } from '../../shared/tech-icon';
 import { HlmAlertImports } from '@spartan-ng/helm/alert';

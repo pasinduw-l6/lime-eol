@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { notificationConfig, NotificationConfig } from '../../../config';
+import { IntegrationsService } from '../../integrations/integrations.service';
 import {
   NotificationCard,
   NotificationChannel,
@@ -17,6 +18,7 @@ export class TeamsAdapter implements NotificationChannel {
   constructor(
     @Inject(notificationConfig.KEY)
     private readonly config: NotificationConfig,
+    private readonly integrations: IntegrationsService,
   ) {}
 
   send(card: NotificationCard): Promise<void> {
@@ -52,7 +54,9 @@ export class TeamsAdapter implements NotificationChannel {
       return;
     }
 
-    const url = target?.url ?? this.config.teamsWebhookUrl;
+    // A project's own channel, else the default chosen on the Operations screen, else .env.
+    const fallback = target ? null : await this.integrations.defaultTeams().catch(() => null);
+    const url = target?.url ?? fallback?.url ?? this.config.teamsWebhookUrl;
     if (!url) {
       throw new Error('No TEAMS_WEBHOOK_URL is configured.');
     }

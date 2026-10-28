@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   Api,
   ApiChange,
@@ -110,7 +110,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
                       [class.bg-background]="view() === v.key" [class.shadow-sm]="view() === v.key"
                       [class.text-foreground]="view() === v.key"
                       [class.text-ink-soft]="view() !== v.key"
-                      (click)="setView(v.key, env.id)"
+                      (click)="setView(v.key)"
                     >
                       {{ v.label }}
                     </button>
@@ -125,7 +125,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
                   Every recorded change to this environment, newest first.
                 </p>
                 <span class="flex items-center gap-3 text-[12px]">
-                  @if (verification(); as check) {
+                  @if (checks()[env.id]; as check) {
                     <span
                       [style.color]="
                         check.intact ? 'var(--color-good)' : 'var(--color-overdue)'
@@ -147,7 +147,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
                 </span>
               </div>
 
-              <lime-change-timeline [changes]="history()" />
+              <lime-change-timeline [changes]="histories()[env.id] ?? []" />
             } @else {
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -289,24 +289,30 @@ export class Environments {
   ];
 
   protected readonly view = signal<'components' | 'history'>('components');
-  protected readonly history = signal<ApiChange[]>([]);
-  protected readonly verification = signal<ApiVerification | null>(null);
+  /** History per environment, so each panel shows its own and never the previous project's. */
+  protected readonly histories = signal<Record<string, ApiChange[]>>({});
+  protected readonly checks = signal<Record<string, ApiVerification>>({});
 
-  protected setView(view: 'components' | 'history', deploymentId: string): void {
-    this.view.set(view);
-
-    if (view === 'history') {
-      this.loadHistory(deploymentId);
+  /** Reloads the shown environments' history when the tab opens, the project or environment changes, or data reloads. */
+  private readonly historyLoader = effect(() => {
+    if (this.view() !== 'history') return;
+    for (const project of this.projects()) {
+      const env = this.selected(project);
+      if (env) untracked(() => this.loadHistory(env.id));
     }
+  });
+
+  protected setView(view: 'components' | 'history'): void {
+    this.view.set(view);
   }
 
   protected loadHistory(deploymentId: string): void {
     this.api
       .history(deploymentId)
-      .subscribe({ next: (changes) => this.history.set(changes) });
+      .subscribe({ next: (changes) => this.histories.update((all) => ({ ...all, [deploymentId]: changes })) });
     this.api
       .verifyHistory(deploymentId)
-      .subscribe({ next: (result) => this.verification.set(result) });
+      .subscribe({ next: (result) => this.checks.update((all) => ({ ...all, [deploymentId]: result })) });
   }
 
   protected csvUrl(deploymentId: string): string {

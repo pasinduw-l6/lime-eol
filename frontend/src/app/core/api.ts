@@ -66,6 +66,10 @@ export interface ApiIntegration {
   lastOk: boolean | null;
   lastDetail: string | null;
   projects: number;
+  /** Used by projects that picked none. Exactly one per kind; the .env one when none is chosen. */
+  isDefault: boolean;
+  /** Projects that picked none and so use this default. */
+  viaDefault: number;
 }
 
 export interface ApiIntegrationOption {
@@ -690,8 +694,12 @@ export class Api {
     return this.http.post<ApiIntegration>(`/api/v1/integrations/${id}/test`, {});
   }
 
-  deleteIntegration(id: string) {
-    return this.http.delete<void>(`/api/v1/integrations/${id}`);
+  makeIntegrationDefault(id: string) {
+    return this.http.post<ApiIntegration[]>(`/api/v1/integrations/${id}/default`, {});
+  }
+
+  deleteIntegration(id: string, moveTo?: string) {
+    return this.http.delete<void>(`/api/v1/integrations/${id}`, { params: moveTo ? { moveTo } : {} });
   }
 
   createTeam(body: { name: string; email?: string | null; memberIds?: string[] }) {

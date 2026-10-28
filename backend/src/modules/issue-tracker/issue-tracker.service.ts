@@ -648,7 +648,7 @@ export class IssueTrackerService {
     });
     const project = link?.deployment.project;
     return {
-      integrationId: project?.jiraIntegrationId ?? null,
+      integrationId: await this.integrations.effectiveId('JIRA', project?.jiraIntegrationId ?? null),
       projectKey: project?.jiraProjectKey ?? null,
     };
   }

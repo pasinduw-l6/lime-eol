@@ -6,7 +6,6 @@ import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 import { NOTICE_DAYS, parseDate, today } from '../../core/lifecycle';
-import { Api } from '../../core/api';
 import { Cycle, EnvironmentName, Project } from '../../core/models';
 import { ReportDownload } from '../../core/report-download';
 import { RegistryStore } from '../../core/registry.store';
@@ -487,7 +486,6 @@ export class Overview {
     { phase: 'ended', meaning: 'The vendor no longer releases any fixes, including security fixes.' },
   ];
 
-  private readonly api = inject(Api);
   protected readonly downloads = inject(ReportDownload);
 
   readonly projectId = input<string | null>(null);

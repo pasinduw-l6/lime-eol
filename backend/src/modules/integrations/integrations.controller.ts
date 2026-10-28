@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Can } from '../auth/can.decorator';
 import { AuthenticatedUser, CurrentUser } from '../auth/current-user.decorator';
 import { CreateIntegrationDto, UpdateIntegrationDto } from './dto/integration.dto';
@@ -44,11 +44,22 @@ export class IntegrationsController {
     return this.integrations.test(id);
   }
 
+  @Post(':id/default')
+  @Can('integration:write')
+  @ApiOperation({
+    summary: 'Use this connection for projects that picked none',
+    description: 'Pass env-jira or env-teams to go back to the server .env connection.',
+  })
+  makeDefault(@Param('id') id: string) {
+    return this.integrations.makeDefault(id);
+  }
+
   @Delete(':id')
   @Can('integration:write')
   @HttpCode(204)
-  @ApiOperation({ summary: 'Remove a connection. Projects using it fall back to the server default.' })
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.integrations.remove(id);
+  @ApiQuery({ name: 'moveTo', required: false, description: 'Connection to move its projects to; omitted means the default' })
+  @ApiOperation({ summary: 'Remove a connection and move the projects that used it' })
+  remove(@Param('id', ParseUUIDPipe) id: string, @Query('moveTo') moveTo?: string): Promise<void> {
+    return this.integrations.remove(id, moveTo);
   }
 }

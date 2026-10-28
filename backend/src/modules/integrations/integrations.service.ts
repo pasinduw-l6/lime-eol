@@ -37,6 +37,14 @@ export class IntegrationsService {
       include: { _count: { select: { jiraProjects: true, teamsProjects: true } } },
     });
 
+    // Projects that picked no connection use the default one.
+    const [jiraUnset, teamsUnset] = await Promise.all([
+      this.prisma.project.count({ where: { archivedAt: null, jiraIntegrationId: null } }),
+      this.prisma.project.count({ where: { archivedAt: null, teamsIntegrationId: null } }),
+    ]);
+    const unset = { JIRA: jiraUnset, TEAMS: teamsUnset };
+    const chosen = (kind: IntegrationKind) => rows.find((r) => r.kind === kind && r.isDefault && r.enabled);
+
     const defaults = [
       {
         id: 'env-jira',
@@ -44,6 +52,8 @@ export class IntegrationsService {
         name: 'Server default',
         source: 'env' as const,
         enabled: this.jira.configured,
+        isDefault: !chosen('JIRA'),
+        viaDefault: chosen('JIRA') ? 0 : unset.JIRA,
         baseUrl: this.jira.baseUrl ?? null,
         email: this.jira.email ?? null,
         projectKey: this.jira.projectKey ?? null,
@@ -60,6 +70,8 @@ export class IntegrationsService {
         name: 'Server default',
         source: 'env' as const,
         enabled: !!this.notify.teamsWebhookUrl,
+        isDefault: !chosen('TEAMS'),
+        viaDefault: chosen('TEAMS') ? 0 : unset.TEAMS,
         baseUrl: null,
         email: null,
         projectKey: null,
@@ -72,7 +84,10 @@ export class IntegrationsService {
       },
     ];
 
-    return [...defaults, ...rows.map((row) => this.toResponse(row, row._count))];
+    return [
+      ...defaults,
+      ...rows.map((row) => this.toResponse(row, row._count, chosen(row.kind)?.id === row.id ? unset[row.kind] : 0)),
+    ];
   }
 
   async options() {
@@ -129,6 +144,8 @@ export class IntegrationsService {
         data: {
           name: input.name?.trim(),
           enabled: input.enabled,
+          // Switching a default off hands the default back to .env.
+          ...(input.enabled === false ? { isDefault: false } : {}),
           settings: this.settingsFor(current.kind, input, current.settings) as unknown as Prisma.InputJsonValue,
           ...(secret ? { secret: seal(secret), secretHint: hint(secret) } : {}),
           lastCheckedAt: null,
@@ -144,10 +161,60 @@ export class IntegrationsService {
     return this.test(id);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.mustExist(id);
-    await this.prisma.integration.delete({ where: { id } });
+  /**
+   * Deletes a connection. Projects using it move to `moveTo` (another connection of the same kind),
+   * or to the default when it is omitted. Jira issues already linked keep their link.
+   */
+  async remove(id: string, moveTo?: string): Promise<void> {
+    const row = await this.mustExist(id);
+    const target = moveTo && moveTo !== 'default' ? await this.mustExist(moveTo) : null;
+    if (target && (target.kind !== row.kind || target.id === row.id)) {
+      throw new BadRequestException('Move the projects to another connection of the same type.');
+    }
+
+    const field = row.kind === 'JIRA' ? 'jiraIntegrationId' : 'teamsIntegrationId';
+    await this.prisma.$transaction([
+      this.prisma.project.updateMany({ where: { [field]: id }, data: { [field]: target?.id ?? null } }),
+      this.prisma.integration.delete({ where: { id } }),
+    ]);
     this.adapters.delete(id);
+  }
+
+  /** Makes a connection the default for projects that picked none. "env-jira" / "env-teams" go back to .env. */
+  async makeDefault(id: string) {
+    const envKind = id === 'env-jira' ? 'JIRA' : id === 'env-teams' ? 'TEAMS' : null;
+    const row = envKind ? null : await this.mustExist(id);
+    const kind = (envKind ?? row!.kind) as IntegrationKind;
+    if (row && !row.enabled) {
+      throw new BadRequestException('Switch the connection on before making it the default.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.integration.updateMany({ where: { kind, isDefault: true }, data: { isDefault: false } }),
+      ...(row ? [this.prisma.integration.update({ where: { id: row.id }, data: { isDefault: true } })] : []),
+    ]);
+    return this.list();
+  }
+
+  /** The connection chosen as default, if it is switched on. Null means use the .env one. */
+  async defaultId(kind: 'JIRA' | 'TEAMS'): Promise<string | null> {
+    const row = await this.prisma.integration.findFirst({ where: { kind, isDefault: true, enabled: true } });
+    return row?.id ?? null;
+  }
+
+  /** The connection a project uses: its own when switched on, otherwise the default. */
+  async effectiveId(kind: 'JIRA' | 'TEAMS', projectChoice: string | null): Promise<string | null> {
+    if (projectChoice) {
+      const own = await this.prisma.integration.findUnique({ where: { id: projectChoice } });
+      if (own?.enabled) return own.id;
+    }
+    return this.defaultId(kind);
+  }
+
+  /** The default Teams channel chosen on screen, if any. */
+  async defaultTeams(): Promise<{ name: string; url: string } | null> {
+    const id = await this.defaultId('TEAMS');
+    return id ? this.teamsUrl(id) : null;
   }
 
   async test(id: string) {
@@ -308,7 +375,7 @@ export class IntegrationsService {
     return error;
   }
 
-  private toResponse(row: Integration, count: { jiraProjects: number; teamsProjects: number }) {
+  private toResponse(row: Integration, count: { jiraProjects: number; teamsProjects: number }, viaDefault = 0) {
     const settings = (row.settings ?? {}) as Partial<JiraSettings>;
     return {
       id: row.id,
@@ -316,6 +383,8 @@ export class IntegrationsService {
       name: row.name,
       source: 'ui' as const,
       enabled: row.enabled,
+      isDefault: row.isDefault && row.enabled,
+      viaDefault,
       baseUrl: settings.baseUrl ?? null,
       email: settings.email ?? null,
       projectKey: settings.projectKey ?? null,
