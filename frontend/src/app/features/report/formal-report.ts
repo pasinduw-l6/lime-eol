@@ -85,7 +85,7 @@ const KIND: Record<string, string> = {
       --brand: #3b7d0a;
       color: var(--ink);
       font-family: 'Segoe UI', -apple-system, Helvetica, Arial, sans-serif;
-      font-size: 9.5pt;
+      font-size: 10.5pt;
       line-height: 1.45;
       background: #fff;
     }
@@ -124,14 +124,18 @@ const KIND: Record<string, string> = {
     }
     h2 {
       margin: 0 0 4px;
-      font-size: 14pt;
+      font-size: 16pt;
       font-weight: 700;
     }
     h3 {
       margin: 16px 0 6px;
-      font-size: 11pt;
+      font-size: 13pt;
       font-weight: 700;
       break-after: avoid;
+    }
+    .new-page {
+      break-before: page;
+      margin-top: 0;
     }
     .meta {
       margin-top: 22mm;
@@ -148,7 +152,7 @@ const KIND: Record<string, string> = {
     .sub {
       margin: 0 0 10px;
       color: var(--soft);
-      font-size: 9pt;
+      font-size: 10pt;
     }
     .glance {
       display: grid;
@@ -166,12 +170,12 @@ const KIND: Record<string, string> = {
     }
     .glance b {
       display: block;
-      font-size: 17pt;
+      font-size: 19pt;
       line-height: 1.1;
     }
     .glance span {
       color: var(--soft);
-      font-size: 8.5pt;
+      font-size: 9.5pt;
     }
     .chart {
       margin: 4px 0 14px;
@@ -181,12 +185,12 @@ const KIND: Record<string, string> = {
       display: grid;
       grid-template-columns: 44mm 1fr;
       align-items: center;
-      height: 20px;
+      height: 22px;
     }
     .chart-label {
       overflow: hidden;
       padding-right: 8px;
-      font-size: 8.5pt;
+      font-size: 9.5pt;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -208,7 +212,7 @@ const KIND: Record<string, string> = {
       margin-left: 44mm;
       border-top: 1px solid var(--rule);
       color: var(--soft);
-      font-size: 7.5pt;
+      font-size: 8.5pt;
     }
     .axis span:last-child {
       transform: translateX(-100%);
@@ -238,7 +242,7 @@ const KIND: Record<string, string> = {
       gap: 14px;
       margin-top: 4px;
       color: var(--soft);
-      font-size: 8pt;
+      font-size: 9pt;
     }
     .swatch {
       display: inline-block;
@@ -255,14 +259,14 @@ const KIND: Record<string, string> = {
     .group-head {
       padding: 6px 10px;
       border-left: 4px solid;
-      font-size: 10pt;
+      font-size: 11.5pt;
       font-weight: 700;
       break-after: avoid;
     }
     .group-head small {
       display: block;
       color: var(--soft);
-      font-size: 8.5pt;
+      font-size: 9.5pt;
       font-weight: 400;
     }
     table.eol {
@@ -276,7 +280,7 @@ const KIND: Record<string, string> = {
       padding: 5px 8px;
       border-bottom: 1.5px solid var(--ink);
       color: var(--soft);
-      font-size: 8pt;
+      font-size: 9pt;
       font-weight: 600;
       text-align: left;
     }
@@ -293,7 +297,7 @@ const KIND: Record<string, string> = {
     }
     .muted {
       color: var(--soft);
-      font-size: 8.5pt;
+      font-size: 9.5pt;
     }
     .envs {
       white-space: nowrap;
@@ -304,7 +308,7 @@ const KIND: Record<string, string> = {
       padding: 0 5px;
       border: 1px solid var(--rule);
       border-radius: 3px;
-      font-size: 8pt;
+      font-size: 9pt;
     }
     .dates {
       margin: 0;
@@ -314,7 +318,7 @@ const KIND: Record<string, string> = {
     }
     .dates li span {
       display: inline-block;
-      width: 30mm;
+      width: 34mm;
       color: var(--soft);
     }
     .story {
@@ -377,7 +381,7 @@ const KIND: Record<string, string> = {
 
       @for (section of sections(); track section.id) {
         @if (!single()) {
-          <h3>{{ section.title }}</h3>
+          <h3 [class.new-page]="!$first">{{ section.title }}</h3>
         }
 
         <div class="chart">

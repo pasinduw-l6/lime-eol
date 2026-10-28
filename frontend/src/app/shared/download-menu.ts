@@ -1,16 +1,22 @@
-import { Component, ElementRef, inject, input, output, signal } from '@angular/core';
+import { CdkConnectedOverlay, CdkOverlayOrigin, ConnectedPosition } from '@angular/cdk/overlay';
+import { Component, input, output, signal } from '@angular/core';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { ReportFormat } from '../core/report-download';
 
-/** A download button that asks for PDF or Word. */
+/**
+ * A download button that asks for PDF or Word. The menu opens in the page-level overlay,
+ * so a card with overflow hidden, or the card below it, can never cover it.
+ */
 @Component({
   selector: 'lime-download-menu',
-  imports: [HlmButton],
-  host: { class: 'relative inline-block', '(document:click)': 'outside($event)', '(document:keydown.escape)': 'open.set(false)' },
+  imports: [HlmButton, CdkOverlayOrigin, CdkConnectedOverlay],
+  host: { class: 'inline-block' },
   template: `
     <button
       type="button"
       hlmBtn
+      cdkOverlayOrigin
+      #origin="cdkOverlayOrigin"
       [variant]="variant()"
       [size]="size()"
       class="gap-1.5"
@@ -27,8 +33,16 @@ import { ReportFormat } from '../core/report-download';
         <path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
     </button>
-    @if (open()) {
-      <div role="menu" class="absolute right-0 z-40 mt-1 min-w-[190px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
+    <ng-template
+      cdkConnectedOverlay
+      [cdkConnectedOverlayOrigin]="origin"
+      [cdkConnectedOverlayOpen]="open()"
+      [cdkConnectedOverlayPositions]="positions"
+      (overlayOutsideClick)="outside($event, origin.elementRef.nativeElement)"
+      (overlayKeydown)="$event.key === 'Escape' && open.set(false)"
+      (detach)="open.set(false)"
+    >
+      <div role="menu" class="min-w-[190px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
         <button type="button" role="menuitem" class="item" (click)="choose('pdf')">
           <span class="badge pdf">PDF</span>
           <span><span class="block">PDF</span><span class="block text-[11px] text-muted-foreground">Ready to send</span></span>
@@ -38,7 +52,7 @@ import { ReportFormat } from '../core/report-download';
           <span><span class="block">Word (.docx)</span><span class="block text-[11px] text-muted-foreground">Editable</span></span>
         </button>
       </div>
-    }
+    </ng-template>
   `,
   styles: `
     .item {
@@ -76,8 +90,6 @@ import { ReportFormat } from '../core/report-download';
   `,
 })
 export class DownloadMenu {
-  private readonly host = inject(ElementRef<HTMLElement>);
-
   readonly label = input('Download');
   readonly busy = input(false);
   readonly variant = input<'default' | 'outline'>('default');
@@ -86,12 +98,19 @@ export class DownloadMenu {
 
   protected readonly open = signal(false);
 
+  /** Below the button, right edges aligned; above it when there is no room below. */
+  protected readonly positions: ConnectedPosition[] = [
+    { originX: 'end', originY: 'bottom', overlayX: 'end', overlayY: 'top', offsetY: 4 },
+    { originX: 'end', originY: 'top', overlayX: 'end', overlayY: 'bottom', offsetY: -4 },
+  ];
+
   protected choose(format: ReportFormat): void {
     this.open.set(false);
     this.pick.emit(format);
   }
 
-  protected outside(event: Event): void {
-    if (!this.host.nativeElement.contains(event.target as Node)) this.open.set(false);
+  /** The button toggles the menu itself, so a click on it is not an outside click. */
+  protected outside(event: MouseEvent, button: HTMLElement): void {
+    if (!button.contains(event.target as Node)) this.open.set(false);
   }
 }
