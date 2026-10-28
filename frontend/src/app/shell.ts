@@ -28,7 +28,7 @@ import { NotificationMenu } from './shared/notification-menu';
   ],
   host: { class: 'block min-h-screen bg-background' },
   template: `
-    <header class="app-bar border-b" role="banner">
+    <header class="app-bar border-b" role="banner" style="view-transition-name: app-bar">
       <div class="mx-auto flex h-14 max-w-[1500px] items-center gap-3 px-5">
         <a
           routerLink="/overview"

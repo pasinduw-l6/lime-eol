@@ -362,3 +362,70 @@
     print-color-adjust: exact;
   }
 }
+
+/* Page transitions (router view transitions). The top bar keeps its place; the page underneath fades. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.25s;
+  animation-timing-function: ease;
+}
+::view-transition-old(root) {
+  animation-name: page-out;
+}
+::view-transition-new(root) {
+  animation-name: page-in;
+}
+::view-transition-group(app-bar) {
+  animation: none;
+}
+
+/* Signing in: the sign-in screen moves forward and fades, the dashboard rises out of a soft blur. */
+html.entering-app::view-transition-old(root) {
+  animation: enter-out 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+html.entering-app::view-transition-new(root) {
+  animation: enter-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+html.entering-app::view-transition-new(app-bar) {
+  animation: bar-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+}
+
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes enter-out {
+  to {
+    opacity: 0;
+    transform: scale(1.06);
+    filter: blur(6px);
+  }
+}
+@keyframes enter-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+    filter: blur(10px);
+  }
+}
+@keyframes bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

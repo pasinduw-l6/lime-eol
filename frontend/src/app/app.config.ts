@@ -11,7 +11,7 @@ import {
   withInterceptors,
 } from '@angular/common/http';
 import { authInterceptor, SessionStore } from './core/session';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, ViewTransitionInfo, withComponentInputBinding, withViewTransitions } from '@angular/router';
 import { routes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -22,7 +22,22 @@ export const appConfig: ApplicationConfig = {
       withFetch(),
       withInterceptors([authInterceptor]),
     ),
-    provideRouter(routes, withComponentInputBinding()),
+    provideRouter(
+      routes,
+      withComponentInputBinding(),
+      withViewTransitions({ skipInitialTransition: true, onViewTransitionCreated: markSignIn }),
+    ),
     provideAppInitializer(() => inject(SessionStore).verify()),
   ],
 };
+
+/** Leaving the sign-in screens gets the longer "entering the app" transition; other navigations a quick fade. */
+function markSignIn({ transition, from }: ViewTransitionInfo): void {
+  let page = from;
+  while (page.firstChild) page = page.firstChild;
+  const path = page.routeConfig?.path ?? '';
+  if (path !== 'login' && !path.startsWith('auth/')) return;
+  const root = document.documentElement;
+  root.classList.add('entering-app');
+  void transition.finished.finally(() => root.classList.remove('entering-app'));
+}

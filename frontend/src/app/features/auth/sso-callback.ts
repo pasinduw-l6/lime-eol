@@ -14,7 +14,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
       [subheading]="error() ? 'That did not complete.' : 'One moment.'"
     >
       @if (error()) {
-        <p class="m-0 text-[13px] text-overdue" role="alert">{{ error() }}</p>
+        <p class="m-0 text-[13px] text-red-400" role="alert">{{ error() }}</p>
         <a
           routerLink="/login"
           hlmBtn class="mt-5 w-full justify-center py-2.5 no-underline"
@@ -22,7 +22,7 @@ import { HlmButton } from '@spartan-ng/helm/button';
           Back to sign in
         </a>
       } @else {
-        <p class="m-0 text-[14px] text-ink-soft" role="status">
+        <p class="m-0 text-[14px] text-zinc-400" role="status">
           Finishing your sign-in…
         </p>
       }

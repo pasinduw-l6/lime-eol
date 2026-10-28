@@ -27,7 +27,7 @@ interface PreviewAccount {
     >
       <div class="grid gap-4">
         @if (shownError()) {
-          <p class="m-0 text-[13px] text-overdue" role="alert">
+          <p class="m-0 text-[13px] text-red-400" role="alert">
             {{ shownError() }}
           </p>
         }
@@ -35,7 +35,6 @@ interface PreviewAccount {
         <button
           type="button"
           hlmBtn
-          variant="outline"
           size="lg"
           class="w-full gap-2.5"
           (click)="startSso()"
@@ -55,14 +54,14 @@ interface PreviewAccount {
           Sign in with Microsoft
         </button>
 
-        <p class="m-0 text-center text-[13px] text-ink-soft">
+        <p class="m-0 text-center text-[13px] text-zinc-400">
           Use your {{ '@' }}linearsix.com account. Access is granted by an
           administrator — there is no self-service registration.
         </p>
 
         @if (preview().length > 0) {
-          <section class="mt-2 rounded-lg border border-dashed p-3" aria-labelledby="preview-title">
-            <p id="preview-title" class="m-0 mb-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+          <section class="mt-2 rounded-lg border border-dashed border-white/20 p-3" aria-labelledby="preview-title">
+            <p id="preview-title" class="m-0 mb-2 text-xs font-medium tracking-wider text-zinc-400 uppercase">
               Local preview · sign in as
             </p>
             <ul class="m-0 grid max-h-64 list-none gap-1 overflow-y-auto p-0">
@@ -70,15 +69,15 @@ interface PreviewAccount {
                 <li>
                   <button
                     type="button"
-                    class="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
+                    class="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-white/10"
                     [disabled]="busy()"
                     (click)="signInAs(a)"
                   >
                     <span class="min-w-0">
                       <span class="block truncate font-medium">{{ a.name }}</span>
-                      <span class="block truncate text-xs text-muted-foreground">{{ a.email }}</span>
+                      <span class="block truncate text-xs text-zinc-400">{{ a.email }}</span>
                     </span>
-                    <span class="shrink-0 rounded-md border px-1.5 text-xs text-muted-foreground">{{ a.roleName ?? a.role }}</span>
+                    <span class="shrink-0 rounded-md border border-white/20 px-1.5 text-xs text-zinc-300">{{ a.roleName ?? a.role }}</span>
                   </button>
                 </li>
               }
