@@ -429,3 +429,10 @@ html.entering-app::view-transition-new(app-bar) {
     animation: none !important;
   }
 }
+
+/* Dropdown lists: the boxes are transparent, so give the options the theme's colours or Windows draws them white. */
+select option,
+select optgroup {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
