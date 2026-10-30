@@ -272,6 +272,8 @@ model Project {
   deployments Deployment[]
   engineers   ProjectEngineer[]
   access      ProjectAccess[]
+  source      ProjectSource?
+  proposals   VersionProposal[]
   jiraIntegration  Integration? @relation("ProjectJira", fields: [jiraIntegrationId], references: [id], onDelete: SetNull)
   teamsIntegration Integration? @relation("ProjectTeams", fields: [teamsIntegrationId], references: [id], onDelete: SetNull)
 
@@ -682,4 +684,63 @@ model VersionSync {
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("version_sync")
+}
+
+/// Where a project's code lives on GitHub, read through the GitHub App to find its Node.js and Angular versions.
+model ProjectSource {
+  projectId      String    @id @map("project_id") @db.Uuid
+  /// owner/name, e.g. l6projects/lime-siyapatha-l6
+  repo           String
+  prodBranch     String    @map("prod_branch")
+  devBranch      String?   @map("dev_branch")
+  /// Blank means look in the usual places (Dockerfile, gui/Dockerfile / gui/package.json, package.json).
+  dockerfilePath String?   @map("dockerfile_path")
+  packagePath    String?   @map("package_path")
+  lastScanAt     DateTime? @map("last_scan_at") @db.Timestamptz(3)
+  status         String    @default("NEVER")
+  message        String?
+  /// What the last scan found per environment: { PROD: { sha, node, angular, ... }, DEV: { ... } }
+  found          Json      @default("{}")
+  /// "deploymentId|technologyId" pairs whose version comes from GitHub.
+  managed        Json      @default("[]")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_source")
+}
+
+/// A new version seen on a project's production branch, waiting for an Admin or SRE to approve it.
+model VersionProposal {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  projectId     String    @map("project_id") @db.Uuid
+  deploymentId  String    @map("deployment_id") @db.Uuid
+  technologyId  String    @map("technology_id") @db.Uuid
+  technology    String
+  fromVersion   String?   @map("from_version")
+  toVersion     String    @map("to_version")
+  repo          String
+  branch        String
+  sha           String
+  commitUrl     String    @map("commit_url")
+  commitMessage String    @map("commit_message")
+  commitAuthor  String    @map("commit_author")
+  committedAt   DateTime  @map("committed_at") @db.Timestamptz(3)
+  /// PENDING, APPROVED, or SUPERSEDED when the recorded version caught up some other way.
+  status        String    @default("PENDING")
+  /// Next Teams reminder while it waits; the interval repeats until someone decides.
+  remindAt      DateTime  @map("remind_at") @db.Timestamptz(3)
+  remindHours   Int       @default(24) @map("remind_hours")
+  lastNotifiedAt DateTime? @map("last_notified_at") @db.Timestamptz(3)
+  decidedById   String?   @map("decided_by_id") @db.Uuid
+  decidedAt     DateTime? @map("decided_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([status, remindAt])
+  @@index([deploymentId, technologyId, status])
+  @@map("version_proposal")
 }

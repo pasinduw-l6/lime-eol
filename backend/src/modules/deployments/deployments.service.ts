@@ -23,7 +23,7 @@ export class DeploymentsService {
     deploymentId: string,
     input: ChangeComponentDto,
     actorId?: string,
-    options: { fromVersionFile?: boolean } = {},
+    options: { fromSync?: boolean } = {},
   ): Promise<ComponentChangeDto> {
     const deployment = await this.prisma.deployment.findUnique({
       where: { id: deploymentId },
@@ -42,9 +42,19 @@ export class DeploymentsService {
       );
     }
 
-    if (!options.fromVersionFile) {
-      const sync = await this.prisma.versionSync.findUnique({ where: { id: 'default' } });
-      if (((sync?.managed as string[] | undefined) ?? []).includes(`${deploymentId}|${technology.id}`)) {
+    // Versions read from GitHub (the project's own repo, or eol-versions.yml) are changed there, not here.
+    if (!options.fromSync) {
+      const key = `${deploymentId}|${technology.id}`;
+      const [sync, source] = await Promise.all([
+        this.prisma.versionSync.findUnique({ where: { id: 'default' } }),
+        this.prisma.projectSource.findUnique({ where: { projectId: deployment.projectId } }),
+      ]);
+      if (((source?.managed as string[] | undefined) ?? []).includes(key)) {
+        throw new ConflictException(
+          `${technology.name} on this environment is read from ${source!.repo} on GitHub. Change it in the code and the tool updates itself.`,
+        );
+      }
+      if (((sync?.managed as string[] | undefined) ?? []).includes(key)) {
         throw new ConflictException(
           `${technology.name} on this environment comes from eol-versions.yml in GitHub. Change it there and the tool updates itself.`,
         );

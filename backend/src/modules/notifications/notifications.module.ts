@@ -27,6 +27,6 @@ import { NOTIFICATION_CHANNEL } from './ports/notification-channel.port';
     NotificationEventsService,
     OpsNotificationsService,
   ],
-  exports: [NotificationsService, NotificationEventsService],
+  exports: [NotificationsService, NotificationEventsService, TeamsAdapter],
 })
 export class NotificationsModule {}

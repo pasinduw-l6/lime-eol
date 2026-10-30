@@ -185,7 +185,7 @@ export class VersionFileService {
             evidenceUrl: commit.url,
           },
           undefined,
-          { fromVersionFile: true },
+          { fromSync: true },
         );
         applied.push(`${project.code} · ${entry.environment} · ${technology.name} ${current ?? 'none'} → ${entry.version}`);
       } catch (error) {

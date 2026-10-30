@@ -72,6 +72,12 @@ export const envSchema = z
     VERSIONS_FILE: z.string().default('eol-versions.yml'),
     VERSIONS_BRANCH: z.string().default('main'),
     VERSIONS_SYNC_CRON: z.string().default('*/15 * * * *'),
+
+    GITHUB_APP_ID: blankable(z.string().regex(/^\d+$/, 'GITHUB_APP_ID is a number').optional()),
+    GITHUB_APP_ORG: z.string().default('l6projects'),
+    GITHUB_APP_PRIVATE_KEY_PATH: blankable(z.string().optional()),
+    GITHUB_APP_PRIVATE_KEY: blankable(z.string().optional()),
+    SOURCE_SCAN_CRON: z.string().default('*/15 * * * *'),
   })
   .refine(
     (env) => !(env.NODE_ENV === 'production' && env.JIRA_DEMO),

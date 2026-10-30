@@ -4,6 +4,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { SessionStore } from '../../core/session';
 import { Integrations } from './integrations';
+import { SourceCode } from './source-code';
 import { VersionFile } from './version-file';
 
 type Severity = 'critical' | 'warning' | 'info' | 'good';
@@ -40,7 +41,7 @@ const ICONS: Record<Severity, string> = {
 
 @Component({
   selector: 'lime-ops',
-  imports: [HlmCardImports, HlmButton, Integrations, VersionFile],
+  imports: [HlmCardImports, HlmButton, Integrations, VersionFile, SourceCode],
   host: { class: 'block' },
   template: `
     <header class="mb-6">
@@ -51,6 +52,7 @@ const ICONS: Record<Severity, string> = {
     </header>
 
     <lime-integrations />
+    <lime-source-code />
     <lime-version-file />
 
     @if (session.isAdmin()) {

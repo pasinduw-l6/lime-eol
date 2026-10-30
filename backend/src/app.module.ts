@@ -7,6 +7,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { AccessModule } from './modules/access/access.module';
 import { RolesModule } from './modules/roles/roles.module';
+import { SourceCodeModule } from './modules/source-code/source-code.module';
 import { VersionFileModule } from './modules/version-file/version-file.module';
 import { ProjectAccessGuard } from './modules/access/access.guard';
 import { AppConfigModule } from './config/config.module';
@@ -42,6 +43,7 @@ import { PrismaModule } from './prisma/prisma.module';
     UsersModule,
     RolesModule,
     VersionFileModule,
+    SourceCodeModule,
     TeamsModule,
     AuditModule,
     LimeReleasesModule,
