@@ -328,11 +328,6 @@ export class JiraPanel {
       next: (link) => {
         this.link.set(link);
         this.busy.set(false);
-        if (link.linked) {
-          this.loadAssignees();
-        } else {
-          this.assignees.set([]);
-        }
         after?.();
       },
       error: (err: { error?: { message?: string } }) => {
