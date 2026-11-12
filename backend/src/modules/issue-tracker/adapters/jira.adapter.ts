@@ -194,10 +194,18 @@ export class JiraAdapter implements IssueTracker {
     );
   }
 
-  async getAssignees(issueKey: string): Promise<Assignee[]> {
-    const users = await this.request<RawUser[]>(
-      `/rest/api/3/user/assignable/search?issueKey=${encodeURIComponent(issueKey)}&maxResults=50`,
-    );
+  async getAssignees(issueKey: string | null, query = ''): Promise<Assignee[]> {
+    const params = new URLSearchParams({ maxResults: '50' });
+    if (issueKey) {
+      params.set('issueKey', issueKey);
+    } else if (this.config.projectKey) {
+      params.set('project', this.config.projectKey);
+    } else {
+      throw new Error('This Jira board has no project key, so there is nobody to list.');
+    }
+    if (query.trim()) params.set('query', query.trim());
+
+    const users = await this.request<RawUser[]>(`/rest/api/3/user/assignable/search?${params.toString()}`);
 
     return users
       .filter((user) => user.active !== false)
@@ -321,6 +329,7 @@ export class JiraAdapter implements IssueTracker {
       status: fields.status?.name ?? 'Unknown',
       statusCategory: toCategory(fields.status?.statusCategory?.key),
       assignee: fields.assignee?.displayName ?? null,
+      assigneeId: fields.assignee?.accountId ?? null,
       url: `${this.config.baseUrl}/browse/${issue.key}`,
       parentKey: fields.parent?.key ?? null,
       startDate: typeof start === 'string' ? start.slice(0, 10) : null,
@@ -526,7 +535,7 @@ interface RawIssue {
   fields?: {
     summary?: string;
     status?: { name?: string; statusCategory?: { key?: string } };
-    assignee?: { displayName?: string } | null;
+    assignee?: { displayName?: string; accountId?: string } | null;
     parent?: { key?: string } | null;
     duedate?: string | null;
     timetracking?: {

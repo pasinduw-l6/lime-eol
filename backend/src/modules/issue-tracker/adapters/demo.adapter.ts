@@ -77,8 +77,14 @@ export class DemoIssueTracker implements IssueTracker {
     return Promise.resolve(this.ensureChildren(normalised).map((child) => ({ ...child })));
   }
 
-  getAssignees(): Promise<Assignee[]> {
-    return Promise.resolve(PEOPLE.map((name) => ({ id: `demo-${name.toLowerCase()}`, name })));
+  getAssignees(_issueKey: string | null, query = ''): Promise<Assignee[]> {
+    const needle = query.trim().toLowerCase();
+    return Promise.resolve(
+      PEOPLE.filter((name) => name.toLowerCase().includes(needle)).map((name) => ({
+        id: `demo-${name.toLowerCase()}`,
+        name,
+      })),
+    );
   }
 
   createIssue(input: NewSubtask): Promise<TrackedIssue> {

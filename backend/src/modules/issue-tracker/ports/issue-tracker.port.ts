@@ -9,6 +9,7 @@ export interface TrackedIssue {
   status: string;
   statusCategory: IssueStatusCategory;
   assignee: string | null;
+  assigneeId?: string | null;
   url: string;
   parentKey: string | null;
   startDate?: string | null;
@@ -86,7 +87,8 @@ export interface IssueTracker {
 
   addWorklog(key: string, entry: NewWorklog): Promise<Worklog>;
 
-  getAssignees(issueKey: string): Promise<Assignee[]>;
+  /** People Jira lets you assign: for an issue, or for the board's project when issueKey is null. */
+  getAssignees(issueKey: string | null, query?: string): Promise<Assignee[]>;
 
   check(): Promise<{ ok: boolean; detail: string }>;
 }

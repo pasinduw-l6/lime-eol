@@ -50,7 +50,7 @@ import { Modal } from './modal';
             </div>
             <div class="flex justify-between gap-3">
               <dt class="text-ink-soft">Owner</dt>
-              <dd class="m-0">{{ action().assignee?.name || 'unassigned' }}</dd>
+              <dd class="m-0">{{ action().jiraAssignee || 'unassigned' }}</dd>
             </div>
           </dl>
 

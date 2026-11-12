@@ -89,6 +89,20 @@ export class CreateUpgradeActionDto extends ProcessFieldsDto {
   @IsUUID()
   assigneeId?: string;
 
+  @ApiPropertyOptional({ nullable: true, description: 'Jira account id of the main ticket assignee' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(128)
+  jiraAssigneeId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: 'Their Jira display name, shown until the next sync' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(200)
+  jiraAssigneeName?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID()

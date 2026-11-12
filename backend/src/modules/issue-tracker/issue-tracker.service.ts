@@ -91,7 +91,8 @@ export class IssueTrackerService {
     return this.sync(actionId);
   }
 
-  async createFor(actionId: string, withSteps = true) {
+  /** Raises the plan's main issue only; sub-tasks are added by hand. */
+  async createFor(actionId: string) {
     const action = await this.prisma.upgradeAction.findUnique({
       where: { id: actionId },
       include: {
@@ -161,7 +162,7 @@ export class IssueTrackerService {
         summary,
         description,
         dueDate: action.plannedDate?.toISOString().slice(0, 10) ?? null,
-        assigneeId: null,
+        assigneeId: action.jiraAssigneeId,
       });
     } catch (error) {
       await this.prisma.upgradeAction.update({
@@ -181,21 +182,6 @@ export class IssueTrackerService {
         jiraSyncError: null,
       },
     });
-
-    for (const environment of withSteps ? environments : []) {
-      try {
-        await tracker.createSubtask(issue.key, {
-          summary: `${environment} — upgrade ${technology} ${cycle}`,
-          description: null,
-          dueDate: null,
-          assigneeId: null,
-        });
-      } catch (error) {
-        this.logger.warn(
-          `Created ${issue.key} but not its step for ${environment}: ${message(error)}`,
-        );
-      }
-    }
 
     return this.sync(actionId);
   }
@@ -273,6 +259,7 @@ export class IssueTrackerService {
             jiraStatus: issue.status,
             jiraStatusCategory: issue.statusCategory,
             jiraAssignee: issue.assignee,
+            jiraAssigneeId: issue.assigneeId ?? null,
             jiraSubtaskDone: done,
             jiraSubtaskTotal: children.length,
             jiraSyncedAt: new Date(),
@@ -327,7 +314,7 @@ export class IssueTrackerService {
     let action = await this.mustExist(actionId);
 
     if (!action.jiraKey) {
-      await this.createFor(actionId, false);
+      await this.createFor(actionId);
       action = await this.mustExist(actionId);
       if (!action.jiraKey) {
         throw new BadRequestException('Could not create the Jira issue for this plan.');
@@ -415,20 +402,60 @@ export class IssueTrackerService {
     return this.read(actionId);
   }
 
-  async assignees(actionId: string) {
+  /** Jira people who can take this plan's work; before a ticket exists, those on the project's board. */
+  async assignees(actionId: string, query = '') {
     const action = await this.mustExist(actionId);
 
-    if (!action.jiraKey) {
-      return [];
-    }
-
     try {
-      const tracker = await this.trackerFor(action.jiraIntegrationId);
-      return await tracker.getAssignees(action.jiraKey);
+      if (action.jiraKey) {
+        const tracker = await this.trackerFor(action.jiraIntegrationId);
+        return await tracker.getAssignees(action.jiraKey, query);
+      }
+      const connection = await this.projectConnection(actionId);
+      const tracker = await this.trackerFor(connection.integrationId, connection.projectKey);
+      return tracker.configured ? await tracker.getAssignees(null, query) : [];
     } catch (error) {
       this.logger.warn(`Could not list assignees: ${message(error)}`);
       return [];
     }
+  }
+
+  /** Jira people on a project's board, for a plan that is not saved yet. Never stored as app users. */
+  async projectAssignees(projectId: string, query = '') {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { jiraIntegrationId: true, jiraProjectKey: true },
+    });
+    if (!project) {
+      throw new NotFoundException('No such project.');
+    }
+
+    const integrationId = await this.integrations.effectiveId('JIRA', project.jiraIntegrationId);
+    const tracker = await this.trackerFor(integrationId, project.jiraProjectKey);
+    if (!tracker.configured) {
+      return { connected: false, people: [] };
+    }
+
+    try {
+      return { connected: true, people: await tracker.getAssignees(null, query) };
+    } catch (error) {
+      this.logger.warn(`Could not list assignees: ${message(error)}`);
+      return { connected: true, people: [], error: message(error) };
+    }
+  }
+
+  /** Sets the main issue's assignee in Jira, then re-reads it. */
+  async assignIssue(actionId: string, accountId: string | null) {
+    const action = await this.mustExist(actionId);
+    if (!action.jiraKey) return;
+
+    try {
+      const tracker = await this.trackerFor(action.jiraIntegrationId);
+      await tracker.updateIssue(action.jiraKey, { assigneeId: accountId });
+    } catch (error) {
+      throw new BadRequestException(`Saved, but Jira refused the assignee: ${message(error)}`);
+    }
+    await this.sync(actionId);
   }
 
   async read(actionId: string) {

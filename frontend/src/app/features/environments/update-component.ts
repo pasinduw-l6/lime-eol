@@ -13,6 +13,7 @@ import { Celebrations, celebrationFor } from '../../core/celebration.service';
 import { formatDate, formatDays, SupportStatus } from '../../core/lifecycle';
 import { ChangeTimeline } from '../../shared/change-timeline';
 import { Modal } from '../../shared/modal';
+import { SearchOption, SearchSelect } from '../../shared/search-select';
 import { TechIcon } from '../../shared/tech-icon';
 import { MIN_WORKING_MS, Working } from '../../shared/working';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -21,7 +22,7 @@ import { HlmLabel } from '@spartan-ng/helm/label';
 
 @Component({
   selector: 'lime-update-component',
-  imports: [HlmButton, HlmInput, HlmLabel, FormsModule, Modal, TechIcon, ChangeTimeline, Working],
+  imports: [HlmButton, HlmInput, HlmLabel, FormsModule, Modal, SearchSelect, TechIcon, ChangeTimeline, Working],
   host: { class: 'block' },
   template: `
     <lime-modal
@@ -46,16 +47,12 @@ import { HlmLabel } from '@spartan-ng/helm/label';
         <form class="grid gap-4" (submit)="save($event)">
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             New version
-            <select hlmInput [(ngModel)]="version" name="version">
-              <option value="">Choose a newer version…</option>
-              @for (group of options(); track group.cycle) {
-                <optgroup [label]="cycleLabel(group)">
-                  @for (v of group.versions; track v) {
-                    <option [value]="v">{{ v }}</option>
-                  }
-                </optgroup>
-              }
-            </select>
+            <lime-search-select
+              [(value)]="version"
+              [options]="versionChoices()"
+              placeholder="Choose a newer version…"
+              label="New version"
+            />
             @if (options().length === 0) {
               <span class="mt-1 block text-[11.5px] text-ink-soft">
                 Nothing newer is published. Type a version below if you know one.
@@ -202,6 +199,12 @@ export class UpdateComponent {
   private readonly allOptions = signal<ApiVersionOption[]>([]);
 
   protected readonly options = computed(() => this.allOptions());
+
+  protected readonly versionChoices = computed<SearchOption[]>(() =>
+    this.options().flatMap((group) =>
+      group.versions.map((v) => ({ value: v, label: v, group: this.cycleLabel(group) })),
+    ),
+  );
 
   protected readonly history = computed(() =>
     this.allChanges().filter((c) => c.technology === this.component().technology),

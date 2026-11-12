@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Api, ApiJiraSubtask, ApiUpgradeAction, Decision } from '../../core/api';
+import { Api, ApiJiraAssignee, ApiJiraSubtask, ApiUpgradeAction, Decision } from '../../core/api';
 import { DECISIONS } from '../../core/process';
 import { Permission } from '../../core/permissions';
 import { SessionStore } from '../../core/session';
@@ -28,6 +28,8 @@ import {
   todayIso,
 } from '../../shared/gantt';
 import { SubtaskDialogs } from './subtask-dialogs';
+import { SearchOption, SearchSelect } from '../../shared/search-select';
+import { map, Observable, of, tap } from 'rxjs';
 import { Modal } from '../../shared/modal';
 import { PlanBoard } from '../../shared/plan-board';
 import { PlanCard } from '../../shared/plan-card';
@@ -48,7 +50,8 @@ interface Draft {
   status: string;
   startDate: string;
   plannedDate: string;
-  assigneeId: string;
+  jiraAssigneeId: string;
+  jiraAssigneeName: string;
   deploymentIds: string[];
   decision: Decision | '';
   assessment: string;
@@ -61,7 +64,7 @@ interface Draft {
 
 @Component({
   selector: 'lime-actions',
-  imports: [HlmAlertImports, HlmCardImports, HlmButton, HlmInput, HlmLabel, FormsModule, Gantt, Modal, SubtaskDialogs, PlanCard, PlanBoard, PlanDetail],
+  imports: [HlmAlertImports, HlmCardImports, HlmButton, HlmInput, HlmLabel, FormsModule, Gantt, Modal, SearchSelect, SubtaskDialogs, PlanCard, PlanBoard, PlanDetail],
   host: { class: 'block' },
   template: `
     <header class="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -127,12 +130,15 @@ interface Draft {
         hlmInput class="h-8 min-w-[200px] flex-1 text-[13px]"
       />
       @if (!activeProject()) {
-        <select hlmInput class="h-8 w-auto py-0 text-[13px]" aria-label="Customer" [ngModel]="customer()" (ngModelChange)="customer.set($event)">
-          <option value="">All customers</option>
-          @for (c of customers(); track c) {
-            <option [value]="c">{{ c }}</option>
-          }
-        </select>
+        <lime-search-select
+          class="w-[180px]"
+          [value]="customer()"
+          (valueChange)="customer.set($event)"
+          [options]="customerOptions()"
+          emptyLabel="All customers"
+          [compact]="true"
+          label="Customer"
+        />
       }
       <select hlmInput class="h-8 w-auto py-0 text-[13px]" aria-label="Status" [ngModel]="filter()" (ngModelChange)="filter.set($event)">
         @for (f of filters; track f) {
@@ -201,26 +207,22 @@ interface Draft {
           <div class="grid gap-3 sm:grid-cols-2">
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Technology
-              <select
-                hlmInput
-                [(ngModel)]="form.technology"
-                name="technology"
-                (change)="onTechnology()"
-              >
-                <option value="">Choose…</option>
-                @for (t of technologies(); track t.id) {
-                  <option [value]="t.name">{{ t.name }}</option>
-                }
-              </select>
+              <lime-search-select
+                [(value)]="form.technology"
+                (picked)="onTechnology()"
+                [options]="technologyOptions()"
+                label="Technology"
+              />
             </label>
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Cycle running out
-              <select hlmInput [(ngModel)]="form.technologyCycleId" name="cycle" (change)="onCycle()">
-                <option value="">Choose…</option>
-                @for (c of cyclesFor(form.technology); track c.id) {
-                  <option [value]="c.id">{{ c.cycle }} — ends {{ date(c.eolDate) }}</option>
-                }
-              </select>
+              <lime-search-select
+                [(value)]="form.technologyCycleId"
+                (picked)="onCycle()"
+                [options]="cycleOptions(form.technology)"
+                [disabled]="!form.technology"
+                label="Cycle running out"
+              />
             </label>
           </div>
 
@@ -262,13 +264,22 @@ interface Draft {
               <input type="date" hlmInput [(ngModel)]="form.plannedDate" name="planned" />
             </label>
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
-              Assignee
-              <select hlmInput [(ngModel)]="form.assigneeId" name="assignee">
-                <option value="">Unassigned</option>
-                @for (e of engineers(); track e.id) {
-                  <option [value]="e.id">{{ e.name }}</option>
-                }
-              </select>
+              Assignee (Jira)
+              <lime-search-select
+                [(value)]="form.jiraAssigneeId"
+                (picked)="form.jiraAssigneeName = $event?.label ?? ''"
+                [remote]="jiraPeople"
+                [selectedLabel]="form.jiraAssigneeName || null"
+                emptyLabel="Unassigned"
+                [disabled]="!form.id && !planProject(form)"
+                emptyText="Nobody on this Jira board matches"
+                label="Assignee in Jira"
+              />
+              @if (!form.id && !planProject(form)) {
+                <span class="text-[11.5px] text-muted-foreground">Tick an environment below first.</span>
+              } @else if (jiraConnected() === false) {
+                <span class="text-[11.5px] text-muted-foreground">No Jira board for this project. Connect one in Operations.</span>
+              }
             </label>
           </div>
 
@@ -565,7 +576,7 @@ export class Actions {
     return this.scoped().filter((action) => {
       const matches =
         !needle ||
-        `${action.technology} ${action.cycle} ${action.jiraKey ?? ''} ${action.assignee?.name ?? ''}`
+        `${action.technology} ${action.cycle} ${action.jiraKey ?? ''} ${action.jiraAssignee ?? ''}`
           .toLowerCase()
           .includes(needle);
 
@@ -597,6 +608,48 @@ export class Actions {
   protected cyclesFor(technology: string) {
     return this.store.cycles().filter((c) => c.technology === technology);
   }
+
+  protected readonly customerOptions = computed<SearchOption[]>(() =>
+    this.customers().map((c) => ({ value: c, label: c })),
+  );
+
+  protected readonly technologyOptions = computed<SearchOption[]>(() =>
+    this.technologies().map((t) => ({ value: t.name, label: t.name })),
+  );
+
+  protected cycleOptions(technology: string): SearchOption[] {
+    return this.cyclesFor(technology).map((c) => ({
+      value: c.id,
+      label: c.cycle,
+      hint: c.eolDate ? `ends ${this.date(c.eolDate)}` : 'no end date',
+    }));
+  }
+
+  /** False once the project is known to have no Jira board; null until asked. */
+  protected readonly jiraConnected = signal<boolean | null>(null);
+
+  /** The project whose Jira board the assignee comes from. */
+  protected planProject(form: Draft): string | null {
+    return (
+      this.activeProject()?.id ??
+      this.store.allDeployments().find((d) => form.deploymentIds.includes(d.id))?.projectId ??
+      null
+    );
+  }
+
+  /** Searched live in Jira each time; the people are never saved as app users. */
+  protected readonly jiraPeople = (query: string): Observable<SearchOption[]> => {
+    const form = this.draft();
+    if (!form) return of([]);
+    const toOptions = (people: ApiJiraAssignee[]) => people.map((p) => ({ value: p.id, label: p.name }));
+    if (form.id) return this.api.jiraAssignees(form.id, query).pipe(map(toOptions));
+    const projectId = this.planProject(form);
+    if (!projectId) return of([]);
+    return this.api.projectJiraAssignees(projectId, query).pipe(
+      tap((result) => this.jiraConnected.set(result.connected)),
+      map((result) => toOptions(result.people)),
+    );
+  };
 
   protected targetsFor(
     technology: string,
@@ -656,11 +709,13 @@ export class Actions {
 
   protected create(): void {
     this.error.set(null);
+    this.jiraConnected.set(null);
     this.draft.set(blank());
   }
 
   protected edit(action: ApiUpgradeAction): void {
     this.error.set(null);
+    this.jiraConnected.set(null);
     this.draft.set({
       id: action.id,
       technology: action.technology,
@@ -669,7 +724,8 @@ export class Actions {
       status: action.status,
       startDate: action.startDate ?? '',
       plannedDate: action.plannedDate ?? '',
-      assigneeId: action.assignee?.id ?? '',
+      jiraAssigneeId: action.jiraAssigneeId ?? '',
+      jiraAssigneeName: action.jiraAssignee ?? '',
       deploymentIds: action.environments.map((e) => e.deploymentId),
       decision: action.decision ?? '',
       assessment: action.assessment ?? '',
@@ -739,7 +795,8 @@ export class Actions {
       technologyCycleId: form.technologyCycleId,
       targetVersion: form.targetVersion || undefined,
       deploymentIds: form.deploymentIds,
-      assigneeId: form.assigneeId || undefined,
+      jiraAssigneeId: form.jiraAssigneeId || null,
+      jiraAssigneeName: form.jiraAssigneeId ? form.jiraAssigneeName || null : null,
       startDate: form.startDate || undefined,
       plannedDate: form.plannedDate || undefined,
       status: form.status,
@@ -882,7 +939,7 @@ function toItem(action: ApiUpgradeAction): GanttItem {
     technology: action.technology,
     statusLabel: key === 'OVERDUE' ? 'Overdue' : key.charAt(0) + key.slice(1).toLowerCase().replace('_', ' '),
     colour: STATUS_COLOURS[key] ?? STATUS_COLOURS['NOT_STARTED']!,
-    people: action.assignee ? [action.assignee.name] : action.team ? [action.team.name] : [],
+    people: action.jiraAssignee ? [action.jiraAssignee] : action.team ? [action.team.name] : [],
     start: start <= end ? start : end,
     end,
     due: action.plannedDate,
@@ -929,7 +986,8 @@ function blank(): Draft {
     status: 'PLANNED',
     startDate: '',
     plannedDate: '',
-    assigneeId: '',
+    jiraAssigneeId: '',
+    jiraAssigneeName: '',
     deploymentIds: [],
     decision: '',
     assessment: '',

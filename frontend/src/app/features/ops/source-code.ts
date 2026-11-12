@@ -5,6 +5,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
 import { HlmInput } from '@spartan-ng/helm/input';
 import { Api } from '../../core/api';
 import { Feedback } from '../../core/feedback';
+import { SearchOption, SearchSelect } from '../../shared/search-select';
 
 interface Found {
   branch: string;
@@ -79,7 +80,7 @@ const STATE: Record<Source['status'], string> = {
 /** Links each project to its GitHub repository and branches; Node.js and Angular are read from the code. */
 @Component({
   selector: 'lime-source-code',
-  imports: [HlmCardImports, HlmButton, HlmInput],
+  imports: [HlmCardImports, HlmButton, HlmInput, SearchSelect],
   host: { class: 'block' },
   template: `
     <section hlmCard class="mt-5 gap-0 py-0">
@@ -171,19 +172,27 @@ const STATE: Record<Source['status'], string> = {
                     <span class="block text-[12px] text-muted-foreground">{{ p.code }}</span>
                   </td>
                   <td class="px-3 py-2.5">
-                    <select hlmInput class="h-8 min-w-[200px] py-0 text-[13px]" [attr.aria-label]="'Repository for ' + p.name" (change)="pickRepo(p.id, $any($event.target).value)">
-                      <option value="" [selected]="!d.repo">Not linked</option>
-                      @for (r of repos(); track r.fullName) {
-                        <option [value]="r.fullName" [selected]="r.fullName === d.repo">{{ r.name }}</option>
-                      }
-                    </select>
+                    <lime-search-select
+                      class="min-w-[200px]"
+                      [value]="d.repo"
+                      (valueChange)="pickRepo(p.id, $event)"
+                      [options]="repoOptions()"
+                      emptyLabel="Not linked"
+                      [compact]="true"
+                      [label]="'Repository for ' + p.name"
+                    />
                   </td>
                   <td class="px-3 py-2.5">
-                    <select hlmInput class="h-8 min-w-[140px] py-0 text-[13px]" [disabled]="!d.repo" [attr.aria-label]="'Production branch for ' + p.name" (change)="set(p.id, 'prodBranch', $any($event.target).value)">
-                      @for (b of branchesOf(d.repo); track b) {
-                        <option [value]="b" [selected]="b === d.prodBranch">{{ b }}</option>
-                      }
-                    </select>
+                    <lime-search-select
+                      class="min-w-[160px]"
+                      [value]="d.prodBranch"
+                      (valueChange)="set(p.id, 'prodBranch', $event)"
+                      [options]="branchOptions(d.repo)"
+                      [disabled]="!d.repo"
+                      placeholder="Branch…"
+                      [compact]="true"
+                      [label]="'Production branch for ' + p.name"
+                    />
                   </td>
                   <td class="px-3 py-2.5 text-[12.5px]">
                     @if (s) {
@@ -294,6 +303,23 @@ export class SourceCode {
 
   protected branchesOf(repo: string): string[] {
     return repo ? (this.branches()[repo] ?? []) : [];
+  }
+
+  protected readonly repoOptions = computed<SearchOption[]>(() =>
+    this.repos().map((r) => ({ value: r.fullName, label: r.name })),
+  );
+
+  private readonly branchCache = new WeakMap<string[], SearchOption[]>();
+
+  /** Kept per branch list, so a repo with hundreds of branches is not rebuilt on every check. */
+  protected branchOptions(repo: string): SearchOption[] {
+    const list = this.branchesOf(repo);
+    let options = this.branchCache.get(list);
+    if (!options) {
+      options = list.map((b) => ({ value: b, label: b }));
+      this.branchCache.set(list, options);
+    }
+    return options;
   }
 
   protected dirty(projectId: string): boolean {

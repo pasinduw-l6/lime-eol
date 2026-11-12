@@ -9,6 +9,7 @@ import { ReportDownload } from '../../core/report-download';
 import { RegistryStore } from '../../core/registry.store';
 import { DownloadMenu } from '../../shared/download-menu';
 import { TechIcon } from '../../shared/tech-icon';
+import { SearchOption, SearchSelect } from '../../shared/search-select';
 
 type Status = 'EOL' | 'NEAR' | 'SUPPORTED' | 'UNKNOWN';
 type Health = 'red' | 'amber' | 'green';
@@ -66,7 +67,7 @@ const STATUS_COLOUR: Record<Status, string> = {
 
 @Component({
   selector: 'lime-manager',
-  imports: [FormsModule, HlmButton, HlmCardImports, HlmInput, TechIcon, DownloadMenu],
+  imports: [FormsModule, HlmButton, HlmCardImports, HlmInput, TechIcon, DownloadMenu, SearchSelect],
   host: { class: 'block' },
   template: `
     <header class="mb-5 flex flex-wrap items-end justify-between gap-4">
@@ -86,12 +87,14 @@ const STATUS_COLOUR: Record<Status, string> = {
           [ngModel]="query()"
           (ngModelChange)="query.set($event)"
         />
-        <select hlmInput class="h-9 w-auto" aria-label="Customer" [ngModel]="customer()" (ngModelChange)="customer.set($event)">
-          <option value="">All customers</option>
-          @for (c of customers(); track c) {
-            <option [value]="c">{{ c }}</option>
-          }
-        </select>
+        <lime-search-select
+          class="w-[200px]"
+          [value]="customer()"
+          (valueChange)="customer.set($event)"
+          [options]="customerOptions()"
+          emptyLabel="All customers"
+          label="Customer"
+        />
         <div class="segmented" role="group" aria-label="Status">
           @for (f of filters; track f.key) {
             <button
@@ -407,6 +410,10 @@ export class Manager {
   protected readonly health = signal<Health | 'all'>('all');
 
   protected readonly customers = computed(() => [...new Set(this.api.projects().map((p) => p.customer))].sort());
+
+  protected readonly customerOptions = computed<SearchOption[]>(() =>
+    this.customers().map((c) => ({ value: c, label: c })),
+  );
 
   protected readonly cards = computed<ProjectCard[]>(() =>
     this.api

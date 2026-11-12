@@ -288,6 +288,8 @@ export interface ApiUpgradeAction {
   completedDate: string | null;
   assignee: { id: string; name: string } | null;
   team: { id: string; name: string } | null;
+  jiraAssignee: string | null;
+  jiraAssigneeId: string | null;
   jiraKey: string | null;
   jiraUrl: string | null;
   jiraSyncError: string | null;
@@ -796,9 +798,17 @@ export class Api {
     );
   }
 
-  jiraAssignees(actionId: string) {
+  jiraAssignees(actionId: string, q = '') {
     return this.http.get<ApiJiraAssignee[]>(
       `/api/v1/upgrade-actions/${actionId}/jira/assignees`,
+      { params: { q } },
+    );
+  }
+
+  projectJiraAssignees(projectId: string, q = '') {
+    return this.http.get<{ connected: boolean; people: ApiJiraAssignee[]; error?: string }>(
+      `/api/v1/projects/${projectId}/jira/assignees`,
+      { params: { q } },
     );
   }
 

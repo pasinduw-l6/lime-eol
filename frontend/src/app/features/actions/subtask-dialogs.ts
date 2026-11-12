@@ -5,7 +5,6 @@ import { HlmInput } from '@spartan-ng/helm/input';
 import { HlmLabel } from '@spartan-ng/helm/label';
 import {
   Api,
-  ApiJiraAssignee,
   ApiJiraSubtask,
   ApiJiraTransition,
   ApiJiraWorklog,
@@ -15,6 +14,8 @@ import { formatDate } from '../../core/lifecycle';
 import { Feedback } from '../../core/feedback';
 import { GanttJiraEvent, GanttSubEvent, todayIso } from '../../shared/gantt';
 import { Modal } from '../../shared/modal';
+import { SearchOption, SearchSelect } from '../../shared/search-select';
+import { map, Observable } from 'rxjs';
 
 interface SubForm {
   planId: string;
@@ -25,7 +26,6 @@ interface SubForm {
   startDate: string;
   dueDate: string;
   estimate: string;
-  assignees: ApiJiraAssignee[];
 }
 
 interface LogForm {
@@ -50,7 +50,7 @@ interface StatusForm {
 
 @Component({
   selector: 'lime-subtask-dialogs',
-  imports: [FormsModule, HlmButton, HlmInput, HlmLabel, Modal],
+  imports: [FormsModule, HlmButton, HlmInput, HlmLabel, Modal, SearchSelect],
   template: `
     @if (sub(); as form) {
       <lime-modal
@@ -66,12 +66,13 @@ interface StatusForm {
           <div class="grid gap-3 sm:grid-cols-2">
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Assignee
-              <select hlmInput [(ngModel)]="form.assigneeId" name="assignee">
-                <option value="">{{ form.currentAssignee && !form.assigneeId ? form.currentAssignee + ' (keep)' : 'Unassigned' }}</option>
-                @for (a of form.assignees; track a.id) {
-                  <option [value]="a.id">{{ a.name }}</option>
-                }
-              </select>
+              <lime-search-select
+                [(value)]="form.assigneeId"
+                [remote]="peopleFor(form.planId)"
+                [emptyLabel]="form.currentAssignee ? form.currentAssignee + ' (keep)' : 'Unassigned'"
+                emptyText="Nobody on this Jira board matches"
+                label="Assignee in Jira"
+              />
             </label>
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Estimate
@@ -214,14 +215,14 @@ export class SubtaskDialogs {
     void this.feedback
       .confirm({
         title: `Create a Jira issue for ${plan.technology} ${plan.cycle}?`,
-        message: 'It goes to the board linked to this project (or the server default), with a sub-task per environment.',
+        message: 'It goes to the board linked to this project (or the server default). Add sub-tasks yourself afterwards.',
         confirmLabel: 'Create in Jira',
       })
       .then((ok) => {
         if (!ok) return;
         this.busy.set(true);
         this.api.createJiraIssue(plan.id).subscribe({
-          next: (result) => this.done(`Created ${result.key} with ${result.total} sub-task(s).`),
+          next: (result) => this.done(`Created ${result.key} in Jira.`),
           error: (err) => this.fail(err, 'Could not create the Jira issue.'),
         });
       });
@@ -262,17 +263,20 @@ export class SubtaskDialogs {
       startDate: task?.startDate ?? '',
       dueDate: task?.dueDate ?? plan.plannedDate ?? '',
       estimate: task?.estimateSeconds ? this.hours(task.estimateSeconds).replace(/\s/g, ' ') : '',
-      assignees: [],
     });
+  }
 
-    this.api.jiraAssignees(plan.id).subscribe({
-      next: (assignees) => {
-        const form = this.sub();
-        if (!form || form.planId !== plan.id) return;
-        const match = assignees.find((a) => a.name === form.currentAssignee);
-        this.sub.set({ ...form, assignees, assigneeId: match?.id ?? form.assigneeId });
-      },
-    });
+  private readonly people = new Map<string, (query: string) => Observable<SearchOption[]>>();
+
+  /** One search function per plan, so the picker keeps the same one between checks. */
+  protected peopleFor(planId: string): (query: string) => Observable<SearchOption[]> {
+    let search = this.people.get(planId);
+    if (!search) {
+      search = (query: string) =>
+        this.api.jiraAssignees(planId, query).pipe(map((people) => people.map((p) => ({ value: p.id, label: p.name }))));
+      this.people.set(planId, search);
+    }
+    return search;
   }
 
   private openLog(plan: ApiUpgradeAction, task: ApiJiraSubtask): void {

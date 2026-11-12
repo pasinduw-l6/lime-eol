@@ -159,7 +159,7 @@ import { HlmCardImports } from '@spartan-ng/helm/card';
         class="mt-3.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-rule pt-3"
       >
         <p class="m-0 text-[12px] text-ink-soft">
-          {{ action().assignee?.name || 'unassigned' }}
+          {{ action().jiraAssignee || 'unassigned' }}
           @if (action().plannedDate) {
             · planned for {{ date(action().plannedDate) }}
           }

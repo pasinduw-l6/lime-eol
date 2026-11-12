@@ -44,7 +44,7 @@ export class IssueTrackerController {
   @Post('upgrade-actions/:id/jira/create')
   @Scope('action')
   @ApiOperation({
-    summary: 'Raise the issue for this plan, with a step per environment',
+    summary: 'Raise the main issue for this plan',
     description:
       'Creates a new issue on the configured board and links it. Refused if the plan already has one — two tickets for one upgrade both drift, and neither is obviously the real one. Use this to retry after a failure, or for plans made before automatic creation was switched on.',
   })
@@ -79,8 +79,18 @@ export class IssueTrackerController {
     description:
       "Jira's own account list for this issue. Our engineer records are separate and cannot be used as assignees.",
   })
-  assignees(@Param('id') id: string) {
-    return this.tracker.assignees(id);
+  assignees(@Param('id') id: string, @Query('q') q?: string) {
+    return this.tracker.assignees(id, q?.slice(0, 80) ?? '');
+  }
+
+  @Get('projects/:id/jira/assignees')
+  @Scope('project')
+  @ApiOperation({
+    summary: "Who can be assigned on this project's Jira board",
+    description: 'Searched live in Jira for a plan that has no ticket yet. Nobody is copied into the app.',
+  })
+  projectAssignees(@Param('id') id: string, @Query('q') q?: string) {
+    return this.tracker.projectAssignees(id, q?.slice(0, 80) ?? '');
   }
 
   @Post('upgrade-actions/:id/jira/subtasks')

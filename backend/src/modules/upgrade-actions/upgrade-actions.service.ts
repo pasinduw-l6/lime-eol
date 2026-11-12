@@ -70,6 +70,8 @@ export class UpgradeActionsService {
         technologyCycleId: input.technologyCycleId,
         targetVersion: input.targetVersion ?? null,
         assigneeId: input.assigneeId ?? null,
+        jiraAssigneeId: input.jiraAssigneeId || null,
+        jiraAssignee: input.jiraAssigneeId ? input.jiraAssigneeName || null : null,
         teamId: input.teamId ?? null,
         startDate: toDate(input.startDate),
         plannedDate: toDate(input.plannedDate),
@@ -111,8 +113,10 @@ export class UpgradeActionsService {
   }
 
   async update(id: string, input: UpdateUpgradeActionDto, permissions?: string[]) {
-    await this.findOne(id);
+    const before = await this.findOne(id);
     assertFieldsAllowed(input, permissions);
+    const reassigned =
+      input.jiraAssigneeId !== undefined && (input.jiraAssigneeId || null) !== before.jiraAssigneeId;
 
     if (input.deploymentIds) {
       await this.prisma.$transaction([
@@ -139,6 +143,12 @@ export class UpgradeActionsService {
       data: {
         targetVersion: input.targetVersion,
         assigneeId: input.assigneeId,
+        ...(reassigned
+          ? {
+              jiraAssigneeId: input.jiraAssigneeId || null,
+              jiraAssignee: input.jiraAssigneeId ? input.jiraAssigneeName || null : null,
+            }
+          : {}),
         teamId: input.teamId,
         startDate: input.startDate ? toDate(input.startDate) : undefined,
         plannedDate: input.plannedDate ? toDate(input.plannedDate) : undefined,
@@ -160,6 +170,11 @@ export class UpgradeActionsService {
       },
       include: ACTION_INCLUDE,
     });
+
+    if (reassigned && action.jiraKey) {
+      await this.tracker.assignIssue(id, input.jiraAssigneeId || null);
+      return this.findOne(id);
+    }
 
     return this.toDto(action);
   }
@@ -271,6 +286,8 @@ export class UpgradeActionsService {
           }
         : null,
       team: action.team ? { id: action.team.id, name: action.team.name } : null,
+      jiraAssignee: action.jiraAssignee,
+      jiraAssigneeId: action.jiraAssigneeId,
       jiraKey: action.jiraKey,
       jiraUrl: action.jiraUrl,
       jiraSyncError: action.jiraSyncError,

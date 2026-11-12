@@ -6,6 +6,7 @@ import { Feedback } from '../../core/feedback';
 import { SessionStore } from '../../core/session';
 import { RegistryStore } from '../../core/registry.store';
 import { Modal } from '../../shared/modal';
+import { SearchOption, SearchSelect } from '../../shared/search-select';
 import { Deployment, EnvironmentName, Project, ProjectStatus } from '../../core/models';
 import { Environments } from '../environments/environments';
 import { HlmCardImports } from '@spartan-ng/helm/card';
@@ -18,7 +19,7 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
 @Component({
   selector: 'lime-projects',
-  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, Environments, RouterLink],
+  imports: [HlmCardImports, HlmButton, HlmInput, HlmLabel, HlmTableImports, FormsModule, Modal, SearchSelect, Environments, RouterLink],
   host: { class: 'block' },
   template: `
     <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -213,16 +214,12 @@ const ALL_ENVIRONMENTS: EnvironmentName[] = ['DEV', 'UAT', 'PROD'];
 
               @for (row of form.stack; track $index) {
                 <div class="mb-2 grid grid-cols-[1fr_130px_32px] gap-2">
-                  <select
-                    hlmInput
-                    [(ngModel)]="row.technology"
-                    [name]="'tech' + $index"
-                  >
-                    <option value="">Technology…</option>
-                    @for (t of technologies(); track t.id) {
-                      <option [value]="t.name">{{ t.name }}</option>
-                    }
-                  </select>
+                  <lime-search-select
+                    [(value)]="row.technology"
+                    [options]="technologyOptions()"
+                    placeholder="Technology…"
+                    label="Technology"
+                  />
                   <input
                     hlmInput class="tabular"
                     [(ngModel)]="row.version"
@@ -626,6 +623,10 @@ export class Projects {
   };
 
   protected readonly technologies = this.store.technologies;
+
+  protected readonly technologyOptions = computed<SearchOption[]>(() =>
+    this.technologies().map((t) => ({ value: t.name, label: t.name })),
+  );
 
   protected versionsFor(technology: string): string[] {
     return this.store

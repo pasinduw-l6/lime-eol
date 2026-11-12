@@ -439,7 +439,7 @@ export class Calendar {
           date: plan.plannedDate,
           technology: plan.technology,
           title: `${plan.technology} ${plan.cycle}${plan.targetVersion ? ' → ' + plan.targetVersion : ''}`,
-          meta: [plan.jiraKey, plan.assignee?.name, plan.status.toLowerCase().replace('_', ' ')].filter(Boolean).join(' · '),
+          meta: [plan.jiraKey, plan.jiraAssignee, plan.status.toLowerCase().replace('_', ' ')].filter(Boolean).join(' · '),
           seconds: 0,
           person: null,
           link: '/plan',

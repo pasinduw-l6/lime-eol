@@ -2,16 +2,17 @@ import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   Api,
-  ApiJiraAssignee,
   ApiJiraLink,
   JiraStatusCategory,
 } from '../core/api';
 import { HlmButton } from '@spartan-ng/helm/button';
 import { HlmInput } from '@spartan-ng/helm/input';
+import { map, Observable } from 'rxjs';
+import { SearchOption, SearchSelect } from './search-select';
 
 @Component({
   selector: 'lime-jira-panel',
-  imports: [HlmButton, HlmInput, FormsModule],
+  imports: [HlmButton, HlmInput, FormsModule, SearchSelect],
   host: { class: 'block' },
   template: `
     <div class="mt-4 border-t border-rule pt-4">
@@ -142,18 +143,14 @@ import { HlmInput } from '@spartan-ng/helm/input';
                 placeholder="Add a step in Jira"
                 [disabled]="adding()"
               />
-              <select
-                hlmInput
-                [(ngModel)]="newAssignee"
-                name="stepassignee"
+              <lime-search-select
+                [(value)]="newAssignee"
+                [remote]="people"
+                emptyLabel="Unassigned"
+                emptyText="Nobody on this Jira board matches"
                 [disabled]="adding()"
-                aria-label="Assign to"
-              >
-                <option value="">Unassigned</option>
-                @for (person of assignees(); track person.id) {
-                  <option [value]="person.id">{{ person.name }}</option>
-                }
-              </select>
+                label="Assign to"
+              />
               <input
                 hlmInput
                 type="date"
@@ -226,7 +223,6 @@ export class JiraPanel {
   protected readonly busy = signal(false);
   protected readonly issueKey = signal('');
 
-  protected readonly assignees = signal<ApiJiraAssignee[]>([]);
   protected readonly adding = signal(false);
   protected readonly newSummary = signal('');
   protected readonly newAssignee = signal('');
@@ -262,20 +258,15 @@ export class JiraPanel {
 
   private load(): void {
     this.api.jiraLink(this.actionId()).subscribe({
-      next: (link) => {
-        this.link.set(link);
-        if (link.linked) {
-          this.loadAssignees();
-        }
-      },
+      next: (link) => this.link.set(link),
     });
   }
 
-  private loadAssignees(): void {
-    this.api.jiraAssignees(this.actionId()).subscribe({
-      next: (people) => this.assignees.set(people),
-    });
-  }
+  /** Jira people searched live as you type; nobody is stored in the app. */
+  protected readonly people = (query: string): Observable<SearchOption[]> =>
+    this.api
+      .jiraAssignees(this.actionId(), query)
+      .pipe(map((people) => people.map((p) => ({ value: p.id, label: p.name }))));
 
   protected addStep(event: Event): void {
     event.preventDefault();

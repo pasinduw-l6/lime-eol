@@ -4,6 +4,7 @@ import { Api, ApiEnvironment, ApiVersionOption } from '../../core/api';
 import { SessionStore } from '../../core/session';
 import { Celebrations } from '../../core/celebration.service';
 import { Modal } from '../../shared/modal';
+import { SearchOption, SearchSelect } from '../../shared/search-select';
 import { TechIcon } from '../../shared/tech-icon';
 import { MIN_WORKING_MS, Working } from '../../shared/working';
 import { HlmButton } from '@spartan-ng/helm/button';
@@ -12,7 +13,7 @@ import { HlmLabel } from '@spartan-ng/helm/label';
 
 @Component({
   selector: 'lime-add-component',
-  imports: [HlmButton, HlmInput, HlmLabel, FormsModule, Modal, TechIcon, Working],
+  imports: [HlmButton, HlmInput, HlmLabel, FormsModule, Modal, SearchSelect, TechIcon, Working],
   host: { class: 'block' },
   template: `
     <lime-modal
@@ -25,14 +26,12 @@ import { HlmLabel } from '@spartan-ng/helm/label';
       <form class="grid gap-4" (submit)="save($event)">
         <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
           Technology
-          <select hlmInput [(ngModel)]="technology" name="technology">
-            <option value="">Choose a technology…</option>
-            @for (t of available(); track t.id) {
-              <option [value]="t.name">
-                {{ t.name }} — {{ t.componentType.toLowerCase() }}
-              </option>
-            }
-          </select>
+          <lime-search-select
+            [(value)]="technology"
+            [options]="technologyChoices()"
+            placeholder="Choose a technology…"
+            label="Technology"
+          />
           @if (available().length === 0) {
             <span class="mt-1 block text-[11.5px] text-ink-soft">
               Every technology in the registry is already recorded here. Add a new
@@ -58,16 +57,12 @@ import { HlmLabel } from '@spartan-ng/helm/label';
 
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
             Version
-            <select hlmInput [(ngModel)]="version" name="version">
-              <option value="">Choose a version…</option>
-              @for (group of options(); track group.cycle) {
-                <optgroup [label]="cycleLabel(group)">
-                  @for (v of group.versions; track v) {
-                    <option [value]="v">{{ v }}</option>
-                  }
-                </optgroup>
-              }
-            </select>
+            <lime-search-select
+              [(value)]="version"
+              [options]="versionChoices()"
+              placeholder="Choose a version…"
+              label="Version"
+            />
           </label>
 
           <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
@@ -184,6 +179,16 @@ export class AddComponent {
       .filter((t) => !installed.has(t.name))
       .sort((a, b) => a.name.localeCompare(b.name));
   });
+
+  protected readonly technologyChoices = computed<SearchOption[]>(() =>
+    this.available().map((t) => ({ value: t.name, label: t.name, hint: t.componentType.toLowerCase() })),
+  );
+
+  protected readonly versionChoices = computed<SearchOption[]>(() =>
+    this.options().flatMap((group) =>
+      group.versions.map((v) => ({ value: v, label: v, group: this.cycleLabel(group) })),
+    ),
+  );
 
   protected readonly optionCount = computed(() =>
     this.options().reduce((total, group) => total + group.versions.length, 0),

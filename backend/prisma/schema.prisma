@@ -501,6 +501,7 @@ model UpgradeAction {
   jiraStatus        String?      @map("jira_status")
   jiraStatusCategory String?     @map("jira_status_category")
   jiraAssignee      String?      @map("jira_assignee")
+  jiraAssigneeId    String?      @map("jira_assignee_id")
   jiraSubtaskDone   Int?         @map("jira_subtask_done")
   jiraSubtaskTotal  Int?         @map("jira_subtask_total")
   jiraSyncedAt      DateTime?    @map("jira_synced_at") @db.Timestamptz(3)

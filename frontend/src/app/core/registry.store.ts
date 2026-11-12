@@ -146,7 +146,7 @@ export class RegistryStore {
         : a.derivedStatus) as UpgradeAction['status'],
       plannedDate: a.plannedDate,
       completedDate: a.completedDate,
-      assignee: a.assignee?.name ?? null,
+      assignee: a.jiraAssignee ?? null,
       team: a.team?.name ?? null,
       jiraKey: a.jiraKey,
       deploymentIds: a.environments.map((e) => e.deploymentId),
