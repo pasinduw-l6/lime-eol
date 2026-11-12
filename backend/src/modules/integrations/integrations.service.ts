@@ -84,8 +84,9 @@ export class IntegrationsService {
       },
     ];
 
+    // A .env connection only appears while the server .env actually sets one.
     return [
-      ...defaults,
+      ...defaults.filter((row) => row.enabled),
       ...rows.map((row) => this.toResponse(row, row._count, chosen(row.kind)?.id === row.id ? unset[row.kind] : 0)),
     ];
   }
