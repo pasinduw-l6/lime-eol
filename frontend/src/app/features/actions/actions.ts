@@ -219,7 +219,7 @@ interface Draft {
             </label>
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Cycle running out
-              <select hlmInput [(ngModel)]="form.technologyCycleId" name="cycle">
+              <select hlmInput [(ngModel)]="form.technologyCycleId" name="cycle" (change)="onCycle()">
                 <option value="">Choose…</option>
                 @for (c of cyclesFor(form.technology); track c.id) {
                   <option [value]="c.id">{{ c.cycle }} — ends {{ date(c.eolDate) }}</option>
@@ -231,12 +231,20 @@ interface Draft {
           <div class="grid gap-3 sm:grid-cols-2">
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Target version
-              <select hlmInput class="tabular" [(ngModel)]="form.targetVersion" name="target">
-                <option value="">Choose…</option>
+              <input
+                hlmInput
+                class="tabular"
+                [(ngModel)]="form.targetVersion"
+                name="target"
+                list="target-versions"
+                autocomplete="off"
+                placeholder="Choose or type a version"
+              />
+              <datalist id="target-versions">
                 @for (t of targetsFor(form.technology, form.technologyCycleId); track t.value) {
                   <option [value]="t.value">{{ t.label }}</option>
                 }
-              </select>
+              </datalist>
             </label>
             <label hlmLabel class="flex-col items-stretch gap-1.5 *:font-normal">
               Status
@@ -615,23 +623,55 @@ export class Actions {
     excludeCycleId: string,
   ): { value: string; label: string }[] {
     const today = new Date().toISOString().slice(0, 10);
+    const users = new Map<string, string[]>();
+    for (const d of this.store.allDeployments()) {
+      for (const c of d.components) {
+        if (c.technology !== technology) continue;
+        users.set(c.version, [...(users.get(c.version) ?? []), `${d.customer} ${d.environment}`]);
+      }
+    }
 
     return this.cyclesFor(technology)
       .filter((cycle) => cycle.id !== excludeCycleId)
       .sort((a, b) => (b.eolDate ?? '').localeCompare(a.eolDate ?? ''))
-      .map((cycle) => {
-        const version = cycle.latestPatch ?? cycle.cycle;
+      .flatMap((cycle) => {
+        const latest = cycle.latestPatch ?? cycle.cycle;
         const state = !cycle.eolDate
           ? 'no date recorded'
           : cycle.eolDate < today
             ? `past end of life ${this.date(cycle.eolDate)}`
             : `supported until ${this.date(cycle.eolDate)}`;
 
-        return {
-          value: version,
-          label: `${version} · ${state}`,
-        };
+        const recorded = cycle.versions
+          .filter((v) => v !== latest && v !== cycle.cycle)
+          .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+          .map((v) => ({
+            value: v,
+            label: `${v} · ${users.has(v) ? `used by ${users.get(v)!.join(', ')}` : 'recorded'}`,
+          }));
+
+        return [{ value: latest, label: `${latest} · ${state}` }, ...recorded];
       });
+  }
+
+  /** The cycle this project runs for a technology, and the environments running it. */
+  private runningCycle(technology: string): { cycleId: string; deploymentIds: string[] } | null {
+    if (!this.activeProject()) return null;
+    const cycles = this.cyclesFor(technology);
+    const found = this.deployments().flatMap((d) =>
+      d.components
+        .filter((c) => c.technology === technology)
+        .map((c) => ({ deploymentId: d.id, cycle: cycles.find((y) => y.versions.includes(c.version)) }))
+        .filter((x) => x.cycle),
+    );
+    if (found.length === 0) return null;
+    const oldest = found
+      .map((x) => x.cycle!)
+      .sort((a, b) => (a.eolDate ?? '9999').localeCompare(b.eolDate ?? '9999'))[0];
+    return {
+      cycleId: oldest.id,
+      deploymentIds: found.filter((x) => x.cycle!.id === oldest.id).map((x) => x.deploymentId),
+    };
   }
 
   protected create(): void {
@@ -663,9 +703,30 @@ export class Actions {
 
   protected onTechnology(): void {
     const form = this.draft();
-    if (form) {
-      form.technologyCycleId = '';
-    }
+    if (!form) return;
+    form.targetVersion = '';
+    const running = this.runningCycle(form.technology);
+    form.technologyCycleId = running?.cycleId ?? '';
+    if (running && !form.id) form.deploymentIds = running.deploymentIds;
+  }
+
+  protected onCycle(): void {
+    const form = this.draft();
+    if (!form) return;
+    form.targetVersion = '';
+    if (form.id || !this.activeProject()) return;
+    const ids = this.deployments()
+      .filter((d) =>
+        d.components.some(
+          (c) =>
+            c.technology === form.technology &&
+            this.cyclesFor(form.technology)
+              .find((y) => y.id === form.technologyCycleId)
+              ?.versions.includes(c.version),
+        ),
+      )
+      .map((d) => d.id);
+    if (ids.length) form.deploymentIds = ids;
   }
 
   protected toggleDeployment(id: string): void {
