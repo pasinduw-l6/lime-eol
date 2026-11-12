@@ -13,7 +13,7 @@ import {
 } from '../../core/api';
 import { formatDate } from '../../core/lifecycle';
 import { Feedback } from '../../core/feedback';
-import { GanttJiraEvent, GanttSubEvent, GanttSubReschedule, todayIso } from '../../shared/gantt';
+import { GanttJiraEvent, GanttSubEvent, todayIso } from '../../shared/gantt';
 import { Modal } from '../../shared/modal';
 
 interface SubForm {
@@ -246,18 +246,6 @@ export class SubtaskDialogs {
         this.openStatus(plan, task);
         break;
     }
-  }
-
-  reschedule(change: GanttSubReschedule): void {
-    this.api
-      .updateJiraSubtask(change.planId, change.key, { startDate: change.start, dueDate: change.end })
-      .subscribe({
-        next: () => {
-          this.api.actionsResource.reload();
-          this.feedback.success(`${change.key} moved to ${formatDate(change.start)} – ${formatDate(change.end)} in Jira.`);
-        },
-        error: (err) => this.feedback.failed(err, `Could not move ${change.key}.`),
-      });
   }
 
   protected planKey(planId: string): string | null {

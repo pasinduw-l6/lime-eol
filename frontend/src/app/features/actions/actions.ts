@@ -22,7 +22,6 @@ import {
   GanttGroup,
   GanttItem,
   GanttMenu,
-  GanttReschedule,
   GanttSub,
   GanttZoom,
   shiftDays,
@@ -152,10 +151,9 @@ interface Draft {
         [anchor]="anchor()"
         [editable]="canEditPlans()"
         (zoomChange)="zoom.set($event)"
-        (reschedule)="reschedule($event)"
+        (scrollDays)="scrollBy($event)"
         (menu)="onMenu($event)"
         (subMenu)="dialogs.onSub($event)"
-        (subReschedule)="dialogs.reschedule($event)"
         (jira)="dialogs.onJira($event)"
       />
       <lime-subtask-dialogs #dialogs />
@@ -163,9 +161,7 @@ interface Draft {
         <span class="flex items-center gap-1.5"><span class="size-2 rotate-45" style="background: var(--color-overdue)"></span>End of life</span>
         <span class="flex items-center gap-1.5"><span class="size-2 rotate-45" style="background: var(--color-soon)"></span>Risk acceptance expires</span>
         <span class="flex items-center gap-1.5"><span class="h-2.5 w-4 rounded-sm" style="box-shadow: 0 0 0 1.5px var(--color-overdue)"></span>Finishes after end of life</span>
-        @if (canEditPlans()) {
-          <span>Drag a bar to move it, drag its ends to change dates.</span>
-        }
+        <span>Drag the chart or use Shift + wheel to move through time · change dates from ⋯ → Edit</span>
       </p>
     } @else if (filtered().length === 0) {
       <p hlmCard class="block px-6 py-10 text-center text-[14px] text-ink-soft">
@@ -499,24 +495,8 @@ export class Actions {
     setTimeout(() => this.gantt()?.scrollToToday());
   }
 
-  protected reschedule(change: GanttReschedule): void {
-    const action = this.api.actions().find((a) => a.id === change.id);
-    if (!action) return;
-    const before = { startDate: toItem(action).start, plannedDate: toItem(action).end };
-
-    this.api.updateAction(change.id, { startDate: change.start, plannedDate: change.end }).subscribe({
-      next: () => {
-        this.api.actionsResource.reload();
-        this.feedback.success(`${action.technology} ${action.cycle} moved to ${formatDate(change.start)} – ${formatDate(change.end)}.`, {
-          label: 'Undo',
-          run: () =>
-            this.api.updateAction(change.id, before).subscribe({
-              next: () => this.api.actionsResource.reload(),
-            }),
-        });
-      },
-      error: (err) => this.feedback.failed(err, 'Could not move that plan.'),
-    });
+  protected scrollBy(days: number): void {
+    this.anchor.set(shiftDays(this.anchor(), days));
   }
 
   protected onMenu(event: GanttMenu): void {

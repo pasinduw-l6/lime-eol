@@ -55,13 +55,6 @@ export interface GanttSubEvent {
   action: 'edit' | 'status' | 'log' | 'open';
 }
 
-export interface GanttSubReschedule {
-  planId: string;
-  key: string;
-  start: string;
-  end: string;
-}
-
 export interface GanttJiraEvent {
   planId: string;
   action: 'create' | 'link' | 'add';
@@ -74,18 +67,10 @@ export interface GanttGroup {
   items: GanttItem[];
 }
 
-export interface GanttReschedule {
-  id: string;
-  start: string;
-  end: string;
-}
-
 export interface GanttMenu {
   id: string;
   action: 'open' | 'edit' | 'complete' | 'delete';
 }
-
-type DragMode = 'move' | 'start' | 'end';
 
 interface DragTarget {
   id: string;
@@ -129,7 +114,10 @@ const ROW = 40;
       <div
         #scroller
         class="scroll-hidden relative h-[calc(100vh-262px)] min-h-[360px] overflow-auto"
-        [class.select-none]="drag() !== null"
+        [class.select-none]="panning()"
+        [class.cursor-grabbing]="panning()"
+        (pointerdown)="pan($event)"
+        (wheel)="onWheel($event)"
       >
         <div class="relative flex min-h-full flex-col" [style.width.px]="left() + width()">
           <div class="sticky top-0 z-30 flex border-b bg-card" [style.height.px]="64">
@@ -354,20 +342,14 @@ const ROW = 40;
                           [style.left.px]="bar.left"
                         >
                           <div
-                            class="relative h-full overflow-hidden rounded-md"
-                            [class.cursor-grab]="editable()"
-                            [class.cursor-grabbing]="drag()?.id === item.id"
+                            class="relative h-full cursor-pointer overflow-hidden rounded-md"
                             [style.width.px]="bar.width"
                             [style.background]="tint(item.colour, 38)"
                             [style.box-shadow]="bar.late ? '0 0 0 1.5px var(--color-overdue)' : null"
                             [title]="item.name + ': ' + long(bar.start) + ' to ' + long(bar.end) + (bar.late ? ' (finishes after end of life)' : '')"
-                            (pointerdown)="startDrag($event, planTarget(item), 'move')"
+                            (pointerdown)="pan($event, planTarget(item))"
                           >
                             <div class="h-full" [style.width.%]="item.progress * 100" [style.background]="item.colour"></div>
-                            @if (editable()) {
-                              <span class="absolute inset-y-0 left-0 w-2 cursor-ew-resize" (pointerdown)="startDrag($event, planTarget(item), 'start')"></span>
-                              <span class="absolute inset-y-0 right-0 w-2 cursor-ew-resize" (pointerdown)="startDrag($event, planTarget(item), 'end')"></span>
-                            }
                           </div>
                           <span class="ml-2 whitespace-nowrap text-[12.5px] font-medium">{{ item.name }}</span>
                         </div>
@@ -450,18 +432,13 @@ const ROW = 40;
                           @if (subBar && target) {
                             <div class="absolute top-1/2 flex h-4 -translate-y-1/2 items-center" [style.left.px]="subBar.left">
                               <div
-                                class="relative h-full overflow-hidden rounded"
-                                [class.cursor-grab]="editable()"
+                                class="relative h-full cursor-pointer overflow-hidden rounded"
                                 [style.width.px]="subBar.width"
                                 [style.background]="tint(sub.colour, 30)"
                                 [title]="sub.key + ' ' + sub.summary + ': ' + long(subBar.start) + ' to ' + long(subBar.end)"
-                                (pointerdown)="startDrag($event, target, 'move')"
+                                (pointerdown)="pan($event, target)"
                               >
                                 <div class="h-full" [style.width.%]="sub.progress * 100" [style.background]="sub.colour"></div>
-                                @if (editable()) {
-                                  <span class="absolute inset-y-0 left-0 w-1.5 cursor-ew-resize" (pointerdown)="startDrag($event, target, 'start')"></span>
-                                  <span class="absolute inset-y-0 right-0 w-1.5 cursor-ew-resize" (pointerdown)="startDrag($event, target, 'end')"></span>
-                                }
                               </div>
                               <span class="ml-1.5 whitespace-nowrap text-[11.5px] text-muted-foreground">
                                 {{ sub.key }}
@@ -529,11 +506,11 @@ export class Gantt {
   readonly anchor = input.required<string>();
   readonly editable = input(false);
 
-  readonly reschedule = output<GanttReschedule>();
+  /** Days to move the visible window by when the chart is dragged or scrolled sideways. */
+  readonly scrollDays = output<number>();
   readonly menu = output<GanttMenu>();
   readonly zoomChange = output<GanttZoom>();
   readonly subMenu = output<GanttSubEvent>();
-  readonly subReschedule = output<GanttSubReschedule>();
   readonly jira = output<GanttJiraEvent>();
 
   protected readonly row = ROW;
@@ -542,7 +519,8 @@ export class Gantt {
   protected readonly nameWidth = signal(300);
   protected readonly collapsed = signal(new Set<string>());
   protected readonly menuFor = signal<string | null>(null);
-  protected readonly drag = signal<{ id: string; mode: DragMode; delta: number } | null>(null);
+  protected readonly panning = signal(false);
+  private wheel = 0;
 
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
@@ -659,16 +637,8 @@ export class Gantt {
   }
 
   protected barFor(item: { id: string; start: string; end: string; eol: string | null; progress: number }) {
-    const drag = this.drag();
-    let start = parse(item.start);
-    let end = parse(item.end);
-
-    if (drag && drag.id === item.id) {
-      const shift = drag.delta * DAY;
-      if (drag.mode !== 'end') start = Math.min(start + shift, drag.mode === 'start' ? end : Infinity);
-      if (drag.mode !== 'start') end = Math.max(end + shift, drag.mode === 'end' ? start : -Infinity);
-    }
-
+    const start = parse(item.start);
+    const end = parse(item.end);
     const origin = this.origin();
     const d = this.day();
     const from = ((start - origin) / DAY) * d;
@@ -772,51 +742,61 @@ export class Gantt {
     return m === 0 ? `${h}h` : h === 0 ? `${m}m` : `${h}h ${m}m`;
   }
 
-  protected startDrag(event: PointerEvent, target: DragTarget, mode: DragMode): void {
+  /**
+   * Dragging the chart moves through time a week at a step, like moving a map. Bars never change
+   * dates here — those are typed in the edit form — so pressing a bar without dragging opens it.
+   */
+  protected pan(event: PointerEvent, target?: DragTarget | null): void {
     if (event.button !== 0) return;
-    const click = () =>
-      target.key
-        ? this.subMenu.emit({ planId: target.planId, key: target.key, action: 'edit' })
-        : this.menu.emit({ id: target.planId, action: 'open' });
-
-    if (!this.editable()) {
-      if (mode === 'move') click();
-      return;
+    const el = this.scroller()?.nativeElement;
+    if (!el) return;
+    if (!target) {
+      if ((event.target as HTMLElement).closest('button, a, input, select, textarea')) return;
+      if (event.clientX < el.getBoundingClientRect().left + this.left()) return;
     }
     event.stopPropagation();
     event.preventDefault();
 
-    const origin = event.clientX;
-    const d = this.day();
+    const step = this.day() * 7;
+    const startX = event.clientX;
+    let last = startX;
     let moved = false;
-    this.drag.set({ id: target.id, mode, delta: 0 });
 
     const move = (e: PointerEvent) => {
-      const delta = Math.round((e.clientX - origin) / d);
-      if (delta !== 0) moved = true;
-      this.drag.set({ id: target.id, mode, delta });
+      if (!moved && Math.abs(e.clientX - startX) > 4) {
+        moved = true;
+        this.panning.set(true);
+      }
+      const weeks = Math.trunc((last - e.clientX) / step);
+      if (weeks !== 0) {
+        last -= weeks * step;
+        this.scrollDays.emit(weeks * 7);
+      }
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
-      const final = this.drag();
-      const bar = this.barFor(target);
-      this.drag.set(null);
-
-      if (!moved || !final || final.delta === 0) {
-        if (mode === 'move') click();
-        return;
-      }
-      if (!bar) return;
-      if (target.key) {
-        this.subReschedule.emit({ planId: target.planId, key: target.key, start: bar.start, end: bar.end });
-      } else {
-        this.reschedule.emit({ id: target.planId, start: bar.start, end: bar.end });
-      }
+      this.panning.set(false);
+      if (moved || !target) return;
+      if (target.key) this.subMenu.emit({ planId: target.planId, key: target.key, action: 'edit' });
+      else this.menu.emit({ id: target.planId, action: 'open' });
     };
 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+  }
+
+  /** Shift + wheel, or a sideways trackpad swipe, moves a week per notch. */
+  protected onWheel(event: WheelEvent): void {
+    const delta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.shiftKey ? event.deltaY : 0;
+    if (!delta) return;
+    event.preventDefault();
+    this.wheel += delta;
+    if (Math.abs(this.wheel) >= 100) {
+      this.scrollDays.emit(Math.sign(this.wheel) * 7);
+      this.wheel = 0;
+    }
   }
 
   protected startResize(event: PointerEvent): void {
