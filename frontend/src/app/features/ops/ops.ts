@@ -27,6 +27,7 @@ interface SendResult {
 interface SyncResult {
   technologies: number;
   cyclesUpdated: number;
+  added: { technology: string; cycles: string[] }[];
   changes: { technology: string; cycle: string; field: string; from: string | null; to: string | null }[];
   unmatched: { technology: string; cycles: string[] }[];
   failures: { technology: string; reason: string }[];
@@ -84,6 +85,11 @@ const ICONS: Record<Severity, string> = {
           {{ s.cyclesUpdated }} cycles refreshed across {{ s.technologies }}
           technologies · {{ s.changes.length }} changed
         </p>
+        @for (a of s.added; track a.technology) {
+          <p class="mt-1 mb-0 text-ink-soft">
+            {{ a.technology }} · new cycle{{ a.cycles.length === 1 ? '' : 's' }} added: {{ a.cycles.join(', ') }}
+          </p>
+        }
         @for (change of s.changes; track $index) {
           <p class="mt-1 mb-0 text-ink-soft">
             {{ change.technology }} {{ change.cycle }} · {{ change.field }}:

@@ -6,6 +6,7 @@ import { EolLookupService } from './eol-lookup.service';
 export interface SyncResult {
   technologies: number;
   cyclesUpdated: number;
+  added: { technology: string; cycles: string[] }[];
   changes: { technology: string; cycle: string; field: string; from: string | null; to: string | null }[];
   unmatched: { technology: string; cycles: string[] }[];
   failures: { technology: string; reason: string }[];
@@ -29,6 +30,7 @@ export class EolSyncService {
     const result: SyncResult = {
       technologies: technologies.length,
       cyclesUpdated: 0,
+      added: [],
       changes: [],
       unmatched: [],
       failures: [],
@@ -123,6 +125,37 @@ export class EolSyncService {
         result.cyclesUpdated += 1;
       }
 
+      const known = new Set(
+        (
+          await this.prisma.technologyCycle.findMany({
+            where: { technologyId: technology.id },
+            select: { cycle: true },
+          })
+        ).map((c) => c.cycle),
+      );
+      const fresh = releases.filter((r) => r.isMaintained && !known.has(r.cycle));
+
+      if (fresh.length > 0) {
+        await this.prisma.technologyCycle.createMany({
+          data: fresh.map((release) => ({
+            technologyId: technology.id,
+            cycle: release.cycle,
+            label: release.label,
+            releaseDate: toDate(release.releaseDate),
+            eolDate: toDate(release.eolDate),
+            activeSupportEnd: toDate(release.activeSupportEnd),
+            isLts: release.isLts,
+            isMaintained: release.isMaintained,
+            latestPatch: release.latestSupported,
+            eolSource: 'API' as const,
+            lastSyncedAt: new Date(),
+            notes: 'Added by the sync when endoflife.date published it.',
+          })),
+          skipDuplicates: true,
+        });
+        result.added.push({ technology: technology.name, cycles: fresh.map((r) => r.cycle) });
+      }
+
       const unmatched = existing
         .filter((cycle) => !releases.some((r) => r.cycle === cycle.cycle))
         .map((cycle) => cycle.cycle);
@@ -134,7 +167,7 @@ export class EolSyncService {
 
     this.logger.log(
       `Synced ${result.cyclesUpdated} cycles across ${result.technologies} technologies, ` +
-        `${result.changes.length} changed`,
+        `${result.changes.length} changed, ${result.added.flatMap((a) => a.cycles).length} added`,
     );
 
     return result;
